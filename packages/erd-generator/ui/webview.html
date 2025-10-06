@@ -281,6 +281,65 @@
             margin-bottom: 20px;
             font-size: 1.3rem;
         }
+
+        .config-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--vscode-panel-border, #3c3c3c);
+        }
+
+        .config-group {
+            margin-bottom: 15px;
+        }
+
+        .config-group label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .config-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .config-group input[type="number"] {
+            width: 100px;
+            padding: 6px 10px;
+            background: var(--vscode-input-background, #3c3c3c);
+            color: var(--vscode-input-foreground, #cccccc);
+            border: 1px solid var(--vscode-input-border, #3c3c3c);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .config-group input[type="number"]:focus {
+            outline: none;
+            border-color: var(--vscode-focusBorder, #007acc);
+        }
+
+        .config-label-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .config-label-group label {
+            font-weight: 500;
+            min-width: 200px;
+        }
+
+        .config-help {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-left: 28px;
+            margin-top: -8px;
+            margin-bottom: 8px;
+        }
     </style>
 </head>
 <body>
@@ -330,7 +389,36 @@
                     <button class="format-btn" data-format="plantuml">PlantUML</button>
                     <button class="format-btn" data-format="graphviz">Graphviz</button>
                 </div>
-                <button class="btn btn-primary" id="generateBtn">Generate ERD</button>
+                
+                <div class="config-section">
+                    <h3 style="margin-bottom: 15px; font-size: 1.1rem;">Configuration</h3>
+                    
+                    <div class="config-group">
+                        <label>
+                            <input type="checkbox" id="includeAttributesCheckbox" checked>
+                            <span>Include Attributes</span>
+                        </label>
+                        <div class="config-help">Show table columns/fields in the diagram</div>
+                    </div>
+                    
+                    <div class="config-group">
+                        <label>
+                            <input type="checkbox" id="includeRelationshipsCheckbox" checked>
+                            <span>Include Relationships</span>
+                        </label>
+                        <div class="config-help">Show relationships between tables</div>
+                    </div>
+                    
+                    <div class="config-group">
+                        <div class="config-label-group">
+                            <label for="maxAttributesInput">Max Attributes per Table:</label>
+                            <input type="number" id="maxAttributesInput" value="10" min="0" max="100">
+                        </div>
+                        <div class="config-help">Maximum number of attributes to display per table (0 = show all)</div>
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary" id="generateBtn" style="margin-top: 20px;">Generate ERD</button>
                 <button class="btn btn-secondary hidden" id="newDiagramBtn">Generate Another</button>
             </div>
         </div>
@@ -356,7 +444,12 @@
             solutions: [],
             selectedSolution: null,
             selectedFormat: 'mermaid',
-            generatedDiagram: null
+            generatedDiagram: null,
+            config: {
+                includeAttributes: true,
+                includeRelationships: true,
+                maxAttributesPerTable: 10
+            }
         };
 
         // DOM elements
@@ -494,6 +587,23 @@
             });
         });
 
+        // Config controls
+        const includeAttributesCheckbox = document.getElementById('includeAttributesCheckbox');
+        const includeRelationshipsCheckbox = document.getElementById('includeRelationshipsCheckbox');
+        const maxAttributesInput = document.getElementById('maxAttributesInput');
+
+        includeAttributesCheckbox.addEventListener('change', (e) => {
+            state.config.includeAttributes = e.target.checked;
+        });
+
+        includeRelationshipsCheckbox.addEventListener('change', (e) => {
+            state.config.includeRelationships = e.target.checked;
+        });
+
+        maxAttributesInput.addEventListener('input', (e) => {
+            state.config.maxAttributesPerTable = parseInt(e.target.value) || 0;
+        });
+
         // Generate ERD
         elements.generateBtn.addEventListener('click', () => {
             if (!state.selectedSolution) {
@@ -509,7 +619,8 @@
                 environmentUrl: state.environmentUrl,
                 accessToken: state.accessToken,
                 solutionName: state.selectedSolution,
-                format: state.selectedFormat
+                format: state.selectedFormat,
+                config: state.config
             });
         });
 

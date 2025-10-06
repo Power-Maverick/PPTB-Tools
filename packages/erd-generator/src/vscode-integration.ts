@@ -90,7 +90,7 @@ export class ERDToolPanel {
                         break;
 
                     case 'generateERD':
-                        await this.handleGenerateERD(message.solutionName, message.format);
+                        await this.handleGenerateERD(message.solutionName, message.format, message.config);
                         break;
 
                     case 'saveFile':
@@ -141,7 +141,7 @@ export class ERDToolPanel {
         }
     }
 
-    private async handleGenerateERD(solutionName: string, format: string) {
+    private async handleGenerateERD(solutionName: string, format: string, config?: any) {
         try {
             const client = new DataverseClient({
                 environmentUrl: this.environmentUrl,
@@ -150,12 +150,15 @@ export class ERDToolPanel {
 
             const solution = await client.fetchSolution(solutionName);
             
-            const generator = new ERDGenerator({
+            // Use config from webview or defaults
+            const erdConfig = {
                 format: format as any,
-                includeAttributes: true,
-                includeRelationships: true,
-                maxAttributesPerTable: 10
-            });
+                includeAttributes: config?.includeAttributes !== undefined ? config.includeAttributes : true,
+                includeRelationships: config?.includeRelationships !== undefined ? config.includeRelationships : true,
+                maxAttributesPerTable: config?.maxAttributesPerTable !== undefined ? config.maxAttributesPerTable : 10
+            };
+            
+            const generator = new ERDGenerator(erdConfig);
 
             const diagram = generator.generate(solution);
 
