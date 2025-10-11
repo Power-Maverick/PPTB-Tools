@@ -51,68 +51,6 @@
             margin-bottom: 20px;
         }
 
-        .step-indicator {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 30px;
-            position: relative;
-        }
-
-        .step {
-            flex: 1;
-            text-align: center;
-            position: relative;
-            padding: 10px;
-        }
-
-        .step::after {
-            content: '';
-            position: absolute;
-            top: 20px;
-            right: 0;
-            width: 100%;
-            height: 2px;
-            background: var(--vscode-panel-border, #3c3c3c);
-            z-index: -1;
-        }
-
-        .step:last-child::after {
-            display: none;
-        }
-
-        .step-number {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--vscode-button-secondaryBackground, #3a3d41);
-            color: var(--vscode-button-secondaryForeground, #cccccc);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-
-        .step.active .step-number {
-            background: var(--vscode-button-background, #0e639c);
-            color: var(--vscode-button-foreground, #ffffff);
-        }
-
-        .step.completed .step-number {
-            background: var(--vscode-testing-iconPassed, #73c991);
-            color: #ffffff;
-        }
-
-        .step-label {
-            font-size: 0.9rem;
-            opacity: 0.7;
-        }
-
-        .step.active .step-label {
-            opacity: 1;
-            font-weight: 600;
-        }
-
         .info-message {
             background: var(--vscode-inputValidation-infoBackground, #063b49);
             border: 1px solid var(--vscode-inputValidation-infoBorder, #007acc);
@@ -126,41 +64,43 @@
             display: none !important;
         }
 
-        .solutions-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
+        .form-group {
+            margin-bottom: 20px;
         }
 
-        .solution-card {
-            padding: 20px;
-            border: 1px solid var(--vscode-panel-border, #3c3c3c);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-            background: var(--vscode-editor-background, #1e1e1e);
-        }
-
-        .solution-card:hover {
-            border-color: var(--vscode-focusBorder, #007acc);
-            background: var(--vscode-list-hoverBackground, #2a2d2e);
-        }
-
-        .solution-card.selected {
-            border-color: var(--vscode-focusBorder, #007acc);
-            background: var(--vscode-list-activeSelectionBackground, #094771);
-        }
-
-        .solution-card h3 {
+        .form-group label {
+            display: block;
             margin-bottom: 8px;
-            font-size: 1.1rem;
+            font-weight: 500;
+            font-size: 14px;
         }
 
-        .solution-card p {
-            font-size: 0.9rem;
-            opacity: 0.8;
-            margin: 4px 0;
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--vscode-input-background, #3c3c3c);
+            color: var(--vscode-input-foreground, #cccccc);
+            border: 1px solid var(--vscode-input-border, #3c3c3c);
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+            cursor: pointer;
+            appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg fill="%23cccccc" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4z"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 12px;
+            padding-right: 35px;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--vscode-focusBorder, #007acc);
+        }
+
+        select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .loading {
@@ -350,21 +290,6 @@
         </div>
 
         <div class="card">
-            <div class="step-indicator">
-                <div class="step completed" id="step1">
-                    <div class="step-number">1</div>
-                    <div class="step-label">Connected</div>
-                </div>
-                <div class="step active" id="step2">
-                    <div class="step-number">2</div>
-                    <div class="step-label">Select Solution</div>
-                </div>
-                <div class="step" id="step3">
-                    <div class="step-number">3</div>
-                    <div class="step-label">Generate ERD</div>
-                </div>
-            </div>
-
             <div id="connectionInfo" class="info-message">
                 <strong>✓ Connected to Dataverse</strong><br>
                 Environment: <span id="envDisplay"></span>
@@ -372,16 +297,16 @@
 
             <div id="errorMessage" class="error hidden"></div>
 
-            <div id="solutionsSection">
-                <h2>Select a Solution</h2>
-                <div id="loadingIndicator" class="loading hidden">
-                    <div class="spinner"></div>
-                    <p>Loading solutions...</p>
+            <div id="solutionSection">
+                <div class="form-group">
+                    <label for="solutionSelect">Select a Solution</label>
+                    <select id="solutionSelect" disabled>
+                        <option value="">Loading solutions...</option>
+                    </select>
                 </div>
-                <div id="solutionsList" class="solutions-list"></div>
             </div>
 
-            <div id="generateSection" class="hidden">
+            <div id="generateSection">
                 <h2>Generate ERD</h2>
                 <div class="format-selector">
                     <label style="font-weight: 600; margin-right: 10px;">Output Format:</label>
@@ -418,7 +343,7 @@
                     </div>
                 </div>
                 
-                <button class="btn btn-primary" id="generateBtn" style="margin-top: 20px;">Generate ERD</button>
+                <button class="btn btn-primary" id="generateBtn" style="margin-top: 20px;" disabled>Generate ERD</button>
                 <button class="btn btn-secondary hidden" id="newDiagramBtn">Generate Another</button>
             </div>
         </div>
@@ -459,15 +384,10 @@
             downloadSourceBtn: document.getElementById('downloadSourceBtn'),
             copyBtn: document.getElementById('copyBtn'),
             errorMessage: document.getElementById('errorMessage'),
-            solutionsSection: document.getElementById('solutionsSection'),
+            solutionSelect: document.getElementById('solutionSelect'),
             generateSection: document.getElementById('generateSection'),
             diagramSection: document.getElementById('diagramSection'),
-            loadingIndicator: document.getElementById('loadingIndicator'),
-            solutionsList: document.getElementById('solutionsList'),
             diagramContainer: document.getElementById('diagramContainer'),
-            step1: document.getElementById('step1'),
-            step2: document.getElementById('step2'),
-            step3: document.getElementById('step3'),
             envDisplay: document.getElementById('envDisplay'),
             connectionInfo: document.getElementById('connectionInfo')
         };
@@ -479,17 +399,6 @@
             setTimeout(() => {
                 elements.errorMessage.classList.add('hidden');
             }, 5000);
-        }
-
-        function updateStep(step) {
-            [elements.step1, elements.step2, elements.step3].forEach((s, i) => {
-                s.classList.remove('active', 'completed');
-                if (i < step - 1) {
-                    s.classList.add('completed');
-                } else if (i === step - 1) {
-                    s.classList.add('active');
-                }
-            });
         }
 
         // Initialize: Request environment URL and token from VS Code extension
@@ -513,13 +422,13 @@
 
                 case 'solutionsLoaded':
                     state.solutions = message.solutions;
-                    displaySolutions(message.solutions);
-                    elements.loadingIndicator.classList.add('hidden');
+                    populateSolutionsDropdown(message.solutions);
                     break;
 
                 case 'solutionsError':
                     showError(`Failed to load solutions: ${message.error}`);
-                    elements.loadingIndicator.classList.add('hidden');
+                    elements.solutionSelect.disabled = false;
+                    elements.solutionSelect.innerHTML = '<option value="">Error loading solutions</option>';
                     break;
 
                 case 'erdGenerated':
@@ -541,7 +450,8 @@
 
         // Load solutions
         function loadSolutions() {
-            elements.loadingIndicator.classList.remove('hidden');
+            elements.solutionSelect.disabled = true;
+            elements.solutionSelect.innerHTML = '<option value="">Loading solutions...</option>';
             vscode.postMessage({
                 command: 'listSolutions',
                 environmentUrl: state.environmentUrl,
@@ -549,34 +459,25 @@
             });
         }
 
-        // Display solutions
-        function displaySolutions(solutions) {
-            elements.solutionsList.innerHTML = '';
+        // Populate solutions dropdown
+        function populateSolutionsDropdown(solutions) {
+            elements.solutionSelect.innerHTML = '<option value="">-- Select a Solution --</option>';
             
             solutions.forEach(solution => {
-                const card = document.createElement('div');
-                card.className = 'solution-card';
-                card.innerHTML = `
-                    <h3>${solution.displayName}</h3>
-                    <p><strong>Unique Name:</strong> ${solution.uniqueName}</p>
-                    <p><strong>Version:</strong> ${solution.version}</p>
-                `;
-                
-                card.addEventListener('click', () => {
-                    document.querySelectorAll('.solution-card').forEach(c => {
-                        c.classList.remove('selected');
-                    });
-                    
-                    card.classList.add('selected');
-                    state.selectedSolution = solution.uniqueName;
-                    
-                    elements.generateSection.classList.remove('hidden');
-                    updateStep(3);
-                });
-                
-                elements.solutionsList.appendChild(card);
+                const option = document.createElement('option');
+                option.value = solution.uniqueName;
+                option.textContent = `${solution.displayName} (${solution.version})`;
+                elements.solutionSelect.appendChild(option);
             });
+            
+            elements.solutionSelect.disabled = false;
         }
+
+        // Solution selection handler
+        elements.solutionSelect.addEventListener('change', (e) => {
+            state.selectedSolution = e.target.value;
+            elements.generateBtn.disabled = !state.selectedSolution;
+        });
 
         // Format selector
         document.querySelectorAll('.format-btn').forEach(btn => {
@@ -670,18 +571,13 @@
 
         // New diagram
         elements.newDiagramBtn.addEventListener('click', () => {
-            document.querySelectorAll('.solution-card').forEach(c => {
-                c.classList.remove('selected');
-            });
-            
+            elements.solutionSelect.value = '';
             state.selectedSolution = null;
             state.generatedDiagram = null;
             
-            elements.generateSection.classList.add('hidden');
             elements.diagramSection.classList.add('hidden');
             elements.newDiagramBtn.classList.add('hidden');
-            
-            updateStep(2);
+            elements.generateBtn.disabled = true;
         });
 
         // Initialize on load

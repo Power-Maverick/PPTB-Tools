@@ -7,10 +7,7 @@ import { ERDGenerator } from './ERDGenerator';
  * ERD Tool WebView Panel for Dataverse DevTools Integration
  * 
  * This class provides a minimal integration point for DVDT.
- * DVDT only needs to:
- * 1. Import this class
- * 2. Call ERDToolPanel.createOrShow(context, environmentUrl, accessToken)
- * 3. That's it!
+ * DVDT only needs to call showERDPanel() with the required parameters.
  */
 export class ERDToolPanel {
     public static currentPanel: ERDToolPanel | undefined;
@@ -22,7 +19,6 @@ export class ERDToolPanel {
 
     /**
      * Create or show the ERD tool panel
-     * This is the only method DVDT needs to call
      * 
      * @param extensionUri - The extension URI from DVDT's context
      * @param environmentUrl - Dataverse environment URL
@@ -236,44 +232,33 @@ export class ERDToolPanel {
 }
 
 /**
- * Helper function to register the ERD tool command in DVDT
+ * Public function to show the ERD panel
+ * DVDT calls this function directly to open the ERD Generator.
  * 
  * DVDT Integration Example:
  * 
- * import { registerERDTool } from '@dvdt-tools/erd-generator/vscode';
+ * import { showERDPanel } from '@dvdt-tools/erd-generator';
  * 
- * export function activate(context: vscode.ExtensionContext) {
- *     // Your existing DVDT activation code...
- *     
- *     // Register ERD tool - that's it!
- *     registerERDTool(context, {
- *         getEnvironmentUrl: () => yourConfigService.getCurrentEnvironment(),
- *         getAccessToken: () => yourAuthService.getAccessToken()
- *     });
- * }
+ * // In your DVDT code, call this when user wants to generate ERD
+ * showERDPanel(context.extensionUri, environmentUrl, accessToken);
+ * 
+ * @param extensionUri - The extension URI from DVDT's context
+ * @param environmentUrl - Dataverse environment URL
+ * @param accessToken - Dataverse access token
  */
-export function registerERDTool(
-    context: vscode.ExtensionContext,
-    credentialProvider: {
-        getEnvironmentUrl: () => string | Promise<string>;
-        getAccessToken: () => string | Promise<string>;
-    }
+export function showERDPanel(
+    extensionUri: vscode.Uri,
+    environmentUrl: string,
+    accessToken: string
 ) {
-    const command = vscode.commands.registerCommand('dvdt.generateERD', async () => {
-        try {
-            const environmentUrl = await credentialProvider.getEnvironmentUrl();
-            const accessToken = await credentialProvider.getAccessToken();
+    if (!environmentUrl || !accessToken) {
+        vscode.window.showErrorMessage('Please connect to a Dataverse environment first');
+        return;
+    }
 
-            if (!environmentUrl || !accessToken) {
-                vscode.window.showErrorMessage('Please connect to a Dataverse environment first');
-                return;
-            }
-
-            ERDToolPanel.createOrShow(context.extensionUri, environmentUrl, accessToken);
-        } catch (error: any) {
-            vscode.window.showErrorMessage(`Failed to open ERD Generator: ${error.message}`);
-        }
-    });
-
-    context.subscriptions.push(command);
+    try {
+        ERDToolPanel.createOrShow(extensionUri, environmentUrl, accessToken);
+    } catch (error: any) {
+        vscode.window.showErrorMessage(`Failed to open ERD Generator: ${error.message}`);
+    }
 }
