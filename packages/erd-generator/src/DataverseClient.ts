@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import { DataverseSolution, DataverseTable, DataverseAttribute, DataverseRelationship } from './types';
+import { DataverseAttribute, DataverseRelationship, DataverseSolution, DataverseTable } from './types';
 
 /**
  * Configuration for connecting to Dataverse
@@ -46,30 +46,26 @@ export class DataverseClient {
     try {
       // Fetch solution details
       const solutionResponse = await this.axiosInstance.get(
-        `/solutions?$filter=uniquename eq '${solutionUniqueName}'&$select=uniquename,friendlyname,version,publisherid`
+        `/solutions?$filter=uniquename eq '${solutionUniqueName}'&$select=friendlyname,uniquename,_publisherid_value,version&$expand=publisherid($select=customizationprefix)`
       );
-
       if (!solutionResponse.data.value || solutionResponse.data.value.length === 0) {
         throw new Error(`Solution '${solutionUniqueName}' not found`);
       }
-
-      const solutionData = solutionResponse.data.value[0];
-
-      // Fetch publisher prefix
-      const publisherResponse = await this.axiosInstance.get(
-        `/publishers(${solutionData.publisherid})?$select=customizationprefix`
-      );
-      const publisherPrefix = publisherResponse.data.customizationprefix || 'unknown';
+      const solutionData = solutionResponse.data.value[0];   
+      
+      // Publisher Prefix
+      const publisherPrefix = solutionData.publisherid?.customizationprefix ?? 'unknown';
 
       // Fetch solution components (tables)
       const componentsResponse = await this.axiosInstance.get(
         `/solutioncomponents?$filter=_solutionid_value eq ${solutionData.solutionid} and componenttype eq 1&$select=objectid`
       );
-
       const tableIds = componentsResponse.data.value.map((c: any) => c.objectid);
-      
+      console.log('tableIds', tableIds);
+
       // Fetch tables in parallel
       const tables = await this.fetchTables(tableIds);
+      console.log('tables', tables);
 
       return {
         uniqueName: solutionData.uniquename,
@@ -120,7 +116,7 @@ export class DataverseClient {
 
       // Fetch attributes
       const attributesResponse = await this.axiosInstance.get(
-        `/EntityDefinitions(${tableId})/Attributes?$select=LogicalName,DisplayName,AttributeType,IsPrimaryId,IsPrimaryName,RequiredLevel,MaxLength`
+        `/EntityDefinitions(${tableId})/Attributes?$select=LogicalName,DisplayName,AttributeType,IsPrimaryId,IsPrimaryName,RequiredLevel`
       );
 
       const attributes: DataverseAttribute[] = attributesResponse.data.value.map((attr: any) => ({
@@ -130,7 +126,6 @@ export class DataverseClient {
         isPrimaryId: attr.IsPrimaryId || false,
         isPrimaryName: attr.IsPrimaryName || false,
         isRequired: attr.RequiredLevel?.Value === 'ApplicationRequired' || attr.RequiredLevel?.Value === 'SystemRequired',
-        maxLength: attr.MaxLength,
       }));
 
       // Fetch relationships

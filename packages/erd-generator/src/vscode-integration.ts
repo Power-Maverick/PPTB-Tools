@@ -1,6 +1,5 @@
-import * as vscode from 'vscode';
-import * as path from 'path';
 import * as fs from 'fs';
+import * as vscode from 'vscode';
 
 /**
  * ERD Tool WebView Panel for Dataverse DevTools Integration
@@ -154,6 +153,8 @@ export class ERDToolPanel {
         // Read the HTML file
         let html = fs.readFileSync(webviewHtmlPath.fsPath, 'utf8');
 
+        console.log(webview.cspSource);
+        
         // Replace placeholders
         html = html.replace('{{cspSource}}', webview.cspSource);
         html = html.replace('{{webviewJsUri}}', webviewJsUri.toString());
