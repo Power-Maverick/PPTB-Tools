@@ -4,4 +4,4 @@ export * from './types';
 export type { DataverseConfig } from './DataverseClient';
 
 // VS Code integration (optional import)
-export { ERDToolPanel, registerERDTool } from './vscode-integration';
+export { showERDPanel } from './vscode-integration';
