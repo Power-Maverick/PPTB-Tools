@@ -40,34 +40,35 @@ export class ERDGenerator {
   private generateMermaid(solution: DataverseSolution): string {
     const lines: string[] = [];
     lines.push('erDiagram');
-    lines.push('');
 
     // Create a set of table names in the solution for quick lookup
     const tablesInSolution = new Set(solution.tables.map(t => t.logicalName));
 
     // Add tables
     for (const table of solution.tables) {
-      lines.push(`    ${this.sanitizeTableName(table.logicalName)} {`);
+      const tableName = this.sanitizeTableName(table.logicalName);
       
       if (this.config.includeAttributes) {
+        lines.push(`    ${tableName} {`);
         const attributes = this.config.maxAttributesPerTable > 0
           ? table.attributes.slice(0, this.config.maxAttributesPerTable)
           : table.attributes;
 
         for (const attr of attributes) {
           const type = this.mapToMermaidType(attr.type);
-          const pk = attr.isPrimaryId ? 'PK' : '';
-          const required = attr.isRequired ? 'NOT NULL' : '';
-          lines.push(`        ${type} ${attr.logicalName} ${pk} ${required}`.trim());
+          const constraints = [];
+          if (attr.isPrimaryId) constraints.push('PK');
+          if (attr.isRequired && !attr.isPrimaryId) constraints.push('NOT NULL');
+          const constraintStr = constraints.length > 0 ? ` "${constraints.join(' ')}"` : '';
+          lines.push(`        ${type} ${this.sanitizeTableName(attr.logicalName)}${constraintStr}`);
         }
 
         if (this.config.maxAttributesPerTable > 0 && table.attributes.length > this.config.maxAttributesPerTable) {
-          lines.push(`        string ... "and ${table.attributes.length - this.config.maxAttributesPerTable} more"`);
+          lines.push(`        string more_attributes "...${table.attributes.length - this.config.maxAttributesPerTable} more"`);
         }
+        
+        lines.push('    }');
       }
-      
-      lines.push('    }');
-      lines.push('');
     }
 
     // Add relationships - only include relationships where both tables are in the solution
