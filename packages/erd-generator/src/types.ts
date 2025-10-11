@@ -36,8 +36,6 @@ export interface DataverseAttribute {
   isPrimaryName: boolean;
   /** Whether this field is required */
   isRequired: boolean;
-  /** Maximum length (for string types) */
-  maxLength?: number;
 }
 
 /**

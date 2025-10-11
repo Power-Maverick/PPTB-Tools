@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Webview script for ERD Generator
  * This file runs in the webview context and has direct access to all helper classes
@@ -5,7 +6,6 @@
 
 import { DataverseClient } from './DataverseClient';
 import { ERDGenerator } from './ERDGenerator';
-import { DataverseSolution } from './types';
 
 // VS Code API (provided by VS Code webview runtime)
 declare function acquireVsCodeApi(): any;
@@ -87,6 +87,7 @@ window.addEventListener('message', (event) => {
             if (elements.envDisplay) {
                 elements.envDisplay.textContent = message.environmentUrl;
             }
+            console.log('Credentials set', state);
             loadSolutions();
             break;
     }
@@ -154,7 +155,8 @@ async function generateERD() {
         });
 
         const solution = await client.fetchSolution(state.selectedSolution);
-        
+        console.log('solution', solution);
+                
         const generator = new ERDGenerator({
             format: state.selectedFormat,
             includeAttributes: state.config.includeAttributes,
