@@ -109,7 +109,7 @@ export class DataverseClient {
     try {
       // Fetch entity metadata
       const entityResponse = await this.axiosInstance.get(
-        `/EntityDefinitions(${tableId})?$select=LogicalName,DisplayName,SchemaName,PrimaryIdAttribute,PrimaryNameAttribute,TableType`
+        `/EntityDefinitions(${tableId})?$select=LogicalName,DisplayName,SchemaName,PrimaryIdAttribute,PrimaryNameAttribute,TableType,IsIntersect`
       );
 
       const entity = entityResponse.data;
@@ -137,6 +137,7 @@ export class DataverseClient {
         schemaName: entity.SchemaName,
         primaryIdAttribute: entity.PrimaryIdAttribute,
         primaryNameAttribute: entity.PrimaryNameAttribute,
+        isIntersect: entity.IsIntersect || false,
         tableType: entity.TableType,
         attributes: attributes,
         relationships: relationships,
