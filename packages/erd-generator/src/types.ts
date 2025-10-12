@@ -14,6 +14,8 @@ export interface DataverseTable {
   primaryNameAttribute: string;
   /** Table type (Standard, Activity, Virtual, etc.) */
   tableType: string;
+  /** Whether the table is an intersect table */
+  isIntersect: boolean;
   /** Attributes (columns) in the table */
   attributes: DataverseAttribute[];
   /** Relationships from this table */

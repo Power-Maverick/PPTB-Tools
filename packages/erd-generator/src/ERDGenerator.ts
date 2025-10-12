@@ -1,4 +1,4 @@
-import { DataverseSolution, ERDConfig, DataverseTable, DataverseRelationship } from './types';
+import { DataverseRelationship, DataverseSolution, ERDConfig } from './types';
 
 /**
  * ERD Generator for Dataverse solutions
@@ -58,7 +58,7 @@ export class ERDGenerator {
           const type = this.mapToMermaidType(attr.type);
           const attrName = this.sanitizeTableName(attr.logicalName);
           const constraints = [];
-          if (attr.isPrimaryId) constraints.push('PK');
+          if (attr.isPrimaryId && !table.isIntersect) constraints.push('PK');
           if (attr.isRequired && !attr.isPrimaryId) constraints.push('NOT_NULL');
           const constraintStr = constraints.length > 0 ? ` ${constraints.join('_')}` : '';
           lines.push(`        ${type} ${attrName}${constraintStr}`);
