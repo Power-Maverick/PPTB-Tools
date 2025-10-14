@@ -77,7 +77,39 @@ We follow conventional commit messages:
 
 ### Adding a New Tool
 
-To add a new tool to the monorepo:
+The easiest way to add a new tool is using the scaffolding command:
+
+#### Using the Scaffolding Tool (Recommended)
+
+Run the following command from the repository root:
+
+```bash
+npx create-dvdt-tool
+```
+
+This will interactively prompt you for:
+- Tool name
+- Tool description
+- Author name
+
+The scaffolding tool will create a complete tool structure based on the erd-generator template, including:
+- Source code structure (components, integration, models, utils)
+- Build configuration (TypeScript, Webpack)
+- UI templates (WebView HTML)
+- Documentation templates
+
+After scaffolding:
+```bash
+cd tools/your-tool
+npm install
+npm run build
+```
+
+See [tools/create-dvdt-tool/README.md](tools/create-dvdt-tool/README.md) for more details.
+
+#### Manual Setup (Alternative)
+
+If you prefer to set up manually:
 
 1. Create a new directory under `tools/`:
    ```bash

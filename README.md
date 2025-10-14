@@ -36,6 +36,24 @@ See [VSCODE_INTEGRATION.md](./VSCODE_INTEGRATION.md) for complete WebView integr
 - **Standalone Testing**: Open `packages/erd-generator/ui/test.html` in your browser to test without DVDT integration. Just provide your environment URL and access token.
 - **Local DVDT Integration**: See [LOCAL_TESTING.md](./LOCAL_TESTING.md) for step-by-step instructions on integrating with a local copy of Dataverse DevTools.
 
+### [create-dvdt-tool](./tools/create-dvdt-tool)
+
+Scaffolding tool for creating new DVDT tools with a complete project structure.
+
+**Usage:**
+```bash
+npx create-dvdt-tool
+```
+
+**Features:**
+- Interactive prompts for tool name, description, and author
+- Creates complete tool structure based on erd-generator template
+- Includes TypeScript configuration, Webpack setup, and VS Code WebView integration
+- Generates documentation templates and build scripts
+- Ready-to-use Dataverse client and VS Code integration code
+
+See the [create-dvdt-tool README](./tools/create-dvdt-tool/README.md) for more details.
+
 ## Getting Started
 
 ### Prerequisites
@@ -66,15 +84,31 @@ cd tools/erd-generator
 npm run dev
 ```
 
+### Creating a New Tool
+
+Use the scaffolding tool to create a new DVDT tool:
+
+```bash
+npx create-dvdt-tool
+```
+
+This will interactively guide you through creating a new tool with a complete project structure. For more information, see [create-dvdt-tool](./tools/create-dvdt-tool/README.md) or [CONTRIBUTING.md](./CONTRIBUTING.md).
+
 ## Repository Structure
 
 ```
 DVDT-Tools/
 ├── tools/
-│   └── erd-generator/       # ERD generation tool
+│   ├── erd-generator/       # ERD generation tool
+│   │   ├── src/
+│   │   │   ├── ERDGenerator.ts
+│   │   │   ├── types.ts
+│   │   │   └── index.ts
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── README.md
+│   └── create-dvdt-tool/    # Scaffolding tool
 │       ├── src/
-│       │   ├── ERDGenerator.ts
-│       │   ├── types.ts
 │       │   └── index.ts
 │       ├── package.json
 │       ├── tsconfig.json
