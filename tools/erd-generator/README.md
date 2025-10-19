@@ -1,24 +1,40 @@
 # ERD Generator for Dataverse
 
-Generate Entity Relationship Diagrams (ERD) from Dataverse solutions. Designed as a **VS Code WebView panel** for seamless integration with Dataverse DevTools (DVDT).
+Generate Entity Relationship Diagrams (ERD) from Dataverse solutions. **React-based tool** with dual integration support for **DVDT (Dataverse DevTools)** and **PPTB (Power Platform Toolbox)**.
 
 ## Features
 
-- **🎨 VS Code WebView Panel**: Complete UI with modern dropdown controls and configuration options
-- **Minimal Integration**: Just call one function - no command registration needed
-- **Fetch metadata automatically**: Retrieve solution, table, attribute, and relationship metadata from Dataverse
-- Generate ERD from Dataverse solution metadata
-- Support for multiple diagram formats:
-  - Mermaid
-  - PlantUML
-  - Graphviz DOT
-- Configurable output (via UI):
-  - Include/exclude attributes
-  - Include/exclude relationships
-  - Limit number of attributes per table
-- **Download options**:
-  - Source code (.mmd, .puml, .dot)
-  - Copy to clipboard
+- **🎨 Modern React UI**: Component-based architecture with React 18 and TypeScript
+- **🔄 Dual Platform Support**: Works seamlessly in both VS Code (DVDT) and web browser (PPTB)
+- **⚡ Fast Development**: Vite for instant HMR and optimized production builds
+- **🔌 Minimal Integration**: Just pass credentials - tool handles all the rest
+- **📊 Multiple Formats**: Generate ERDs in Mermaid, PlantUML, or Graphviz DOT
+- **🎯 Smart Detection**: Automatically detects DVDT vs PPTB environment
+- **🛠️ Configurable Output**: Control attributes, relationships, and detail level
+- **📥 Export Options**: Download source files or copy to clipboard
+- **🔍 Visual Preview**: Interactive Mermaid diagram rendering (when available)
+
+## Technical Architecture
+
+### Build System
+- **Vite**: Modern build tool for fast development and optimized production builds
+- **React 18**: Latest React with hooks and concurrent features
+- **TypeScript**: Full type safety across the codebase
+- **Dual Build Target**: 
+  - Extension code (Node.js/VS Code) compiled with `tsc`
+  - Webview (browser) bundled with Vite
+
+### Platform Integration
+The tool automatically detects its environment:
+
+1. **DVDT (VS Code)**: Detects `window.acquireVsCodeApi()`
+   - Receives credentials via `postMessage` with `setCredentials` command
+   - Uses VS Code APIs for file operations and clipboard
+   
+2. **PPTB (Web)**: Detects `window.toolboxAPI`
+   - Gets context via `toolboxAPI.getToolContext()`
+   - Listens for `TOOLBOX_CONTEXT` via `postMessage`
+   - Uses browser APIs for file downloads and clipboard
 
 ## Installation
 
@@ -30,54 +46,271 @@ npm install @dvdt-tools/erd-generator
 
 ### Building the Project
 
-The project uses a single unified build command that compiles both the extension code and webview bundle:
+The project uses dual build targets:
 
 ```bash
 npm run build
 ```
 
-This runs two build processes sequentially:
-1. **TypeScript compiler (`tsc`)** - Compiles extension code for Node.js/VS Code environment
-   - Compiles: `src/vscode-integration.ts`, `DataverseClient.ts`, `ERDGenerator.ts`, etc.
-   - Output: `dist/src/*.js` files
-   - Target: Node.js runtime (used by VS Code extension host)
+This runs:
+1. **Extension build** (`npm run build:extension`): Compiles TypeScript for Node.js/VS Code
+   - Input: `src/` TypeScript files
+   - Output: `dist/src/` JavaScript files
+   - Target: Node.js runtime (VS Code extension host)
 
-2. **Webpack** - Bundles webview code for browser environment
-   - Bundles: `src/webview.ts` with all dependencies (DataverseClient, ERDGenerator, Mermaid)
-   - Output: `dist/webview/webview.js` (single bundled file)
-   - Target: Browser runtime (runs in VS Code WebView panel)
+2. **Webview build** (`npm run build:webview`): Bundles React app for browser
+   - Input: `webview/` React components
+   - Output: `dist/webview/` bundled files (index.js, index.css)
+   - Target: Browser runtime (Chrome-based webview)
 
-**Why two separate build processes?**
+### Development Mode
 
-We need both because the extension and webview run in different environments:
-- **Extension code** runs in Node.js (VS Code extension host) and needs access to VS Code APIs
-- **Webview code** runs in a browser context (Chrome-based webview) and needs all dependencies bundled together
+Run with hot module replacement:
 
-The builds cannot be merged into a single tool because they target fundamentally different JavaScript runtimes.
+```bash
+npm run dev
+```
 
-### Standalone Testing (Without DVDT Integration)
+This starts:
+- TypeScript compiler in watch mode
+- Vite dev server with instant HMR
 
-You can test the ERD Generator without integrating it into DVDT:
+### Preview Production Build
 
-1. **Build the project:**
-   ```bash
-   npm run build
-   ```
+Preview the production build locally:
 
-2. **Open the test page:**
-   Open `packages/erd-generator/ui/test.html` in your browser
+```bash
+npm run preview
+```
 
-3. **Enter credentials:**
-   - Environment URL: Your Dataverse environment (e.g., `https://contoso.crm.dynamics.com`)
-   - Access Token: Your Dataverse access token
+## Integration Guide
 
-4. **Click "Load ERD Generator"** to test the full functionality
+### DVDT (Dataverse DevTools) Integration
 
-The standalone test page simulates VS Code's WebView environment and allows you to:
-- List and select solutions
-- Generate ERDs in all formats
-- Test visual rendering (Mermaid)
-- Download diagrams
+The ERD Generator provides a simple function to show the panel in VS Code:
+
+```typescript
+import { showERDPanel } from '@dvdt-tools/erd-generator';
+
+// In your DVDT extension code
+export function activate(context: vscode.ExtensionContext) {
+  // When you want to show ERD Generator (e.g., from a command)
+  showERDPanel(
+    context.extensionUri,
+    environmentUrl,  // Your Dataverse environment URL
+    accessToken      // Your Dataverse access token
+  );
+}
+```
+
+**What it does:**
+1. Creates or reveals a VS Code WebView panel
+2. Loads the React app into the webview
+3. Sends credentials via `postMessage`
+4. Handles file save and clipboard operations through VS Code APIs
+
+### PPTB (Power Platform Toolbox) Integration
+
+The tool automatically integrates with PPTB when deployed as a tool:
+
+**No code required!** The React app detects PPTB environment and:
+1. Listens for `TOOLBOX_CONTEXT` via `postMessage`
+2. Calls `window.toolboxAPI.getToolContext()` to get connection details
+3. Uses `window.toolboxAPI.showNotification()` for user feedback
+4. Subscribes to toolbox events via `window.toolboxAPI.onToolboxEvent()`
+
+**Package structure for PPTB:**
+```json
+{
+  "name": "dvdt-erd-generator",
+  "version": "0.0.6",
+  "displayName": "Dataverse ERD Generator",
+  "description": "Generate Entity Relationship Diagrams for Dataverse solutions"
+}
+```
+
+The `dist/webview/` folder contains the complete tool:
+- `index.html` - Entry point
+- `index.js` - Bundled React app
+- `index.css` - Styles
+
+## Usage
+
+### In DVDT (VS Code)
+
+1. Install the tool in your Dataverse DevTools extension
+2. Call `showERDPanel()` with connection details
+3. The panel opens showing available solutions
+4. Select a solution and configure options
+5. Click "Generate ERD" to create the diagram
+6. Download or copy the generated diagram
+
+### In PPTB (Web)
+
+1. Install the tool in Power Platform Toolbox
+2. Open the tool from the toolbox interface
+3. Tool automatically receives connection context
+4. Select a solution and configure options
+5. Click "Generate ERD" to create the diagram
+6. Download to your computer or copy to clipboard
+
+## Configuration Options
+
+The tool provides several configuration options:
+
+- **Output Format**: Choose between Mermaid, PlantUML, or Graphviz
+- **Include Attributes**: Show/hide table columns in the diagram
+- **Include Relationships**: Show/hide relationships between tables
+- **Max Attributes**: Limit the number of attributes shown per table (0 = show all)
+
+## Output Formats
+
+### Mermaid
+- Modern, declarative diagram syntax
+- Visual preview available in the tool
+- Great for documentation and GitHub
+
+### PlantUML
+- Widely supported UML format
+- Can be rendered by many tools
+- Standard UML notation
+
+### Graphviz DOT
+- Graph description language
+- Powerful layout engines
+- Flexible customization options
+
+## Architecture Details
+
+### No Node.js Dependencies in Webview
+
+The webview bundle (`dist/webview/index.js`) is **pure browser JavaScript**:
+- ✅ No `require()` or `module.exports`
+- ✅ No `process.env` or Node.js globals
+- ✅ No Node.js-specific APIs
+- ✅ Uses only browser-standard APIs
+
+This ensures:
+- Works in any browser environment (PPTB)
+- Works in VS Code webviews (DVDT)
+- No runtime dependencies
+- Smaller bundle size
+
+### Build Output Structure
+
+```
+dist/
+├── src/                    # Extension code (Node.js)
+│   ├── index.js           # Main export
+│   ├── components/
+│   │   └── ERDGenerator.js
+│   ├── utils/
+│   │   └── DataverseClient.js
+│   └── dvdtIntegration/
+│       └── integration.js  # VS Code panel management
+└── webview/               # Browser bundle (React app)
+    ├── index.html         # Entry point
+    ├── index.js          # Bundled React app (~195 KB)
+    └── index.css         # Styles (~5 KB)
+```
+
+## Core Components
+
+### ERDGenerator (`src/components/ERDGenerator.ts`)
+- Core logic for generating diagrams
+- Supports multiple output formats
+- Handles table and relationship mapping
+- Shared between extension and webview builds
+
+### DataverseClient (`src/utils/DataverseClient.ts`)
+- Dataverse API client
+- Fetches solutions, tables, attributes, relationships
+- Uses Axios for HTTP requests
+- Shared between extension and webview builds
+
+### App Component (`webview/App.tsx`)
+- Main React component
+- Environment detection (DVDT vs PPTB)
+- State management with hooks
+- User interface and interactions
+
+## Troubleshooting
+
+### Build Issues
+
+If builds fail, try:
+```bash
+# Clean build artifacts
+rm -rf dist node_modules
+npm install
+npm run build
+```
+
+### Webview Not Loading in VS Code
+
+Check:
+1. Extension is built: `npm run build:extension`
+2. Webview is built: `npm run build:webview`
+3. Files exist in `dist/webview/`
+4. CSP settings in integration.ts allow loading scripts
+
+### PPTB Integration Issues
+
+Check:
+1. `window.toolboxAPI` is available
+2. Console logs for TOOLBOX_CONTEXT messages
+3. Connection context is being received
+4. Network requests are successful
+
+## Migration from Webpack to Vite
+
+This tool was migrated from Webpack to Vite for better performance and simpler configuration:
+
+**Benefits:**
+- ⚡ Faster development with instant HMR
+- 📦 Smaller production bundles
+- 🎯 Simpler configuration
+- 🔧 Better TypeScript integration
+- 🚀 Native ESM support
+
+**Breaking Changes:**
+- Webview bundle location changed from `dist/webview/webview.js` to `dist/webview/index.js`
+- HTML is now generated (not loaded from template)
+- Build output structure simplified
+
+## Contributing
+
+Contributions are welcome! When contributing:
+
+1. Maintain dual platform support (DVDT + PPTB)
+2. Keep webview bundle browser-only (no Node.js dependencies)
+3. Test in both environments
+4. Update documentation as needed
+5. Follow existing code style
+
+## License
+
+This project is licensed under the GPL-2.0 License - see the [LICENSE](../../LICENSE) file for details.
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/Power-Maverick/DVDT-Tools/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Power-Maverick/DVDT-Tools/discussions)
+
+## Changelog
+
+### v0.0.6
+- 🎉 **Major Rewrite**: Converted to React-based architecture
+- 🔄 Added PPTB (Power Platform Toolbox) integration support
+- ⚡ Migrated from Webpack to Vite
+- 🎨 Modern React components with hooks
+- 🌐 Dual platform support (DVDT + PPTB)
+- 📦 Cleaner build output with no Node.js artifacts in webview
+- 🔧 Improved TypeScript configuration
+- 📚 Updated documentation
+
+### Previous Versions
+See [CHANGELOG.md](../../CHANGELOG.md) for full history.
 - Copy to clipboard
 
 ## Integration with Dataverse DevTools

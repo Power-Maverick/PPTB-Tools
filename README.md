@@ -10,12 +10,16 @@ This is a monorepo containing various tools for working with Microsoft Dataverse
 
 ### [@dvdt-tools/erd-generator](./tools/erd-generator)
 
-Generate Entity Relationship Diagrams (ERD) from Dataverse solutions. Designed as a **VS Code WebView panel** for seamless integration with Dataverse DevTools (DVDT).
+Generate Entity Relationship Diagrams (ERD) from Dataverse solutions. **React-based tool** with dual integration support for:
+- **DVDT (Dataverse DevTools)**: VS Code WebView panel integration
+- **PPTB (Power Platform Toolbox)**: Standalone web-based tool integration
 
 **Key Features:**
-- **VS Code WebView Panel Integration**: Call one function to show the panel - no command registration needed
-- **Self-Contained UI**: Complete webview HTML with modern dropdown controls and configuration options
-- **Minimal DVDT Integration**: DVDT only provides environment URL and token - ERD tool handles everything else
+- **React + TypeScript**: Modern component-based architecture with Vite build system
+- **Dual Platform Support**: Seamlessly works in both VS Code (DVDT) and web browser (PPTB)
+- **Self-Contained UI**: Complete React webview with modern controls and configuration options
+- **Minimal Integration**: DVDT provides environment URL and token - tool handles everything else
+- **PPTB Integration**: Full toolboxAPI support with context awareness
 - Fetch solution metadata automatically from Dataverse
 - Multiple output formats: Mermaid, PlantUML, Graphviz DOT
 - Download diagrams as source code or copy to clipboard
@@ -28,6 +32,20 @@ import { showERDPanel } from '@dvdt-tools/erd-generator';
 // Just call this when you want to show the ERD panel
 showERDPanel(context.extensionUri, environmentUrl, accessToken);
 ```
+
+**PPTB Integration:**
+The tool automatically detects PPTB environment and uses `window.toolboxAPI` for:
+- Getting connection context via `getToolContext()`
+- Showing notifications via `showNotification()`
+- Listening to toolbox events via `onToolboxEvent()`
+- Receiving TOOLBOX_CONTEXT via postMessage
+
+**Technical Architecture:**
+- **React 18** with functional components and hooks
+- **Vite** for fast development and optimized production builds
+- **TypeScript** for type safety
+- **Browser-only bundle**: No Node.js-specific artifacts in webview output
+- **Separate builds**: Extension code (Node.js) and webview (browser) are built independently
 
 See [VSCODE_INTEGRATION.md](./VSCODE_INTEGRATION.md) for complete WebView integration guide.
 
