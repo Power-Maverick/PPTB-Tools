@@ -1,12 +1,12 @@
 {
   "name": "@power-maverick/tool-erd-generator",
-  "version": "0.1.17",
+  "version": "1.0.0",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "@power-maverick/tool-erd-generator",
-      "version": "0.1.17",
+      "version": "1.0.0",
       "license": "GPL-2.0",
       "dependencies": {
         "axios": "^1.7.9",
@@ -15,7 +15,7 @@
         "react-dom": "^18.3.1"
       },
       "devDependencies": {
-        "@pptb/types": "^1.0.7",
+        "@pptb/types": "^1.0.8",
         "@types/react": "^18.3.1",
         "@types/react-dom": "^18.3.0",
         "@vitejs/plugin-react": "^4.3.4",
@@ -896,9 +896,9 @@
       }
     },
     "node_modules/@pptb/types": {
-      "version": "1.0.7",
-      "resolved": "https://registry.npmjs.org/@pptb/types/-/types-1.0.7.tgz",
-      "integrity": "sha512-NmWmrT8YyppV4LeFk056H8z2ZwoMi8Q3zFs67QZARvCAR+6q0JzMLV91N6+Sdqbd3MvKx1yxqoeePSPi5s8RpQ==",
+      "version": "1.0.8",
+      "resolved": "https://registry.npmjs.org/@pptb/types/-/types-1.0.8.tgz",
+      "integrity": "sha512-qGjif4qCFvGsHFB4Ly0xcvfTMkr+IB9WXh2/Zn0/C//orX6IBpnlSXn2D3xUjj69a9hAiqjVMhNJ1fpJJNqO7g==",
       "dev": true,
       "license": "GPL-3.0"
     },

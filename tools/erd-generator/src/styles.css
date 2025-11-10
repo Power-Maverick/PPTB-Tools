@@ -40,6 +40,14 @@ body {
   padding: 3rem;
 }
 
+.loading-mermaid {
+  text-align: center;
+  font-size: 1rem;
+  color: #666;
+  padding: 2rem;
+  font-style: italic;
+}
+
 .card {
   background: white;
   border-radius: 8px;
@@ -241,6 +249,27 @@ select:focus {
   font-family: 'Courier New', monospace;
   font-size: 0.875rem;
   white-space: pre;
+}
+
+.diagram-visual {
+  text-align: center;
+  background: white;
+  padding: 2rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  min-height: 200px;
+}
+
+.diagram-visual svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.diagram-visual img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
 }
 
 .mermaid-container {

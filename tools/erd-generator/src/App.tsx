@@ -31,11 +31,12 @@ function App() {
     const [accessToken, setAccessToken] = useState<string>("");
     const [solutions, setSolutions] = useState<Solution[]>([]);
     const [selectedSolution, setSelectedSolution] = useState<string>("");
-    const [selectedFormat, setSelectedFormat] = useState<'mermaid' | 'plantuml' | 'graphviz'>('mermaid');
+    const [selectedFormat, setSelectedFormat] = useState<'mermaid' | 'plantuml'>('mermaid');
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>("");
     const [generatedDiagram, setGeneratedDiagram] = useState<string>("");
     const [viewMode, setViewMode] = useState<'visual' | 'text'>('text');
+    const [mermaidReady, setMermaidReady] = useState<boolean>(false);
     
     // Configuration options
     const [includeAttributes, setIncludeAttributes] = useState<boolean>(true);
@@ -160,8 +161,7 @@ function App() {
 
         const extensions: Record<string, string> = {
             'mermaid': 'mmd',
-            'plantuml': 'puml',
-            'graphviz': 'dot'
+            'plantuml': 'puml'
         };
 
         const fileName = `${selectedSolution}-erd.${extensions[selectedFormat]}`;
@@ -199,7 +199,20 @@ function App() {
         }
     };
 
-    // Ensure mermaid is available and initialized (lazy load)
+    // Ensure mermaid is available and initialized (preload on mount)
+    useEffect(() => {
+        // Preload mermaid when component mounts to avoid CSS loading issues
+        const preloadMermaid = async () => {
+            try {
+                await ensureMermaid();
+                setMermaidReady(true);
+            } catch (error) {
+                console.error('Failed to preload mermaid:', error);
+            }
+        };
+        preloadMermaid();
+    }, []);
+
     const ensureMermaid = async (): Promise<void> => {
         if (window.mermaid) {
             return;
@@ -222,39 +235,95 @@ function App() {
         (window as any).mermaid = mermaid;
     };
 
+    // Render the diagram (visual or text)
     const renderDiagram = () => {
         if (!generatedDiagram) return null;
 
-        if (viewMode === 'visual' && selectedFormat === 'mermaid') {
-            // Render Mermaid diagram: use 'mermaid' class and set text content for init()
-            return (
-                <div
-                    className="mermaid"
-                    ref={(el) => {
-                        (async () => {
-                            if (!el) return;
-                            try {
-                                // Set the diagram source as text content for Mermaid to parse
-                                el.textContent = generatedDiagram;
-                                await ensureMermaid();
-                                if (window.mermaid) {
-                                    window.mermaid.init(undefined, el);
+        if (viewMode === 'visual') {
+            if (selectedFormat === 'mermaid') {
+                // Show loading message if mermaid isn't ready yet
+                if (!mermaidReady) {
+                    return (
+                        <div className="loading-mermaid">
+                            Loading diagram renderer...
+                        </div>
+                    );
+                }
+
+                // Render Mermaid diagram: use 'mermaid' class and set text content for init()
+                return (
+                    <div
+                        className="mermaid"
+                        ref={(el) => {
+                            (async () => {
+                                if (!el) return;
+                                try {
+                                    // Set the diagram source as text content for Mermaid to parse
+                                    el.textContent = generatedDiagram;
+                                    await ensureMermaid();
+                                    if (window.mermaid) {
+                                        window.mermaid.init(undefined, el);
+                                    }
+                                } catch (error) {
+                                    console.error('Mermaid rendering error:', error);
                                 }
-                            } catch (error) {
-                                console.error('Mermaid rendering error:', error);
-                            }
-                        })();
-                    }}
-                />
-            );
-        } else {
-            // Show text view
-            return (
-                <pre className="diagram-text">
-                    {generatedDiagram}
-                </pre>
-            );
+                            })();
+                        }}
+                    />
+                );
+            } else if (selectedFormat === 'plantuml') {
+                // Render PlantUML by POSTing source to the public server and inlining the returned SVG.
+                // This avoids <img src=...> and respects typical CSP (img-src 'self' data:).
+                return (
+                    <div
+                        className="diagram-visual"
+                        ref={(el) => {
+                            (async () => {
+                                if (!el) return;
+                                try {
+                                    const resp = await fetch('https://www.plantuml.com/plantuml/svg', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'text/plain' },
+                                        body: generatedDiagram,
+                                    });
+                                    if (!resp.ok) throw new Error(`PlantUML HTTP ${resp.status}`);
+                                    const svgText = await resp.text();
+
+                                    const parser = new DOMParser();
+                                    const doc = parser.parseFromString(svgText, 'image/svg+xml');
+                                    const svg = doc.querySelector('svg');
+                                    if (!svg) throw new Error('No <svg> in PlantUML response');
+
+                                    // Remove any script elements for safety
+                                    svg.querySelectorAll('script').forEach((s) => s.remove());
+                                    // Remove inline event attributes
+                                    svg.querySelectorAll('*').forEach((node) => {
+                                        Array.from(node.attributes).forEach((attr) => {
+                                            if (attr.name.toLowerCase().startsWith('on')) {
+                                                node.removeAttribute(attr.name);
+                                            }
+                                        });
+                                    });
+
+                                    el.innerHTML = '';
+                                    el.appendChild(svg);
+                                } catch (error) {
+                                    console.error('PlantUML rendering error:', error);
+                                    el.innerHTML = '<div class="loading-mermaid">Cannot render PlantUML due to CSP or network restrictions. Switch to Text view or enable POST to plantuml.com.</div>';
+                                }
+                            })();
+                        }}
+                    />
+                );
+            }
         }
+
+        // Fallback: show text view
+        return (
+            <pre className="diagram-text">
+                {generatedDiagram}
+            </pre>
+        );
     };
 
     if (loading) {
@@ -317,12 +386,6 @@ function App() {
                         >
                             PlantUML
                         </button>
-                        <button 
-                            className={`format-btn ${selectedFormat === 'graphviz' ? 'active' : ''}`}
-                            onClick={() => setSelectedFormat('graphviz')}
-                        >
-                            Graphviz
-                        </button>
                     </div>
 
                     <div className="config-section">
@@ -382,14 +445,12 @@ function App() {
                 <div className="card">
                     <h2>Generated ERD</h2>
                     <div className="diagram-controls">
-                        {selectedFormat === 'mermaid' && (
-                            <button 
-                                className="btn btn-secondary"
-                                onClick={() => setViewMode(viewMode === 'visual' ? 'text' : 'visual')}
-                            >
-                                {viewMode === 'visual' ? '📝 Show Text' : '🎨 Show Visual'}
-                            </button>
-                        )}
+                        <button 
+                            className="btn btn-secondary"
+                            onClick={() => setViewMode(viewMode === 'visual' ? 'text' : 'visual')}
+                        >
+                            {viewMode === 'visual' ? '📝 Show Text' : '🎨 Show Visual'}
+                        </button>
                         <button className="btn btn-secondary" onClick={handleDownload}>
                             📥 Download Source
                         </button>

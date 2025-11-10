@@ -1,13 +1,14 @@
 {
   "name": "@power-maverick/tool-erd-generator",
   "displayName": "ERD Generator",
-  "version": "0.1.18",
+  "version": "1.0.0",
   "description": "Generate Entity Relationship Diagrams (ERD) for Dataverse solutions - React-based tool for PowerPlatform ToolBox",
   "type": "module",
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "finalize-package": "npm shrinkwrap"
   },
   "files": [
     "dist",
@@ -24,13 +25,13 @@
   "author": "Power Maverick",
   "license": "GPL-2.0",
   "dependencies": {
+    "axios": "^1.7.9",
     "mermaid": "^11.4.1",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "axios": "^1.7.9"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@pptb/types": "^1.0.7",
+    "@pptb/types": "^1.0.8",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.4",

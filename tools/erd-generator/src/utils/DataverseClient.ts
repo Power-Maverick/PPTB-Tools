@@ -89,23 +89,25 @@ export class DataverseClient {
   }
 
   /**
-   * Fetch multiple tables by their IDs
+   * Fetch multiple tables by their IDs in parallel
    */
   private async fetchTables(tableIds: string[]): Promise<DataverseTable[]> {
-    const tables: DataverseTable[] = [];
-
-    for (const tableId of tableIds) {
-      try {
-        const table = await this.fetchTable(tableId);
-        if (table) {
-          tables.push(table);
-        }
-      } catch (error) {
-        console.warn(`Failed to fetch table ${tableId}:`, error);
-      }
+    if (tableIds.length === 0) {
+      return [];
     }
 
-    return tables;
+    // Execute all table fetches in parallel
+    const tableFetchPromises = tableIds.map(tableId => 
+      this.fetchTable(tableId).catch(error => {
+        console.warn(`Failed to fetch table ${tableId}:`, error);
+        return null;
+      })
+    );
+
+    const results = await Promise.all(tableFetchPromises);
+    
+    // Filter out null results from failed fetches
+    return results.filter((table: DataverseTable | null): table is DataverseTable => table !== null);
   }
 
   /**
@@ -120,7 +122,14 @@ export class DataverseClient {
       console.log("Entity Metadata", entity);
 
       // Fetch attributes
-      const responseAttributes = await helper.getOData(`EntityDefinitions(${tableId})/Attributes?$select=LogicalName,DisplayName,AttributeType,IsPrimaryId,IsPrimaryName,RequiredLevel`,this.isPPTB);
+      // Fetch attributes and all relationship types in parallel
+      const [responseAttributes, responseOneToMany, responseManyToOne, responseManyToMany] = await Promise.all([
+        helper.getOData(`EntityDefinitions(${tableId})/Attributes?$select=LogicalName,DisplayName,AttributeType,IsPrimaryId,IsPrimaryName,RequiredLevel`, this.isPPTB),
+        helper.getOData(`EntityDefinitions(${tableId})/OneToManyRelationships?$select=SchemaName,ReferencedEntity,ReferencingEntity,ReferencingAttribute`, this.isPPTB),
+        helper.getOData(`EntityDefinitions(${tableId})/ManyToOneRelationships?$select=SchemaName,ReferencedEntity,ReferencingEntity,ReferencingAttribute`, this.isPPTB),
+        helper.getOData(`EntityDefinitions(${tableId})/ManyToManyRelationships?$select=SchemaName,Entity1LogicalName,Entity2LogicalName,IntersectEntityName`, this.isPPTB),
+      ]);
+
       console.log("Entity Attributes", responseAttributes);
 
       const attributes: DataverseAttribute[] = responseAttributes.map((attr: any) => ({
@@ -132,8 +141,13 @@ export class DataverseClient {
         isRequired: attr.RequiredLevel?.Value === 'ApplicationRequired' || attr.RequiredLevel?.Value === 'SystemRequired',
       }));
 
-      // Fetch relationships
-      const relationships = await this.fetchRelationships(tableId, entity.LogicalName);
+      // Process relationships from parallel fetch results
+      const relationships = this.processRelationships(
+        entity.LogicalName,
+        responseOneToMany,
+        responseManyToOne,
+        responseManyToMany
+      );
 
       return {
         logicalName: entity.LogicalName,
@@ -153,6 +167,63 @@ export class DataverseClient {
   }
 
   /**
+   * Process relationships from parallel fetch results
+   */
+  private processRelationships(
+    logicalName: string,
+    responseOneToMany: any[],
+    responseManyToOne: any[],
+    responseManyToMany: any[]
+  ): DataverseRelationship[] {
+    const relationships: DataverseRelationship[] = [];
+
+    try {
+      // Process One-to-Many relationships
+      console.log("One-to-Many Relationships", responseOneToMany);
+      for (const rel of responseOneToMany) {
+        if (rel.ReferencedEntity === logicalName) {
+          relationships.push({
+            schemaName: rel.SchemaName,
+            type: 'OneToMany',
+            relatedTable: rel.ReferencingEntity,
+            lookupAttribute: rel.ReferencingAttribute,
+          });
+        }
+      }
+
+      // Process Many-to-One relationships
+      console.log("Many-to-One Relationships", responseManyToOne);
+      for (const rel of responseManyToOne) {
+        if (rel.ReferencingEntity === logicalName) {
+          relationships.push({
+            schemaName: rel.SchemaName,
+            type: 'ManyToOne',
+            relatedTable: rel.ReferencedEntity,
+            lookupAttribute: rel.ReferencingAttribute,
+          });
+        }
+      }
+
+      // Process Many-to-Many relationships
+      console.log("Many-to-Many Relationships", responseManyToMany);
+      for (const rel of responseManyToMany) {
+        const isEntity1 = rel.Entity1LogicalName === logicalName;
+        relationships.push({
+          schemaName: rel.SchemaName,
+          type: 'ManyToMany',
+          relatedTable: isEntity1 ? rel.Entity2LogicalName : rel.Entity1LogicalName,
+          intersectTable: rel.IntersectEntityName,
+        });
+      }
+    } catch (error) {
+      console.warn(`Failed to process relationships for ${logicalName}:`, error);
+    }
+
+    return relationships;
+  }
+
+  /**
+   * @deprecated Use processRelationships instead - relationships are now fetched in parallel with attributes
    * Fetch relationships for a table
    */
   private async fetchRelationships(tableId: string, logicalName: string): Promise<DataverseRelationship[]> {
