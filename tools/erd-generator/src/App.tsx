@@ -1,3 +1,4 @@
+import plantumlEncoder from 'plantuml-encoder';
 import { useEffect, useState } from "react";
 import { ERDGenerator } from "./components/ERDGenerator";
 import { DataverseSolution } from "./models/interfaces";
@@ -273,8 +274,7 @@ function App() {
                     />
                 );
             } else if (selectedFormat === 'plantuml') {
-                // Render PlantUML by POSTing source to the public server and inlining the returned SVG.
-                // This avoids <img src=...> and respects typical CSP (img-src 'self' data:).
+                // Render PlantUML using proper encoding and GET request
                 return (
                     <div
                         className="diagram-visual"
@@ -282,18 +282,22 @@ function App() {
                             (async () => {
                                 if (!el) return;
                                 try {
-                                    const resp = await fetch('https://www.plantuml.com/plantuml/svg', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'text/plain' },
-                                        body: generatedDiagram,
-                                    });
+                                    const encoded = plantumlEncoder.encode(generatedDiagram);
+                                    
+                                    // Fetch SVG from PlantUML server using GET with encoded diagram
+                                    const url = `https://www.plantuml.com/plantuml/svg/${encoded}`;
+                                    const resp = await fetch(url);
                                     if (!resp.ok) throw new Error(`PlantUML HTTP ${resp.status}`);
                                     const svgText = await resp.text();
 
                                     const parser = new DOMParser();
                                     const doc = parser.parseFromString(svgText, 'image/svg+xml');
                                     const svg = doc.querySelector('svg');
-                                    if (!svg) throw new Error('No <svg> in PlantUML response');
+                                    
+                                    if (!svg) {
+                                        console.error('PlantUML response:', svgText.substring(0, 500));
+                                        throw new Error('No <svg> in PlantUML response');
+                                    }
 
                                     // Remove any script elements for safety
                                     svg.querySelectorAll('script').forEach((s) => s.remove());
@@ -310,7 +314,7 @@ function App() {
                                     el.appendChild(svg);
                                 } catch (error) {
                                     console.error('PlantUML rendering error:', error);
-                                    el.innerHTML = '<div class="loading-mermaid">Cannot render PlantUML due to CSP or network restrictions. Switch to Text view or enable POST to plantuml.com.</div>';
+                                    el.innerHTML = '<div class="loading-mermaid">Cannot render PlantUML. Error: ' + (error as Error).message + '. Switch to Text view.</div>';
                                 }
                             })();
                         }}
