@@ -1,37 +1,29 @@
-# DVDT-Tools
+# Power Platform ToolBox (PPTB) Tools
 
-Tools that can be integrated with Dataverse DevTools VS Code extension.
+Tools for Power Platform ToolBox (PPTB) - a comprehensive toolkit for working with Microsoft Dataverse and Power Platform.
 
 ## Overview
 
-This is a monorepo containing various tools for working with Microsoft Dataverse and Power Platform.
+This is a monorepo containing various tools designed primarily for Power Platform ToolBox (PPTB), with additional support for Dataverse DevTools (DVDT) VS Code extension.
 
 ## Tools
 
 ### [@dvdt-tools/erd-generator](./tools/erd-generator)
 
 Generate Entity Relationship Diagrams (ERD) from Dataverse solutions. **React-based tool** with dual integration support for:
-- **DVDT (Dataverse DevTools)**: VS Code WebView panel integration
-- **PPTB (Power Platform Toolbox)**: Standalone web-based tool integration
+- **PPTB (Power Platform Toolbox)**: Primary integration - standalone web-based tool
+- **DVDT (Dataverse DevTools)**: Secondary support - VS Code WebView panel integration
 
 **Key Features:**
 - **React + TypeScript**: Modern component-based architecture with Vite build system
-- **Dual Platform Support**: Seamlessly works in both VS Code (DVDT) and web browser (PPTB)
+- **Dual Platform Support**: Seamlessly works in web browser (PPTB) and VS Code (DVDT)
 - **Self-Contained UI**: Complete React webview with modern controls and configuration options
-- **Minimal Integration**: DVDT provides environment URL and token - tool handles everything else
 - **PPTB Integration**: Full toolboxAPI support with context awareness
+- **Minimal DVDT Integration**: DVDT provides environment URL and token - tool handles everything else
 - Fetch solution metadata automatically from Dataverse
 - Multiple output formats: Mermaid, PlantUML, Graphviz DOT
 - Download diagrams as source code or copy to clipboard
 - User-configurable options (include attributes, relationships, max attributes)
-
-**DVDT Integration (Simple Function Call):**
-```typescript
-import { showERDPanel } from '@dvdt-tools/erd-generator';
-
-// Just call this when you want to show the ERD panel
-showERDPanel(context.extensionUri, environmentUrl, accessToken);
-```
 
 **PPTB Integration:**
 The tool automatically detects PPTB environment and uses `window.toolboxAPI` for:
@@ -39,6 +31,14 @@ The tool automatically detects PPTB environment and uses `window.toolboxAPI` for
 - Showing notifications via `showNotification()`
 - Listening to toolbox events via `onToolboxEvent()`
 - Receiving TOOLBOX_CONTEXT via postMessage
+
+**DVDT Integration (Simple Function Call):**
+```typescript
+import { showERDPanel } from '@dvdt-tools/erd-generator';
+
+// Just call this when you want to show the ERD panel in VS Code
+showERDPanel(context.extensionUri, environmentUrl, accessToken);
+```
 
 **Technical Architecture:**
 - **React 18** with functional components and hooks
@@ -51,7 +51,8 @@ See [VSCODE_INTEGRATION.md](./VSCODE_INTEGRATION.md) for complete WebView integr
 
 **Testing:**
 
-- **Standalone Testing**: Open `packages/erd-generator/ui/test.html` in your browser to test without DVDT integration. Just provide your environment URL and access token.
+- **PPTB Testing**: Install the tool in Power Platform ToolBox and test with your Dataverse environment.
+- **Standalone Testing**: Open `packages/erd-generator/ui/test.html` in your browser to test without integration. Just provide your environment URL and access token.
 - **Local DVDT Integration**: See [LOCAL_TESTING.md](./LOCAL_TESTING.md) for step-by-step instructions on integrating with a local copy of Dataverse DevTools.
 
 ## Getting Started
@@ -87,7 +88,7 @@ npm run dev
 ## Repository Structure
 
 ```
-DVDT-Tools/
+PPTB-Tools/
 ├── tools/
 │   └── erd-generator/       # ERD generation tool
 │       ├── src/
