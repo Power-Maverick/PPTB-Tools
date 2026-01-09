@@ -16,7 +16,7 @@ Generate Entity Relationship Diagrams (ERD) from Dataverse solutions. **React-ba
 
 **Key Features:**
 - **React + TypeScript**: Modern component-based architecture with Vite build system
-- **Dual Platform Support**: Seamlessly works in Electron desktop app (PPTB) and VS Code (DVDT)
+- **Dual Platform Support**: Seamlessly works in Electron desktop app (PPTB) and VS Code WebView (DVDT)
 - **Self-Contained UI**: Complete React webview with modern controls and configuration options
 - **PPTB Integration**: Full toolboxAPI support with context awareness
 - **Minimal DVDT Integration**: DVDT provides environment URL and token - tool handles everything else
