@@ -11,12 +11,12 @@ This is a monorepo containing various tools designed primarily for Power Platfor
 ### [@dvdt-tools/erd-generator](./tools/erd-generator)
 
 Generate Entity Relationship Diagrams (ERD) from Dataverse solutions. **React-based tool** with dual integration support for:
-- **PPTB (Power Platform Toolbox)**: Primary integration - standalone web-based tool
+- **PPTB (Power Platform Toolbox)**: Primary integration - Electron desktop app
 - **DVDT (Dataverse DevTools)**: Secondary support - VS Code WebView panel integration
 
 **Key Features:**
 - **React + TypeScript**: Modern component-based architecture with Vite build system
-- **Dual Platform Support**: Seamlessly works in web browser (PPTB) and VS Code (DVDT)
+- **Dual Platform Support**: Seamlessly works in Electron desktop app (PPTB) and VS Code (DVDT)
 - **Self-Contained UI**: Complete React webview with modern controls and configuration options
 - **PPTB Integration**: Full toolboxAPI support with context awareness
 - **Minimal DVDT Integration**: DVDT provides environment URL and token - tool handles everything else
@@ -52,7 +52,6 @@ See [VSCODE_INTEGRATION.md](./VSCODE_INTEGRATION.md) for complete WebView integr
 **Testing:**
 
 - **PPTB Testing**: Install the tool in Power Platform ToolBox and test with your Dataverse environment.
-- **Standalone Testing**: Open `packages/erd-generator/ui/test.html` in your browser to test without integration. Just provide your environment URL and access token.
 - **Local DVDT Integration**: See [LOCAL_TESTING.md](./LOCAL_TESTING.md) for step-by-step instructions on integrating with a local copy of Dataverse DevTools.
 
 ## Getting Started
