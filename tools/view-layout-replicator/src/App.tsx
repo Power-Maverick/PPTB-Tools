@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { DataverseClient } from "./utils/DataverseClient";
 import { Entity, View } from "./models/interfaces";
+import { DataverseClient } from "./utils/DataverseClient";
 
 interface UpdateProgress {
     viewId: string;
     viewName: string;
-    status: 'pending' | 'success' | 'error';
+    status: "pending" | "success" | "error";
     message?: string;
 }
 
@@ -14,17 +14,17 @@ function App() {
     const [connectionUrl, setConnectionUrl] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>("");
-    
+
     // Step 1: Entity Selection
     const [entities, setEntities] = useState<Entity[]>([]);
     const [selectedEntity, setSelectedEntity] = useState<string>("");
-    
+
     // Step 2: View Selection
     const [views, setViews] = useState<View[]>([]);
     const [sourceView, setSourceView] = useState<string>("");
     const [sourceViewLayout, setSourceViewLayout] = useState<string>("");
     const [targetViews, setTargetViews] = useState<string[]>([]);
-    
+
     // Step 3: Replication Progress
     const [isReplicating, setIsReplicating] = useState<boolean>(false);
     const [updateProgress, setUpdateProgress] = useState<UpdateProgress[]>([]);
@@ -35,17 +35,17 @@ function App() {
             // Check if we're in PPTB
             if (window.toolboxAPI) {
                 setIsPPTB(true);
-                
+
                 try {
                     const activeConnection = await window.toolboxAPI.connections.getActiveConnection();
                     setConnectionUrl(activeConnection?.url || "");
                 } catch (error) {
-                    console.error('Failed to get connection:', error);
+                    console.error("Failed to get connection:", error);
                 }
-                
+
                 setLoading(false);
             } else {
-                setError('Not running in Power Platform ToolBox (PPTB). This tool requires PPTB.');
+                setError("Not running in Power Platform ToolBox (PPTB). This tool requires PPTB.");
                 setLoading(false);
             }
         };
@@ -84,7 +84,7 @@ function App() {
         try {
             setLoading(true);
             const client = new DataverseClient();
-            
+
             const entityList = await client.listEntities();
             setEntities(entityList);
         } catch (error: any) {
@@ -98,7 +98,7 @@ function App() {
         try {
             setLoading(true);
             const client = new DataverseClient();
-            
+
             const viewList = await client.listViews(selectedEntity);
             setViews(viewList);
         } catch (error: any) {
@@ -111,7 +111,7 @@ function App() {
     const loadSourceViewLayout = async () => {
         try {
             const client = new DataverseClient();
-            
+
             const view = await client.getView(sourceView);
             setSourceViewLayout(view.layoutxml);
         } catch (error: any) {
@@ -124,12 +124,12 @@ function App() {
         setTimeout(() => setError(""), 5000);
     };
 
-    const showNotification = async (title: string, body: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const showNotification = async (title: string, body: string, type: "success" | "error" | "info" = "success") => {
         if (isPPTB && window.toolboxAPI) {
             await window.toolboxAPI.utils.showNotification({
                 title,
                 body,
-                type
+                type,
             });
         }
     };
@@ -137,14 +137,14 @@ function App() {
     const handleSourceViewChange = (viewId: string) => {
         setSourceView(viewId);
         // Remove from target views if it was there
-        setTargetViews(targetViews.filter(id => id !== viewId));
+        setTargetViews(targetViews.filter((id) => id !== viewId));
     };
 
     const handleTargetViewToggle = (viewId: string) => {
         if (viewId === sourceView) return; // Can't select source as target
-        
+
         if (targetViews.includes(viewId)) {
-            setTargetViews(targetViews.filter(id => id !== viewId));
+            setTargetViews(targetViews.filter((id) => id !== viewId));
         } else {
             setTargetViews([...targetViews, viewId]);
         }
@@ -152,20 +152,20 @@ function App() {
 
     const handleReplicateLayout = async () => {
         if (!sourceView || targetViews.length === 0) {
-            showError('Please select a source view and at least one target view');
+            showError("Please select a source view and at least one target view");
             return;
         }
 
         if (!sourceViewLayout) {
-            showError('Source view layout is not available');
+            showError("Source view layout is not available");
             return;
         }
 
         setIsReplicating(true);
-        const progress: UpdateProgress[] = targetViews.map(viewId => ({
+        const progress: UpdateProgress[] = targetViews.map((viewId) => ({
             viewId,
-            viewName: views.find(v => v.savedqueryid === viewId)?.name || viewId,
-            status: 'pending'
+            viewName: views.find((v) => v.savedqueryid === viewId)?.name || viewId,
+            status: "pending",
         }));
         setUpdateProgress(progress);
 
@@ -176,23 +176,23 @@ function App() {
 
         for (let i = 0; i < targetViews.length; i++) {
             const viewId = targetViews[i];
-            const viewName = views.find(v => v.savedqueryid === viewId)?.name || viewId;
+            const viewName = views.find((v) => v.savedqueryid === viewId)?.name || viewId;
 
             try {
-                await client.updateViewLayout(viewId, sourceViewLayout);
+                await client.updateViewLayout(selectedEntity, viewId, sourceViewLayout);
                 progress[i] = {
                     viewId,
                     viewName,
-                    status: 'success',
-                    message: 'Layout updated successfully'
+                    status: "success",
+                    message: "Layout updated successfully",
                 };
                 successCount++;
             } catch (error: any) {
                 progress[i] = {
                     viewId,
                     viewName,
-                    status: 'error',
-                    message: error.message
+                    status: "error",
+                    message: error.message,
                 };
                 errorCount++;
             }
@@ -201,19 +201,11 @@ function App() {
         }
 
         setIsReplicating(false);
-        
+
         if (errorCount === 0) {
-            await showNotification(
-                'Success',
-                `Layout replicated to ${successCount} view(s) successfully`,
-                'success'
-            );
+            await showNotification("Success", `Layout replicated to ${successCount} view(s) successfully`, "success");
         } else {
-            await showNotification(
-                'Completed with errors',
-                `Success: ${successCount}, Failed: ${errorCount}`,
-                'error'
-            );
+            await showNotification("Completed with errors", `Success: ${successCount}, Failed: ${errorCount}`, "error");
         }
     };
 
@@ -242,23 +234,14 @@ function App() {
 
     return (
         <div className="container">
-            {error && (
-                <div className="error">
-                    {error}
-                </div>
-            )}
+            {error && <div className="error">{error}</div>}
 
             <div className="content-wrapper">
                 {/* Entity Selection */}
                 <div className="section">
                     <div className="section-title">Select Entity</div>
                     <div className="form-group">
-                        <select 
-                            id="entitySelect" 
-                            value={selectedEntity}
-                            onChange={(e) => setSelectedEntity(e.target.value)}
-                            disabled={entities.length === 0 || loading}
-                        >
+                        <select id="entitySelect" value={selectedEntity} onChange={(e) => setSelectedEntity(e.target.value)} disabled={entities.length === 0 || loading}>
                             <option value="">-- Select an Entity --</option>
                             {entities.map((entity) => (
                                 <option key={entity.logicalName} value={entity.logicalName}>
@@ -274,7 +257,7 @@ function App() {
                     <div className="main-section">
                         <div className="section">
                             <div className="section-title">Select Views</div>
-                            
+
                             <div className="views-container">
                                 {/* Source View Panel */}
                                 <div className="views-panel">
@@ -282,12 +265,12 @@ function App() {
                                         <div className="panel-title">Source View</div>
                                         <div className="panel-subtitle">Select the view to copy layout from</div>
                                     </div>
-                                    
+
                                     <div className="view-list">
                                         {views.map((view) => (
                                             <div
                                                 key={view.savedqueryid}
-                                                className={`view-item ${sourceView === view.savedqueryid ? 'source' : ''}`}
+                                                className={`view-item ${sourceView === view.savedqueryid ? "source" : ""}`}
                                                 onClick={() => handleSourceViewChange(view.savedqueryid)}
                                             >
                                                 <input
@@ -310,14 +293,14 @@ function App() {
                                             <div className="panel-title">Target Views</div>
                                             <div className="panel-subtitle">Select views to apply the layout to</div>
                                         </div>
-                                        
+
                                         <div className="view-list">
                                             {views
-                                                .filter(view => view.savedqueryid !== sourceView)
+                                                .filter((view) => view.savedqueryid !== sourceView)
                                                 .map((view) => (
                                                     <div
                                                         key={view.savedqueryid}
-                                                        className={`view-item ${targetViews.includes(view.savedqueryid) ? 'selected' : ''}`}
+                                                        className={`view-item ${targetViews.includes(view.savedqueryid) ? "selected" : ""}`}
                                                         onClick={() => handleTargetViewToggle(view.savedqueryid)}
                                                     >
                                                         <input
@@ -344,18 +327,10 @@ function App() {
                             <strong>{targetViews.length}</strong> view(s) selected for replication
                         </div>
                         <div className="button-group">
-                            <button 
-                                className="btn btn-success" 
-                                onClick={handleReplicateLayout}
-                                disabled={isReplicating}
-                            >
-                                {isReplicating ? 'Replicating...' : '✓ Replicate Layout'}
+                            <button className="btn btn-success" onClick={handleReplicateLayout} disabled={isReplicating}>
+                                {isReplicating ? "Replicating..." : "✓ Replicate Layout"}
                             </button>
-                            <button 
-                                className="btn btn-secondary" 
-                                onClick={handleReset}
-                                disabled={isReplicating}
-                            >
+                            <button className="btn btn-secondary" onClick={handleReset} disabled={isReplicating}>
                                 Reset
                             </button>
                         </div>
@@ -368,14 +343,11 @@ function App() {
                         <div className="section-title">Progress</div>
                         <div className="progress-list">
                             {updateProgress.map((item) => (
-                                <div 
-                                    key={item.viewId} 
-                                    className={`progress-item ${item.status}`}
-                                >
+                                <div key={item.viewId} className={`progress-item ${item.status}`}>
                                     <span className="status-icon">
-                                        {item.status === 'success' && '✓'}
-                                        {item.status === 'error' && '✗'}
-                                        {item.status === 'pending' && '⋯'}
+                                        {item.status === "success" && "✓"}
+                                        {item.status === "error" && "✗"}
+                                        {item.status === "pending" && "⋯"}
                                     </span>
                                     <div>
                                         <strong>{item.viewName}</strong>

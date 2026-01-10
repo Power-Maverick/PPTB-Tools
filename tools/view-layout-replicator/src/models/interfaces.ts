@@ -16,5 +16,5 @@ export interface View {
 export interface ViewListItem {
     id: string;
     name: string;
-    type: 'system' | 'user';
+    type: "system" | "user";
 }
