@@ -56,13 +56,13 @@ See [VSCODE_INTEGRATION.md](./VSCODE_INTEGRATION.md) for complete WebView integr
 
 ### [@power-maverick/tool-view-layout-replicator](./tools/view-layout-replicator)
 
-Apply the same layout to multiple views of the same entity in a single operation. **React-based tool** with PPTB-only integration.
+Copy layout from one view to multiple views of the same entity in a single operation. **React-based tool** with PPTB-only integration.
 
 **Key Features:**
 - **React + TypeScript**: Modern component-based architecture with Vite build system
 - **PPTB-Only Integration**: Designed exclusively for Power Platform ToolBox (uses @pptb/types v1.0.12)
 - **Entity & View Management**: Browse entities and their views with an intuitive interface
-- **Layout Replication**: Copy view layouts from one view to multiple target views in one operation
+- **Layout Copying**: Copy view layouts from one view to multiple target views in one operation
 - **Real-time Progress Tracking**: See the status of each view update as it happens
 - **Error Handling**: Clear feedback on success and failure for each operation
 
@@ -74,7 +74,7 @@ The tool uses `window.toolboxAPI` for:
 
 **Use Cases:**
 - Standardize view layouts across multiple views of an entity
-- Quickly replicate column configurations
+- Quickly copy column configurations
 - Maintain consistency in view designs across your Dataverse environment
 
 ## Getting Started
@@ -115,7 +115,7 @@ Watch mode for development:
 cd tools/erd-generator
 npm run dev
 
-# View Layout Replicator
+# View Layout Copier
 cd tools/view-layout-replicator
 npm run dev
 ```
@@ -136,7 +136,7 @@ DVDT-Tools/
 │   │   ├── tsconfig.json
 │   │   ├── vite.config.ts
 │   │   └── README.md
-│   └── view-layout-replicator/    # View layout replication tool
+│   └── view-layout-replicator/    # View layout copying tool
 │       ├── src/
 │       │   ├── models/
 │       │   ├── utils/

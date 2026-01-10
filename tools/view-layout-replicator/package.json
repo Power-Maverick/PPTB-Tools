@@ -1,8 +1,8 @@
 {
   "name": "@power-maverick/tool-view-layout-replicator",
-  "displayName": "View Layout Replicator",
+  "displayName": "View Layout Copier",
   "version": "1.0.0",
-  "description": "Apply same layout to multiple views of the same entity in a single operation - React-based tool for PowerPlatform ToolBox",
+  "description": "Copy layout from one view to multiple views of the same entity in a single operation - React-based tool for PowerPlatform ToolBox",
   "type": "module",
   "scripts": {
     "build": "vite build",
@@ -18,7 +18,7 @@
     "dataverse",
     "view",
     "layout",
-    "replicator",
+    "copier",
     "power-platform",
     "pptb",
     "toolbox"

@@ -25,8 +25,8 @@ function App() {
     const [sourceViewLayout, setSourceViewLayout] = useState<string>("");
     const [targetViews, setTargetViews] = useState<string[]>([]);
 
-    // Step 3: Replication Progress
-    const [isReplicating, setIsReplicating] = useState<boolean>(false);
+    // Step 3: Copy Progress
+    const [isCopying, setIsCopying] = useState<boolean>(false);
     const [updateProgress, setUpdateProgress] = useState<UpdateProgress[]>([]);
 
     // Detect environment and initialize
@@ -161,7 +161,7 @@ function App() {
             return;
         }
 
-        setIsReplicating(true);
+        setIsCopying(true);
         const progress: UpdateProgress[] = targetViews.map((viewId) => ({
             viewId,
             viewName: views.find((v) => v.savedqueryid === viewId)?.name || viewId,
@@ -200,10 +200,10 @@ function App() {
             setUpdateProgress([...progress]);
         }
 
-        setIsReplicating(false);
+        setIsCopying(false);
 
         if (errorCount === 0) {
-            await showNotification("Success", `Layout replicated to ${successCount} view(s) successfully`, "success");
+            await showNotification("Success", `Layout copied to ${successCount} view(s) successfully`, "success");
         } else {
             await showNotification("Completed with errors", `Success: ${successCount}, Failed: ${errorCount}`, "error");
         }
@@ -324,13 +324,13 @@ function App() {
                 {sourceView && targetViews.length > 0 && (
                     <div className="action-bar">
                         <div className="selection-info">
-                            <strong>{targetViews.length}</strong> view(s) selected for replication
+                            <strong>{targetViews.length}</strong> view(s) selected for copying
                         </div>
                         <div className="button-group">
-                            <button className="btn btn-success" onClick={handleReplicateLayout} disabled={isReplicating}>
-                                {isReplicating ? "Replicating..." : "✓ Replicate Layout"}
+                            <button className="btn btn-success" onClick={handleCopyLayout} disabled={isCopying}>
+                                {isCopying ? "Copying..." : "✓ Copy Layout"}
                             </button>
-                            <button className="btn btn-secondary" onClick={handleReset} disabled={isReplicating}>
+                            <button className="btn btn-secondary" onClick={handleReset} disabled={isCopying}>
                                 Reset
                             </button>
                         </div>
