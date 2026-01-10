@@ -283,11 +283,9 @@ function App() {
     if (loading && !isPPTB) {
         return (
             <div className="container">
-                <div className="header">
-                    <h1>PCF Builder</h1>
-                    <p>Build and manage Power Apps Component Framework controls</p>
+                <div className="content">
+                    <div className="loading">Loading...</div>
                 </div>
-                <div className="loading">Loading...</div>
             </div>
         );
     }
@@ -295,10 +293,6 @@ function App() {
     if (error) {
         return (
             <div className="container">
-                <div className="header">
-                    <h1>PCF Builder</h1>
-                    <p>Build and manage Power Apps Component Framework controls</p>
-                </div>
                 <div className="content">
                     <div className="error">{error}</div>
                 </div>
@@ -308,64 +302,45 @@ function App() {
 
     return (
         <div className="container">
-            <div className="header">
-                <h1>⚡ PCF Builder</h1>
-                <p>Build and manage Power Apps Component Framework controls</p>
-                {connectionUrl && (
-                    <p style={{ fontSize: '0.9rem', marginTop: '10px', opacity: 0.8 }}>
-                        Connected to: {connectionUrl}
-                    </p>
-                )}
+            {/* Navigation Tabs */}
+            <div className="tabs">
+                <button 
+                    className={`tab ${viewMode === 'home' ? 'active' : ''}`}
+                    onClick={() => setViewMode('home')}
+                >
+                    Home
+                </button>
+                <button 
+                    className={`tab ${viewMode === 'new-control' ? 'active' : ''}`}
+                    onClick={() => setViewMode('new-control')}
+                >
+                    New Control
+                </button>
+                <button 
+                    className={`tab ${viewMode === 'edit-control' ? 'active' : ''}`}
+                    onClick={() => setViewMode('edit-control')}
+                >
+                    Edit Control
+                </button>
+                <button 
+                    className={`tab ${viewMode === 'solution' ? 'active' : ''}`}
+                    onClick={() => setViewMode('solution')}
+                >
+                    Solution
+                </button>
             </div>
 
             <div className="content">
-                {/* Navigation Tabs */}
-                <div className="tabs">
-                    <button 
-                        className={`tab ${viewMode === 'home' ? 'active' : ''}`}
-                        onClick={() => setViewMode('home')}
-                    >
-                        Home
-                    </button>
-                    <button 
-                        className={`tab ${viewMode === 'new-control' ? 'active' : ''}`}
-                        onClick={() => setViewMode('new-control')}
-                    >
-                        New Control
-                    </button>
-                    <button 
-                        className={`tab ${viewMode === 'edit-control' ? 'active' : ''}`}
-                        onClick={() => setViewMode('edit-control')}
-                    >
-                        Edit Control
-                    </button>
-                    <button 
-                        className={`tab ${viewMode === 'solution' ? 'active' : ''}`}
-                        onClick={() => setViewMode('solution')}
-                    >
-                        Solution
-                    </button>
-                </div>
 
                 {/* Home View */}
                 {viewMode === 'home' && (
                     <div className="form-section">
-                        <h2>Welcome to PCF Builder</h2>
-                        <p style={{ marginBottom: '20px' }}>
-                            A comprehensive tool for building and managing Power Apps Component Framework (PCF) custom controls.
+                        <h2>PCF Builder</h2>
+                        <p style={{ marginBottom: '16px', color: '#605e5c', fontSize: '0.875rem' }}>
+                            Build and manage Power Apps Component Framework (PCF) custom controls.
                         </p>
-                        
-                        <div className="info-box">
-                            <h3>Getting Started</h3>
-                            <ul style={{ marginLeft: '20px', marginTop: '10px' }}>
-                                <li>Create a new PCF control from the "New Control" tab</li>
-                                <li>Edit existing controls from the "Edit Control" tab</li>
-                                <li>Build and test your controls</li>
-                                <li>Create solution packages for deployment</li>
-                            </ul>
-                        </div>
 
-                        <div className="form-group" style={{ marginTop: '20px' }}>
+                        <div className="form-group">
                             <label htmlFor="projectPath">Project Path</label>
                             <input
                                 type="text"
@@ -374,8 +349,8 @@ function App() {
                                 onChange={(e) => handleSetProjectPath(e.target.value)}
                                 placeholder="e.g., C:\Projects\MyPCFControl"
                             />
-                            <small style={{ color: '#6c757d', marginTop: '5px', display: 'block' }}>
-                                Enter the full path where you want to create or where your PCF project is located
+                            <small style={{ color: '#605e5c', marginTop: '4px', display: 'block', fontSize: '0.75rem' }}>
+                                Full path to create or manage your PCF project
                             </small>
                         </div>
 
@@ -384,12 +359,15 @@ function App() {
                                 Create New Control
                             </button>
                             <button className="btn btn-secondary" onClick={() => setViewMode('edit-control')}>
-                                Edit Existing Control
+                                Edit Control
+                            </button>
+                            <button className="btn btn-secondary" onClick={() => setViewMode('solution')}>
+                                Create Solution
                             </button>
                         </div>
                         
                         {projectPath && (
-                            <div className="success-message" style={{ marginTop: '20px' }}>
+                            <div className="success-message">
                                 <strong>Current Project Path:</strong> {projectPath}
                             </div>
                         )}
@@ -410,8 +388,8 @@ function App() {
                                 onChange={(e) => handleSetProjectPath(e.target.value)}
                                 placeholder="e.g., C:\Projects\MyPCFControl"
                             />
-                            <small style={{ color: '#6c757d', marginTop: '5px', display: 'block' }}>
-                                Enter the full path where you want to create the PCF project
+                            <small style={{ color: '#605e5c', marginTop: '4px', display: 'block', fontSize: '0.75rem' }}>
+                                Full path to create the PCF project
                             </small>
                         </div>
                         
@@ -532,8 +510,8 @@ function App() {
                                 onChange={(e) => handleSetProjectPath(e.target.value)}
                                 placeholder="e.g., C:\Projects\MyPCFControl"
                             />
-                            <small style={{ color: '#6c757d', marginTop: '5px', display: 'block' }}>
-                                Enter the full path to your existing PCF project
+                            <small style={{ color: '#605e5c', marginTop: '4px', display: 'block', fontSize: '0.75rem' }}>
+                                Full path to your existing PCF project
                             </small>
                         </div>
                         
@@ -581,8 +559,8 @@ function App() {
                                 onChange={(e) => handleSetProjectPath(e.target.value)}
                                 placeholder="e.g., C:\Projects\MyPCFControl"
                             />
-                            <small style={{ color: '#6c757d', marginTop: '5px', display: 'block' }}>
-                                Enter the full path to your PCF project
+                            <small style={{ color: '#605e5c', marginTop: '4px', display: 'block', fontSize: '0.75rem' }}>
+                                Full path to your PCF project
                             </small>
                         </div>
                         
