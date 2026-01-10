@@ -1,0 +1,40 @@
+{
+  "name": "@power-maverick/tool-pcf-builder",
+  "displayName": "PCF Builder",
+  "version": "1.0.0",
+  "description": "Build and manage Power Apps Component Framework (PCF) controls - React-based tool for PowerPlatform ToolBox",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview",
+    "finalize-package": "npm shrinkwrap"
+  },
+  "files": [
+    "dist",
+    "npm-shrinkwrap.json"
+  ],
+  "keywords": [
+    "pcf",
+    "power-apps",
+    "component-framework",
+    "custom-control",
+    "power-platform",
+    "pptb",
+    "toolbox"
+  ],
+  "author": "Power Maverick",
+  "license": "GPL-2.0",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@pptb/types": "^1.0.12",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.7"
+  }
+}

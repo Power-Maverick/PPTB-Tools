@@ -8,6 +8,38 @@ This is a monorepo containing various tools designed primarily for Power Platfor
 
 ## Tools
 
+### [@power-maverick/tool-pcf-builder](./tools/pcf-builder)
+
+Build and manage Power Apps Component Framework (PCF) custom controls. **React-based tool** exclusively for:
+- **PPTB (Power Platform Toolbox)**: Full integration with PPTB - Electron desktop app
+
+**Key Features:**
+- **React + TypeScript**: Modern component-based architecture with Vite build system
+- **PPTB-Only Integration**: Designed exclusively for PowerPlatform ToolBox
+- **Visual PCF Control Creation**: Create new PCF controls with intuitive UI
+- **Project Management**: Build, test, and manage PCF projects
+- **Solution Packaging**: Create solution packages for deployment
+- **Template Support**: Field (single field) and Dataset (grid) templates
+- **Additional Packages**: Support for Fluent UI, React, and other npm packages
+- **Command Execution**: Execute Power Apps CLI commands through PPTB terminal API
+- **File System Integration**: Select folders and files through PPTB file system API
+
+**PPTB Integration:**
+The tool uses `window.toolboxAPI` for:
+- Getting active connection via `connections.getActiveConnection()`
+- Showing notifications via `showNotification()`
+- Executing commands via `terminal.executeCommand()`
+- File system operations via `fileSystem.selectFolder()`, `fileSystem.selectFile()`
+
+**Technical Architecture:**
+- **React 18** with functional components and hooks
+- **Vite** for fast development and optimized production builds
+- **TypeScript** for type safety with latest `@pptb/types` (v1.0.12)
+- **Browser-only bundle**: No Node.js-specific artifacts in webview output
+
+**Reference:**
+Based on [PCF-CustomControlBuilder](https://github.com/Power-Maverick/PCF-CustomControlBuilder) adapted for PPTB.
+
 ### [@dvdt-tools/erd-generator](./tools/erd-generator)
 
 Generate Entity Relationship Diagrams (ERD) from Dataverse solutions. **React-based tool** with dual integration support for:
@@ -89,16 +121,25 @@ npm run dev
 ```
 PPTB-Tools/
 ├── tools/
-│   └── erd-generator/       # ERD generation tool
+│   ├── pcf-builder/         # PCF Custom Control Builder tool (PPTB-only)
+│   │   ├── src/
+│   │   │   ├── App.tsx
+│   │   │   ├── main.tsx
+│   │   │   ├── styles.css
+│   │   │   ├── models/
+│   │   │   ├── components/
+│   │   │   └── utils/
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── README.md
+│   └── erd-generator/       # ERD generation tool (PPTB + DVDT)
 │       ├── src/
-│       │   ├── ERDGenerator.ts
-│       │   ├── types.ts
-│       │   └── index.ts
+│       │   ├── App.tsx
+│       │   ├── main.tsx
+│       │   └── components/
 │       ├── package.json
 │       ├── tsconfig.json
 │       └── README.md
-├── package.json             # Root package with workspaces
-├── tsconfig.json           # Shared TypeScript config
 ├── LICENSE
 └── README.md
 ```
