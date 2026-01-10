@@ -242,180 +242,151 @@ function App() {
 
     return (
         <div className="container">
-            <header className="header">
-                <h1>📋 View Layout Replicator</h1>
-                <p>Apply the same layout to multiple views of the same entity</p>
-            </header>
-
             {error && (
                 <div className="error">
                     {error}
                 </div>
             )}
 
-            <div className="card">
-                <div className="info-message">
-                    <strong>✓ Connected to Dataverse</strong><br />
-                    Environment: <span>{connectionUrl || "Not connected"}</span>
-                </div>
-            </div>
-
-            {/* Step 1: Select Entity */}
-            <div className="card step-section">
-                <div className="step-header">
-                    <div className="step-number">1</div>
-                    <div className="step-title">Select Entity</div>
-                </div>
-                
-                <div className="form-group">
-                    <label htmlFor="entitySelect">Choose the entity whose views you want to work with</label>
-                    <select 
-                        id="entitySelect" 
-                        value={selectedEntity}
-                        onChange={(e) => setSelectedEntity(e.target.value)}
-                        disabled={entities.length === 0 || loading}
-                    >
-                        <option value="">-- Select an Entity --</option>
-                        {entities.map((entity) => (
-                            <option key={entity.logicalName} value={entity.logicalName}>
-                                {entity.displayName} ({entity.logicalName})
-                            </option>
-                        ))}
-                    </select>
-                    <div className="help-text">
-                        Select the entity that contains the views you want to replicate
+            <div className="content-wrapper">
+                {/* Entity Selection */}
+                <div className="section">
+                    <div className="section-title">Select Entity</div>
+                    <div className="form-group">
+                        <select 
+                            id="entitySelect" 
+                            value={selectedEntity}
+                            onChange={(e) => setSelectedEntity(e.target.value)}
+                            disabled={entities.length === 0 || loading}
+                        >
+                            <option value="">-- Select an Entity --</option>
+                            {entities.map((entity) => (
+                                <option key={entity.logicalName} value={entity.logicalName}>
+                                    {entity.displayName} ({entity.logicalName})
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 </div>
-            </div>
 
-            {/* Step 2: Select Source and Target Views */}
-            {selectedEntity && views.length > 0 && (
-                <div className="card step-section">
-                    <div className="step-header">
-                        <div className="step-number">2</div>
-                        <div className="step-title">Select Views</div>
-                    </div>
-
-                    <h3>Source View</h3>
-                    <p className="help-text">Select the view whose layout you want to copy</p>
-                    
-                    <div className="view-list">
-                        {views.map((view) => (
-                            <div
-                                key={view.savedqueryid}
-                                className={`view-item ${sourceView === view.savedqueryid ? 'source' : ''}`}
-                                onClick={() => handleSourceViewChange(view.savedqueryid)}
-                            >
-                                <input
-                                    type="radio"
-                                    name="sourceView"
-                                    checked={sourceView === view.savedqueryid}
-                                    onChange={() => handleSourceViewChange(view.savedqueryid)}
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                                <span>{view.name}</span>
-                            </div>
-                        ))}
-                    </div>
-
-                    {sourceView && sourceViewLayout && (
-                        <>
-                            <h3>Source Layout Preview</h3>
-                            <div className="layout-preview">
-                                <pre>{sourceViewLayout}</pre>
-                            </div>
-                        </>
-                    )}
-
-                    {sourceView && (
-                        <>
-                            <h3 style={{ marginTop: '30px' }}>Target Views</h3>
-                            <p className="help-text">
-                                Select one or more views to apply the source layout to
-                            </p>
+                {/* View Selection */}
+                {selectedEntity && views.length > 0 && (
+                    <div className="main-section">
+                        <div className="section">
+                            <div className="section-title">Select Views</div>
                             
-                            <div className="view-list">
-                                {views
-                                    .filter(view => view.savedqueryid !== sourceView)
-                                    .map((view) => (
-                                        <div
-                                            key={view.savedqueryid}
-                                            className={`view-item ${targetViews.includes(view.savedqueryid) ? 'selected' : ''}`}
-                                            onClick={() => handleTargetViewToggle(view.savedqueryid)}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={targetViews.includes(view.savedqueryid)}
-                                                onChange={() => handleTargetViewToggle(view.savedqueryid)}
-                                                onClick={(e) => e.stopPropagation()}
-                                            />
-                                            <span>{view.name}</span>
-                                        </div>
-                                    ))}
-                            </div>
-
-                            {targetViews.length > 0 && (
-                                <div className="success-message" style={{ marginTop: '15px' }}>
-                                    <strong>{targetViews.length}</strong> view(s) selected for layout replication
+                            <div className="views-container">
+                                {/* Source View Panel */}
+                                <div className="views-panel">
+                                    <div className="panel-header">
+                                        <div className="panel-title">Source View</div>
+                                        <div className="panel-subtitle">Select the view to copy layout from</div>
+                                    </div>
+                                    
+                                    <div className="view-list">
+                                        {views.map((view) => (
+                                            <div
+                                                key={view.savedqueryid}
+                                                className={`view-item ${sourceView === view.savedqueryid ? 'source' : ''}`}
+                                                onClick={() => handleSourceViewChange(view.savedqueryid)}
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    name="sourceView"
+                                                    checked={sourceView === view.savedqueryid}
+                                                    onChange={() => handleSourceViewChange(view.savedqueryid)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                                <span>{view.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            )}
-                        </>
-                    )}
-                </div>
-            )}
 
-            {/* Step 3: Replicate */}
-            {sourceView && targetViews.length > 0 && (
-                <div className="card step-section">
-                    <div className="step-header">
-                        <div className="step-number">3</div>
-                        <div className="step-title">Replicate Layout</div>
+                                {/* Target Views Panel */}
+                                {sourceView && (
+                                    <div className="views-panel">
+                                        <div className="panel-header">
+                                            <div className="panel-title">Target Views</div>
+                                            <div className="panel-subtitle">Select views to apply the layout to</div>
+                                        </div>
+                                        
+                                        <div className="view-list">
+                                            {views
+                                                .filter(view => view.savedqueryid !== sourceView)
+                                                .map((view) => (
+                                                    <div
+                                                        key={view.savedqueryid}
+                                                        className={`view-item ${targetViews.includes(view.savedqueryid) ? 'selected' : ''}`}
+                                                        onClick={() => handleTargetViewToggle(view.savedqueryid)}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={targetViews.includes(view.savedqueryid)}
+                                                            onChange={() => handleTargetViewToggle(view.savedqueryid)}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                        <span>{view.name}</span>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
+                )}
 
-                    <p className="help-text">
-                        Click the button below to apply the source view layout to all selected target views
-                    </p>
-
-                    <div className="button-group">
-                        <button 
-                            className="btn btn-success" 
-                            onClick={handleReplicateLayout}
-                            disabled={isReplicating}
-                        >
-                            {isReplicating ? 'Replicating...' : '✓ Replicate Layout'}
-                        </button>
-                        <button 
-                            className="btn btn-secondary" 
-                            onClick={handleReset}
-                            disabled={isReplicating}
-                        >
-                            Reset
-                        </button>
+                {/* Action Bar */}
+                {sourceView && targetViews.length > 0 && (
+                    <div className="action-bar">
+                        <div className="selection-info">
+                            <strong>{targetViews.length}</strong> view(s) selected for replication
+                        </div>
+                        <div className="button-group">
+                            <button 
+                                className="btn btn-success" 
+                                onClick={handleReplicateLayout}
+                                disabled={isReplicating}
+                            >
+                                {isReplicating ? 'Replicating...' : '✓ Replicate Layout'}
+                            </button>
+                            <button 
+                                className="btn btn-secondary" 
+                                onClick={handleReset}
+                                disabled={isReplicating}
+                            >
+                                Reset
+                            </button>
+                        </div>
                     </div>
+                )}
 
-                    {updateProgress.length > 0 && (
-                        <div className="progress-section">
-                            <h3>Progress</h3>
+                {/* Progress */}
+                {updateProgress.length > 0 && (
+                    <div className="section">
+                        <div className="section-title">Progress</div>
+                        <div className="progress-list">
                             {updateProgress.map((item) => (
                                 <div 
                                     key={item.viewId} 
                                     className={`progress-item ${item.status}`}
                                 >
+                                    <span className="status-icon">
+                                        {item.status === 'success' && '✓'}
+                                        {item.status === 'error' && '✗'}
+                                        {item.status === 'pending' && '⋯'}
+                                    </span>
                                     <div>
-                                        <span className="status-icon">
-                                            {item.status === 'success' && '✓'}
-                                            {item.status === 'error' && '✗'}
-                                            {item.status === 'pending' && '⋯'}
-                                        </span>
                                         <strong>{item.viewName}</strong>
                                         {item.message && <span> - {item.message}</span>}
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    )}
-                </div>
-            )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
