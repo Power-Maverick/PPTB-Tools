@@ -1,55 +1,33 @@
-import axios, { AxiosInstance } from 'axios';
-import { DataverseCredentials, Entity, View } from '../models/interfaces';
+import { Entity, View } from '../models/interfaces';
 
 export class DataverseClient {
-    private axiosInstance: AxiosInstance;
-    private isPPTB: boolean;
-
-    constructor(credentials: DataverseCredentials, isPPTB: boolean = false) {
-        this.isPPTB = isPPTB;
-        
-        // Create axios instance with base configuration
-        this.axiosInstance = axios.create({
-            baseURL: `${credentials.environmentUrl}/api/data/v9.2`,
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'OData-MaxVersion': '4.0',
-                'OData-Version': '4.0',
-            },
-        });
-
-        // Add request interceptor to get fresh token for PPTB
-        this.axiosInstance.interceptors.request.use(async (config) => {
-            if (this.isPPTB && window.toolboxAPI) {
-                try {
-                    const token = await window.toolboxAPI.connections.getAccessToken();
-                    config.headers.Authorization = `Bearer ${token}`;
-                } catch (error) {
-                    console.error('Failed to get access token:', error);
-                }
-            } else if (credentials.accessToken) {
-                config.headers.Authorization = `Bearer ${credentials.accessToken}`;
-            }
-            return config;
-        });
+    constructor() {
+        // No longer need credentials - using window.dataverseAPI
     }
 
     async listEntities(): Promise<Entity[]> {
         try {
-            const response = await this.axiosInstance.get('/EntityDefinitions', {
-                params: {
-                    $select: 'LogicalName,DisplayName,ObjectTypeCode',
-                    $filter: 'IsValidForAdvancedFind eq true and IsCustomizable/Value eq true',
-                    $orderby: 'LogicalName'
-                }
-            });
+            // Use getAllEntitiesMetadata from dataverseAPI
+            const response = await window.dataverseAPI.getAllEntitiesMetadata([
+                'LogicalName',
+                'DisplayName',
+                'ObjectTypeCode',
+                'IsValidForAdvancedFind',
+                'IsCustomizable'
+            ]);
 
-            return response.data.value.map((entity: any) => ({
-                logicalName: entity.LogicalName,
-                displayName: entity.DisplayName?.UserLocalizedLabel?.Label || entity.LogicalName,
-                objectTypeCode: entity.ObjectTypeCode
-            }));
+            // Filter for valid and customizable entities
+            return response.value
+                .filter((entity: any) => 
+                    entity.IsValidForAdvancedFind === true && 
+                    entity.IsCustomizable?.Value === true
+                )
+                .map((entity: any) => ({
+                    logicalName: entity.LogicalName,
+                    displayName: entity.DisplayName?.LocalizedLabels?.[0]?.Label || entity.LogicalName,
+                    objectTypeCode: entity.ObjectTypeCode
+                }))
+                .sort((a, b) => a.logicalName.localeCompare(b.logicalName));
         } catch (error: any) {
             console.error('Failed to fetch entities:', error);
             throw new Error(`Failed to fetch entities: ${error.message}`);
@@ -58,16 +36,15 @@ export class DataverseClient {
 
     async listViews(entityLogicalName: string): Promise<View[]> {
         try {
-            // Fetch saved queries (system views)
-            const savedQueriesResponse = await this.axiosInstance.get('/savedqueries', {
-                params: {
-                    $select: 'savedqueryid,name,fetchxml,layoutxml,returnedtypecode,querytype',
-                    $filter: `returnedtypecode eq '${entityLogicalName}' and statecode eq 0`,
-                    $orderby: 'name'
-                }
-            });
+            // Get entity set name for OData query
+            const entitySetName = await window.dataverseAPI.getEntitySetName('savedquery');
+            
+            // Use queryData with OData filter for savedqueries
+            const response = await window.dataverseAPI.queryData(
+                `${entitySetName}?$select=savedqueryid,name,fetchxml,layoutxml,returnedtypecode,querytype&$filter=returnedtypecode eq '${entityLogicalName}' and statecode eq 0&$orderby=name`
+            );
 
-            const views: View[] = savedQueriesResponse.data.value.map((view: any) => ({
+            const views: View[] = response.value.map((view: any) => ({
                 savedqueryid: view.savedqueryid,
                 name: view.name,
                 fetchxml: view.fetchxml,
@@ -85,19 +62,20 @@ export class DataverseClient {
 
     async getView(viewId: string): Promise<View> {
         try {
-            const response = await this.axiosInstance.get(`/savedqueries(${viewId})`, {
-                params: {
-                    $select: 'savedqueryid,name,fetchxml,layoutxml,returnedtypecode,querytype'
-                }
-            });
+            // Use retrieve to get a specific savedquery
+            const view = await window.dataverseAPI.retrieve(
+                'savedquery',
+                viewId,
+                ['savedqueryid', 'name', 'fetchxml', 'layoutxml', 'returnedtypecode', 'querytype']
+            );
 
             return {
-                savedqueryid: response.data.savedqueryid,
-                name: response.data.name,
-                fetchxml: response.data.fetchxml,
-                layoutxml: response.data.layoutxml,
-                returnedtypecode: response.data.returnedtypecode,
-                querytype: response.data.querytype
+                savedqueryid: view.savedqueryid as string,
+                name: view.name as string,
+                fetchxml: view.fetchxml as string,
+                layoutxml: view.layoutxml as string,
+                returnedtypecode: view.returnedtypecode as string,
+                querytype: view.querytype as number
             };
         } catch (error: any) {
             console.error('Failed to fetch view:', error);
@@ -107,7 +85,8 @@ export class DataverseClient {
 
     async updateViewLayout(viewId: string, layoutXml: string): Promise<void> {
         try {
-            await this.axiosInstance.patch(`/savedqueries(${viewId})`, {
+            // Use update to modify the savedquery's layoutxml
+            await window.dataverseAPI.update('savedquery', viewId, {
                 layoutxml: layoutXml
             });
         } catch (error: any) {

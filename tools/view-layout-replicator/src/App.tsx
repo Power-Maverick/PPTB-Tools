@@ -83,9 +83,7 @@ function App() {
     const loadEntities = async () => {
         try {
             setLoading(true);
-            const client = new DataverseClient({
-                environmentUrl: connectionUrl
-            }, isPPTB);
+            const client = new DataverseClient();
             
             const entityList = await client.listEntities();
             setEntities(entityList);
@@ -99,9 +97,7 @@ function App() {
     const loadViews = async () => {
         try {
             setLoading(true);
-            const client = new DataverseClient({
-                environmentUrl: connectionUrl
-            }, isPPTB);
+            const client = new DataverseClient();
             
             const viewList = await client.listViews(selectedEntity);
             setViews(viewList);
@@ -114,9 +110,7 @@ function App() {
 
     const loadSourceViewLayout = async () => {
         try {
-            const client = new DataverseClient({
-                environmentUrl: connectionUrl
-            }, isPPTB);
+            const client = new DataverseClient();
             
             const view = await client.getView(sourceView);
             setSourceViewLayout(view.layoutxml);
@@ -175,9 +169,7 @@ function App() {
         }));
         setUpdateProgress(progress);
 
-        const client = new DataverseClient({
-            environmentUrl: connectionUrl
-        }, isPPTB);
+        const client = new DataverseClient();
 
         let successCount = 0;
         let errorCount = 0;

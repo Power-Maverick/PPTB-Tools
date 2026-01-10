@@ -18,8 +18,3 @@ export interface ViewListItem {
     name: string;
     type: 'system' | 'user';
 }
-
-export interface DataverseCredentials {
-    environmentUrl: string;
-    accessToken?: string;
-}
