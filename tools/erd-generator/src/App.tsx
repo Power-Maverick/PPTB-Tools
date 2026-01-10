@@ -405,69 +405,59 @@ function App() {
 
     return (
         <div className="container">
-            <header className="header">
-                <h1>🗺️ Dataverse ERD Generator</h1>
-                <p>Generate Entity Relationship Diagrams from your Dataverse solutions</p>
-            </header>
-
             {error && (
                 <div className="error">
                     {error}
                 </div>
             )}
 
-            <div className="card">
-                <div className="info-message">
-                    <strong>✓ Connected to Dataverse</strong><br />
-                    Environment: <span>{connectionUrl || "Not connected"}</span>
-                </div>
-
-                <div className="form-group">
-                    <label htmlFor="solutionSelect">Select a Solution</label>
-                    <select 
-                        id="solutionSelect" 
-                        value={selectedSolution}
-                        onChange={(e) => setSelectedSolution(e.target.value)}
-                        disabled={solutions.length === 0}
-                    >
-                        <option value="">-- Select a Solution --</option>
-                        {solutions.map((solution) => (
-                            <option key={solution.uniqueName} value={solution.uniqueName}>
-                                {solution.displayName} ({solution.version})
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                <div className="generate-section">
-                    <h2>Generate ERD</h2>
-                    <div className="format-selector">
-                        <label style={{ fontWeight: 600, marginRight: '10px' }}>Output Format:</label>
-                        <button 
-                            className={`format-btn ${selectedFormat === 'mermaid' ? 'active' : ''}`}
-                            onClick={() => setSelectedFormat('mermaid')}
+            <div className="main-content">
+                <div className="controls-panel">
+                    <div className="form-group">
+                        <label htmlFor="solutionSelect">Solution</label>
+                        <select 
+                            id="solutionSelect" 
+                            value={selectedSolution}
+                            onChange={(e) => setSelectedSolution(e.target.value)}
+                            disabled={solutions.length === 0}
                         >
-                            Mermaid
-                        </button>
-                        <button 
-                            className={`format-btn ${selectedFormat === 'plantuml' ? 'active' : ''}`}
-                            onClick={() => setSelectedFormat('plantuml')}
-                        >
-                            PlantUML
-                        </button>
-                        <button 
-                            className={`format-btn ${selectedFormat === 'drawio' ? 'active' : ''}`}
-                            onClick={() => setSelectedFormat('drawio')}
-                        >
-                            Draw.io
-                        </button>
+                            <option value="">Select a solution</option>
+                            {solutions.map((solution) => (
+                                <option key={solution.uniqueName} value={solution.uniqueName}>
+                                    {solution.displayName} ({solution.version})
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
-                    <div className="config-section">
-                        <h3>Configuration</h3>
-                        
-                        <div className="config-group">
-                            <label>
+                    <div className="form-group">
+                        <label>Format</label>
+                        <div className="format-selector">
+                            <button 
+                                className={`format-btn ${selectedFormat === 'mermaid' ? 'active' : ''}`}
+                                onClick={() => setSelectedFormat('mermaid')}
+                            >
+                                Mermaid
+                            </button>
+                            <button 
+                                className={`format-btn ${selectedFormat === 'plantuml' ? 'active' : ''}`}
+                                onClick={() => setSelectedFormat('plantuml')}
+                            >
+                                PlantUML
+                            </button>
+                            <button 
+                                className={`format-btn ${selectedFormat === 'drawio' ? 'active' : ''}`}
+                                onClick={() => setSelectedFormat('drawio')}
+                            >
+                                Draw.io
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label>Options</label>
+                        <div className="options-list">
+                            <label className="option-item">
                                 <input 
                                     type="checkbox" 
                                     checked={includeAttributes}
@@ -475,11 +465,8 @@ function App() {
                                 />
                                 <span>Include Attributes</span>
                             </label>
-                            <div className="config-help">Show table columns/fields in the diagram</div>
-                        </div>
-
-                        <div className="config-group">
-                            <label>
+                            
+                            <label className="option-item">
                                 <input 
                                     type="checkbox" 
                                     checked={includeRelationships}
@@ -487,12 +474,11 @@ function App() {
                                 />
                                 <span>Include Relationships</span>
                             </label>
-                            <div className="config-help">Show relationships between tables</div>
-                        </div>
-
-                        <div className="config-group">
-                            <div className="config-label-group">
-                                <label htmlFor="maxAttributesInput">Max Attributes per Table:</label>
+                            
+                            <div className="option-item">
+                                <label htmlFor="maxAttributesInput" className="inline-label">
+                                    Max Attributes:
+                                </label>
                                 <input 
                                     type="number" 
                                     id="maxAttributesInput"
@@ -500,9 +486,9 @@ function App() {
                                     onChange={(e) => setMaxAttributesPerTable(parseInt(e.target.value) || 0)}
                                     min="0" 
                                     max="100"
+                                    className="number-input"
                                 />
                             </div>
-                            <div className="config-help">Maximum number of attributes to display per table (0 = show all)</div>
                         </div>
                     </div>
 
@@ -513,31 +499,33 @@ function App() {
                     >
                         Generate ERD
                     </button>
-                </div>
-            </div>
 
-            {generatedDiagram && (
-                <div className="card">
-                    <h2>Generated ERD</h2>
-                    <div className="diagram-controls">
-                        <button 
-                            className="btn btn-secondary"
-                            onClick={() => setViewMode(viewMode === 'visual' ? 'text' : 'visual')}
-                        >
-                            {viewMode === 'visual' ? '📝 Show Text' : '🎨 Show Visual'}
-                        </button>
-                        <button className="btn btn-secondary" onClick={handleDownload}>
-                            📥 Download Source
-                        </button>
-                        <button className="btn btn-secondary" onClick={handleCopyToClipboard}>
-                            📋 Copy to Clipboard
-                        </button>
-                    </div>
-                    <div className="diagram-container">
-                        {renderDiagram()}
-                    </div>
+                    {generatedDiagram && (
+                        <div className="action-buttons">
+                            <button 
+                                className="btn btn-secondary"
+                                onClick={() => setViewMode(viewMode === 'visual' ? 'text' : 'visual')}
+                            >
+                                {viewMode === 'visual' ? '📝 Text' : '🎨 Visual'}
+                            </button>
+                            <button className="btn btn-secondary" onClick={handleDownload}>
+                                📥 Download
+                            </button>
+                            <button className="btn btn-secondary" onClick={handleCopyToClipboard}>
+                                📋 Copy
+                            </button>
+                        </div>
+                    )}
                 </div>
-            )}
+
+                {generatedDiagram && (
+                    <div className="diagram-panel">
+                        <div className="diagram-container">
+                            {renderDiagram()}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
