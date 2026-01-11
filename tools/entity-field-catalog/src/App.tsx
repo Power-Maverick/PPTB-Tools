@@ -5,13 +5,12 @@ import {
   Option,
   Spinner,
   Text,
-  Title1,
   Title3,
   makeStyles,
   shorthands,
   tokens,
 } from '@fluentui/react-components';
-import { ArrowDownload24Regular, Database24Regular } from '@fluentui/react-icons';
+import { ArrowDownload24Regular } from '@fluentui/react-icons';
 import { useEffect, useState } from 'react';
 import { DataverseEntity, DataverseSolution, ExportFormat } from './models/interfaces';
 import { DataverseClient } from './utils/DataverseClient';
@@ -23,20 +22,6 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     minHeight: '100vh',
     backgroundColor: tokens.colorNeutralBackground3,
-  },
-  header: {
-    backgroundColor: tokens.colorBrandBackground,
-    color: tokens.colorNeutralForegroundOnBrand,
-    ...shorthands.padding('32px', '24px'),
-    textAlign: 'center',
-  },
-  headerTitle: {
-    color: tokens.colorNeutralForegroundOnBrand,
-    marginBottom: '8px',
-  },
-  headerSubtitle: {
-    color: tokens.colorNeutralForegroundOnBrand,
-    fontSize: tokens.fontSizeBase400,
   },
   container: {
     maxWidth: '1200px',
@@ -296,16 +281,6 @@ function App() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.header}>
-        <Title1 className={styles.headerTitle}>
-          <Database24Regular style={{ marginRight: '8px', verticalAlign: 'middle' }} />
-          Entity Field Catalog
-        </Title1>
-        <Text className={styles.headerSubtitle}>
-          Export entity and field metadata from your Dataverse solutions
-        </Text>
-      </div>
-
       <div className={styles.container}>
         {error && (
           <div className={styles.error}>
