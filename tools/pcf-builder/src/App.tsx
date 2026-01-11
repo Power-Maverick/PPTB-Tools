@@ -280,6 +280,37 @@ function App() {
         }
     };
 
+    // Handler for selecting folder using selectPath API
+    const handleSelectFolder = async () => {
+        if (!window.toolboxAPI) return;
+        
+        try {
+            const selectedPath = await window.toolboxAPI.utils.selectPath({
+                type: 'folder',
+                title: 'Select PCF Project Folder',
+                message: 'Choose a folder for your PCF project',
+                buttonLabel: 'Select Folder'
+            });
+            
+            if (selectedPath) {
+                setProjectPath(selectedPath);
+                await window.toolboxAPI.utils.showNotification({
+                    title: "Success",
+                    body: `Project path set to: ${selectedPath}`,
+                    type: "success"
+                });
+            }
+        } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            console.error('Failed to select folder:', error);
+            await window.toolboxAPI.utils.showNotification({
+                title: "Error",
+                body: `Failed to select folder: ${errorMsg}`,
+                type: "error"
+            });
+        }
+    };
+
     if (loading && !isPPTB) {
         return (
             <div className="container">
@@ -342,13 +373,23 @@ function App() {
 
                         <div className="form-group">
                             <label htmlFor="projectPath">Project Path</label>
-                            <input
-                                type="text"
-                                id="projectPath"
-                                value={projectPath}
-                                onChange={(e) => handleSetProjectPath(e.target.value)}
-                                placeholder="e.g., C:\Projects\MyPCFControl"
-                            />
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                    type="text"
+                                    id="projectPath"
+                                    value={projectPath}
+                                    onChange={(e) => handleSetProjectPath(e.target.value)}
+                                    placeholder="e.g., C:\Projects\MyPCFControl"
+                                    style={{ flex: 1 }}
+                                />
+                                <button 
+                                    className="btn btn-secondary" 
+                                    onClick={handleSelectFolder}
+                                    style={{ minWidth: '80px' }}
+                                >
+                                    Browse...
+                                </button>
+                            </div>
                             <small style={{ color: '#605e5c', marginTop: '4px', display: 'block', fontSize: '0.75rem' }}>
                                 Full path to create or manage your PCF project
                             </small>
@@ -381,13 +422,23 @@ function App() {
                         
                         <div className="form-group">
                             <label htmlFor="newProjectPath">Project Path *</label>
-                            <input
-                                type="text"
-                                id="newProjectPath"
-                                value={projectPath}
-                                onChange={(e) => handleSetProjectPath(e.target.value)}
-                                placeholder="e.g., C:\Projects\MyPCFControl"
-                            />
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                    type="text"
+                                    id="newProjectPath"
+                                    value={projectPath}
+                                    onChange={(e) => handleSetProjectPath(e.target.value)}
+                                    placeholder="e.g., C:\Projects\MyPCFControl"
+                                    style={{ flex: 1 }}
+                                />
+                                <button 
+                                    className="btn btn-secondary" 
+                                    onClick={handleSelectFolder}
+                                    style={{ minWidth: '80px' }}
+                                >
+                                    Browse...
+                                </button>
+                            </div>
                             <small style={{ color: '#605e5c', marginTop: '4px', display: 'block', fontSize: '0.75rem' }}>
                                 Full path to create the PCF project
                             </small>
@@ -503,13 +554,23 @@ function App() {
                         
                         <div className="form-group">
                             <label htmlFor="editProjectPath">Project Path *</label>
-                            <input
-                                type="text"
-                                id="editProjectPath"
-                                value={projectPath}
-                                onChange={(e) => handleSetProjectPath(e.target.value)}
-                                placeholder="e.g., C:\Projects\MyPCFControl"
-                            />
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                    type="text"
+                                    id="editProjectPath"
+                                    value={projectPath}
+                                    onChange={(e) => handleSetProjectPath(e.target.value)}
+                                    placeholder="e.g., C:\Projects\MyPCFControl"
+                                    style={{ flex: 1 }}
+                                />
+                                <button 
+                                    className="btn btn-secondary" 
+                                    onClick={handleSelectFolder}
+                                    style={{ minWidth: '80px' }}
+                                >
+                                    Browse...
+                                </button>
+                            </div>
                             <small style={{ color: '#605e5c', marginTop: '4px', display: 'block', fontSize: '0.75rem' }}>
                                 Full path to your existing PCF project
                             </small>
@@ -552,13 +613,23 @@ function App() {
                         
                         <div className="form-group">
                             <label htmlFor="solutionProjectPath">Project Path *</label>
-                            <input
-                                type="text"
-                                id="solutionProjectPath"
-                                value={projectPath}
-                                onChange={(e) => handleSetProjectPath(e.target.value)}
-                                placeholder="e.g., C:\Projects\MyPCFControl"
-                            />
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                    type="text"
+                                    id="solutionProjectPath"
+                                    value={projectPath}
+                                    onChange={(e) => handleSetProjectPath(e.target.value)}
+                                    placeholder="e.g., C:\Projects\MyPCFControl"
+                                    style={{ flex: 1 }}
+                                />
+                                <button 
+                                    className="btn btn-secondary" 
+                                    onClick={handleSelectFolder}
+                                    style={{ minWidth: '80px' }}
+                                >
+                                    Browse...
+                                </button>
+                            </div>
                             <small style={{ color: '#605e5c', marginTop: '4px', display: 'block', fontSize: '0.75rem' }}>
                                 Full path to your PCF project
                             </small>
