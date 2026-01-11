@@ -35,7 +35,11 @@ function App() {
     const [selectedFormat, setSelectedFormat] = useState<'mermaid' | 'plantuml' | 'drawio'>('mermaid');
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>("");
-    const [generatedDiagram, setGeneratedDiagram] = useState<string>("");
+    const [generatedDiagrams, setGeneratedDiagrams] = useState<{
+        mermaid: string;
+        plantuml: string;
+        drawio: string;
+    }>({ mermaid: '', plantuml: '', drawio: '' });
     const [viewMode, setViewMode] = useState<'visual' | 'text'>('text');
     const [mermaidReady, setMermaidReady] = useState<boolean>(false);
     
@@ -133,15 +137,35 @@ function App() {
 
             const solution: DataverseSolution = await client.fetchSolution(selectedSolution);
             
-            const generator = new ERDGenerator({
-                format: selectedFormat,
+            // Generate all 3 formats at once
+            const mermaidGenerator = new ERDGenerator({
+                format: 'mermaid',
+                includeAttributes,
+                includeRelationships,
+                maxAttributesPerTable
+            });
+            const plantumlGenerator = new ERDGenerator({
+                format: 'plantuml',
+                includeAttributes,
+                includeRelationships,
+                maxAttributesPerTable
+            });
+            const drawioGenerator = new ERDGenerator({
+                format: 'drawio',
                 includeAttributes,
                 includeRelationships,
                 maxAttributesPerTable
             });
 
-            const diagram = generator.generate(solution);
-            setGeneratedDiagram(diagram);
+            const mermaidDiagram = mermaidGenerator.generate(solution);
+            const plantumlDiagram = plantumlGenerator.generate(solution);
+            const drawioDiagram = drawioGenerator.generate(solution);
+            
+            setGeneratedDiagrams({
+                mermaid: mermaidDiagram,
+                plantuml: plantumlDiagram,
+                drawio: drawioDiagram
+            });
             
             if(isPPTB) {
                 await window.toolboxAPI.utils.showNotification({
@@ -158,7 +182,8 @@ function App() {
     };
 
     const handleDownload = async () => {
-        if (!generatedDiagram) return;
+        const currentDiagram = generatedDiagrams[selectedFormat];
+        if (!currentDiagram) return;
 
         const extensions: Record<string, string> = {
             'mermaid': 'mmd',
@@ -170,7 +195,7 @@ function App() {
         
         try {
             if(isPPTB) {
-                const savedPath = await window.toolboxAPI.utils.saveFile(fileName, generatedDiagram);
+                const savedPath = await window.toolboxAPI.utils.saveFile(fileName, currentDiagram);
                 if (savedPath) {
                     await window.toolboxAPI.utils.showNotification({
                         title: "Success",
@@ -185,11 +210,12 @@ function App() {
     };
 
     const handleCopyToClipboard = async () => {
-        if (!generatedDiagram) return;
+        const currentDiagram = generatedDiagrams[selectedFormat];
+        if (!currentDiagram) return;
 
         try {
             if(isPPTB) {
-                await window.toolboxAPI.utils.copyToClipboard(generatedDiagram);
+                await window.toolboxAPI.utils.copyToClipboard(currentDiagram);
                 await window.toolboxAPI.utils.showNotification({
                     title: "Success",
                     body: "Copied to clipboard",
@@ -239,7 +265,8 @@ function App() {
 
     // Render the diagram (visual or text)
     const renderDiagram = () => {
-        if (!generatedDiagram) return null;
+        const currentDiagram = generatedDiagrams[selectedFormat];
+        if (!currentDiagram) return null;
 
         if (viewMode === 'visual') {
             if (selectedFormat === 'mermaid') {
@@ -261,7 +288,7 @@ function App() {
                                 if (!el) return;
                                 try {
                                     // Set the diagram source as text content for Mermaid to parse
-                                    el.textContent = generatedDiagram;
+                                    el.textContent = currentDiagram;
                                     await ensureMermaid();
                                     if (window.mermaid) {
                                         window.mermaid.init(undefined, el);
@@ -282,7 +309,7 @@ function App() {
                             (async () => {
                                 if (!el) return;
                                 try {
-                                    const encoded = plantumlEncoder.encode(generatedDiagram);
+                                    const encoded = plantumlEncoder.encode(currentDiagram);
                                     
                                     // Fetch SVG from PlantUML server using GET with encoded diagram
                                     const url = `https://www.plantuml.com/plantuml/svg/${encoded}`;
@@ -330,7 +357,7 @@ function App() {
                                 if (!el) return;
                                 try {
                                     // Encode the draw.io XML for embedding
-                                    const encodedDiagram = encodeURIComponent(generatedDiagram);
+                                    const encodedDiagram = encodeURIComponent(currentDiagram);
                                     
                                     // Create an iframe with the draw.io viewer
                                     const iframe = document.createElement('iframe');
@@ -362,7 +389,7 @@ function App() {
                                 if (!el) return;
                                 try {
                                     // Encode the draw.io XML for embedding
-                                    const encodedDiagram = encodeURIComponent(generatedDiagram);
+                                    const encodedDiagram = encodeURIComponent(currentDiagram);
                                     
                                     // Create an iframe with the draw.io viewer
                                     const iframe = document.createElement('iframe');
@@ -390,7 +417,7 @@ function App() {
         // Fallback: show text view
         return (
             <pre className="diagram-text">
-                {generatedDiagram}
+                {currentDiagram}
             </pre>
         );
     };
@@ -500,7 +527,7 @@ function App() {
                         Generate ERD
                     </button>
 
-                    {generatedDiagram && (
+                    {generatedDiagrams.mermaid && (
                         <div className="action-buttons">
                             <button 
                                 className="btn btn-secondary"
@@ -518,7 +545,7 @@ function App() {
                     )}
                 </div>
 
-                {generatedDiagram && (
+                {generatedDiagrams.mermaid && (
                     <div className="diagram-panel">
                         <div className="diagram-container">
                             {renderDiagram()}
