@@ -266,7 +266,7 @@ function App() {
     try {
       const entitiesToExport = entities.filter(e => selectedEntities.has(e.logicalName));
       
-      ExportUtil.export(entitiesToExport, exportFormat, selectedSolution);
+      await ExportUtil.export(entitiesToExport, exportFormat, selectedSolution);
 
       if (isPPTB && window.toolboxAPI?.utils?.showNotification) {
         await window.toolboxAPI.utils.showNotification({

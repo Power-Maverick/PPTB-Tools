@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { DataverseEntity, EntityFieldExportData, ExportFormat } from '../models/interfaces';
 
 /**
@@ -8,11 +8,11 @@ export class ExportUtil {
   /**
    * Export entities and fields to the specified format
    */
-  static export(entities: DataverseEntity[], format: ExportFormat, solutionName: string): void {
+  static async export(entities: DataverseEntity[], format: ExportFormat, solutionName: string): Promise<void> {
     const exportData = this.prepareExportData(entities);
     
     if (format === 'excel') {
-      this.exportToExcel(exportData, solutionName);
+      await this.exportToExcel(exportData, solutionName);
     } else if (format === 'csv') {
       this.exportToCSV(exportData, solutionName);
     }
@@ -51,64 +51,82 @@ export class ExportUtil {
   }
 
   /**
-   * Export data to Excel format
+   * Export data to Excel format using ExcelJS
    */
-  private static exportToExcel(data: EntityFieldExportData[], solutionName: string): void {
+  private static async exportToExcel(data: EntityFieldExportData[], solutionName: string): Promise<void> {
     // Create a new workbook
-    const wb = XLSX.utils.book_new();
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Entity Field Catalog');
 
-    // Convert data to worksheet
-    const ws = XLSX.utils.json_to_sheet(data, {
-      header: [
-        'entityLogicalName',
-        'entityDisplayName',
-        'entitySchemaName',
-        'entityType',
-        'entityDescription',
-        'fieldLogicalName',
-        'fieldDisplayName',
-        'fieldSchemaName',
-        'fieldType',
-        'isPrimaryId',
-        'isPrimaryName',
-        'isRequired',
-        'fieldDescription',
-        'maxLength',
-        'precision',
-        'format',
-      ],
-    });
-
-    // Set column headers with friendly names
-    const headers = [
-      'Entity Logical Name',
-      'Entity Display Name',
-      'Entity Schema Name',
-      'Entity Type',
-      'Entity Description',
-      'Field Logical Name',
-      'Field Display Name',
-      'Field Schema Name',
-      'Field Type',
-      'Is Primary ID',
-      'Is Primary Name',
-      'Is Required',
-      'Field Description',
-      'Max Length',
-      'Precision',
-      'Format',
+    // Define columns with headers
+    worksheet.columns = [
+      { header: 'Entity Logical Name', key: 'entityLogicalName', width: 25 },
+      { header: 'Entity Display Name', key: 'entityDisplayName', width: 25 },
+      { header: 'Entity Schema Name', key: 'entitySchemaName', width: 25 },
+      { header: 'Entity Type', key: 'entityType', width: 20 },
+      { header: 'Entity Description', key: 'entityDescription', width: 35 },
+      { header: 'Field Logical Name', key: 'fieldLogicalName', width: 25 },
+      { header: 'Field Display Name', key: 'fieldDisplayName', width: 25 },
+      { header: 'Field Schema Name', key: 'fieldSchemaName', width: 25 },
+      { header: 'Field Type', key: 'fieldType', width: 20 },
+      { header: 'Is Primary ID', key: 'isPrimaryId', width: 15 },
+      { header: 'Is Primary Name', key: 'isPrimaryName', width: 15 },
+      { header: 'Is Required', key: 'isRequired', width: 15 },
+      { header: 'Field Description', key: 'fieldDescription', width: 35 },
+      { header: 'Max Length', key: 'maxLength', width: 12 },
+      { header: 'Precision', key: 'precision', width: 12 },
+      { header: 'Format', key: 'format', width: 15 },
     ];
 
-    XLSX.utils.sheet_add_aoa(ws, [headers], { origin: 'A1' });
+    // Style the header row
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF0078D4' }, // Microsoft blue
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
+    headerRow.height = 20;
 
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(wb, ws, 'Entity Field Catalog');
+    // Add data rows
+    data.forEach(item => {
+      worksheet.addRow(item);
+    });
+
+    // Apply alternating row colors for better readability
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1 && rowNumber % 2 === 0) {
+        row.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF3F4F6' }, // Light gray
+        };
+      }
+    });
 
     // Generate filename
     const fileName = `${solutionName}-entity-field-catalog.xlsx`;
 
-    // Write file
-    XLSX.writeFile(wb, fileName);
+    // Write to buffer and download
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    });
+    
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', fileName);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up the URL object
+    URL.revokeObjectURL(url);
   }
 
   /**

@@ -1,25 +1,16 @@
 # Security Notes
 
-## Known Issues
+## Dependencies
 
-### xlsx Library Vulnerabilities
+### ExcelJS Library
 
-The xlsx library (v0.18.5) has two known vulnerabilities:
-- GHSA-4r6h-8v6p-xvw6: Prototype Pollution in sheetJS
-- GHSA-5pgg-2g8v-p4x9: SheetJS Regular Expression Denial of Service (ReDoS)
+The tool uses ExcelJS (v4.4.0) for Excel export functionality. This is an actively maintained library with:
+- ✅ No known security vulnerabilities
+- ✅ Regular updates and maintenance
+- ✅ Pure JavaScript implementation
+- ✅ Safe for client-side usage
 
-**Risk Assessment: LOW**
-
-These vulnerabilities are related to parsing untrusted Excel files. In this tool, xlsx is used exclusively for:
-- **Writing/Exporting data** to Excel format (XLSX.utils.json_to_sheet, XLSX.writeFile)
-- **Not parsing user-uploaded files**
-
-The tool generates Excel files from Dataverse metadata that is fetched from authenticated Dataverse environments. No user-provided Excel files are parsed, making the tool safe from these vulnerabilities.
-
-**Mitigation:**
-- The tool only exports data - it never imports or parses Excel files
-- All data comes from trusted Dataverse API responses
-- No user file upload functionality exists
+**Previous Version:** The tool initially used the xlsx library which had known vulnerabilities. These have been resolved by migrating to ExcelJS.
 
 ## Security Features Implemented
 
@@ -27,3 +18,4 @@ The tool generates Excel files from Dataverse metadata that is fetched from auth
 2. **Type Guards**: All accesses to `window.toolboxAPI` use optional chaining (?.) to prevent runtime errors
 3. **Safe Type Conversion**: CSV export safely handles null/undefined values by converting to strings before processing
 4. **No Direct SQL**: All data access goes through Dataverse Web API with proper authentication
+5. **Safe Excel Generation**: ExcelJS is used for Excel export with no parsing of untrusted input
