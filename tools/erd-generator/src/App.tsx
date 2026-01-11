@@ -1,3 +1,4 @@
+import plantumlEncoder from 'plantuml-encoder';
 import { useEffect, useState } from "react";
 import { ERDGenerator } from "./components/ERDGenerator";
 import { DataverseSolution } from "./models/interfaces";
@@ -34,7 +35,11 @@ function App() {
     const [selectedFormat, setSelectedFormat] = useState<'mermaid' | 'plantuml' | 'drawio'>('mermaid');
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>("");
-    const [generatedDiagram, setGeneratedDiagram] = useState<string>("");
+    const [generatedDiagrams, setGeneratedDiagrams] = useState<{
+        mermaid: string;
+        plantuml: string;
+        drawio: string;
+    }>({ mermaid: '', plantuml: '', drawio: '' });
     const [viewMode, setViewMode] = useState<'visual' | 'text'>('text');
     const [mermaidReady, setMermaidReady] = useState<boolean>(false);
     
@@ -132,15 +137,23 @@ function App() {
 
             const solution: DataverseSolution = await client.fetchSolution(selectedSolution);
             
-            const generator = new ERDGenerator({
-                format: selectedFormat,
+            // Common configuration for all generators
+            const generatorConfig = {
                 includeAttributes,
                 includeRelationships,
                 maxAttributesPerTable
+            };
+            
+            // Generate all 3 formats at once
+            const mermaidDiagram = new ERDGenerator({ ...generatorConfig, format: 'mermaid' }).generate(solution);
+            const plantumlDiagram = new ERDGenerator({ ...generatorConfig, format: 'plantuml' }).generate(solution);
+            const drawioDiagram = new ERDGenerator({ ...generatorConfig, format: 'drawio' }).generate(solution);
+            
+            setGeneratedDiagrams({
+                mermaid: mermaidDiagram,
+                plantuml: plantumlDiagram,
+                drawio: drawioDiagram
             });
-
-            const diagram = generator.generate(solution);
-            setGeneratedDiagram(diagram);
             
             if(isPPTB) {
                 await window.toolboxAPI.utils.showNotification({
@@ -157,7 +170,8 @@ function App() {
     };
 
     const handleDownload = async () => {
-        if (!generatedDiagram) return;
+        const currentDiagram = generatedDiagrams[selectedFormat];
+        if (!currentDiagram) return;
 
         const extensions: Record<string, string> = {
             'mermaid': 'mmd',
@@ -169,7 +183,7 @@ function App() {
         
         try {
             if(isPPTB) {
-                const savedPath = await window.toolboxAPI.utils.saveFile(fileName, generatedDiagram);
+                const savedPath = await window.toolboxAPI.utils.saveFile(fileName, currentDiagram);
                 if (savedPath) {
                     await window.toolboxAPI.utils.showNotification({
                         title: "Success",
@@ -184,11 +198,12 @@ function App() {
     };
 
     const handleCopyToClipboard = async () => {
-        if (!generatedDiagram) return;
+        const currentDiagram = generatedDiagrams[selectedFormat];
+        if (!currentDiagram) return;
 
         try {
             if(isPPTB) {
-                await window.toolboxAPI.utils.copyToClipboard(generatedDiagram);
+                await window.toolboxAPI.utils.copyToClipboard(currentDiagram);
                 await window.toolboxAPI.utils.showNotification({
                     title: "Success",
                     body: "Copied to clipboard",
@@ -238,7 +253,8 @@ function App() {
 
     // Render the diagram (visual or text)
     const renderDiagram = () => {
-        if (!generatedDiagram) return null;
+        const currentDiagram = generatedDiagrams[selectedFormat];
+        if (!currentDiagram) return null;
 
         if (viewMode === 'visual') {
             if (selectedFormat === 'mermaid') {
@@ -260,7 +276,7 @@ function App() {
                                 if (!el) return;
                                 try {
                                     // Set the diagram source as text content for Mermaid to parse
-                                    el.textContent = generatedDiagram;
+                                    el.textContent = currentDiagram;
                                     await ensureMermaid();
                                     if (window.mermaid) {
                                         window.mermaid.init(undefined, el);
@@ -273,8 +289,7 @@ function App() {
                     />
                 );
             } else if (selectedFormat === 'plantuml') {
-                // Render PlantUML by POSTing source to the public server and inlining the returned SVG.
-                // This avoids <img src=...> and respects typical CSP (img-src 'self' data:).
+                // Render PlantUML using proper encoding and GET request
                 return (
                     <div
                         className="diagram-visual"
@@ -282,18 +297,22 @@ function App() {
                             (async () => {
                                 if (!el) return;
                                 try {
-                                    const resp = await fetch('https://www.plantuml.com/plantuml/svg', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'text/plain' },
-                                        body: generatedDiagram,
-                                    });
+                                    const encoded = plantumlEncoder.encode(currentDiagram);
+                                    
+                                    // Fetch SVG from PlantUML server using GET with encoded diagram
+                                    const url = `https://www.plantuml.com/plantuml/svg/${encoded}`;
+                                    const resp = await fetch(url);
                                     if (!resp.ok) throw new Error(`PlantUML HTTP ${resp.status}`);
                                     const svgText = await resp.text();
 
                                     const parser = new DOMParser();
                                     const doc = parser.parseFromString(svgText, 'image/svg+xml');
                                     const svg = doc.querySelector('svg');
-                                    if (!svg) throw new Error('No <svg> in PlantUML response');
+                                    
+                                    if (!svg) {
+                                        console.error('PlantUML response:', svgText.substring(0, 500));
+                                        throw new Error('No <svg> in PlantUML response');
+                                    }
 
                                     // Remove any script elements for safety
                                     svg.querySelectorAll('script').forEach((s) => s.remove());
@@ -310,7 +329,7 @@ function App() {
                                     el.appendChild(svg);
                                 } catch (error) {
                                     console.error('PlantUML rendering error:', error);
-                                    el.innerHTML = '<div class="loading-mermaid">Cannot render PlantUML due to CSP or network restrictions. Switch to Text view or enable POST to plantuml.com.</div>';
+                                    el.innerHTML = '<div class="loading-mermaid">Cannot render PlantUML. Error: ' + (error as Error).message + '. Switch to Text view.</div>';
                                 }
                             })();
                         }}
@@ -326,7 +345,39 @@ function App() {
                                 if (!el) return;
                                 try {
                                     // Encode the draw.io XML for embedding
-                                    const encodedDiagram = encodeURIComponent(generatedDiagram);
+                                    const encodedDiagram = encodeURIComponent(currentDiagram);
+                                    
+                                    // Create an iframe with the draw.io viewer
+                                    const iframe = document.createElement('iframe');
+                                    iframe.style.width = '100%';
+                                    iframe.style.height = '600px';
+                                    iframe.style.border = '1px solid #ddd';
+                                    iframe.style.borderRadius = '4px';
+                                    
+                                    // Use draw.io embed viewer with the diagram
+                                    iframe.src = `https://viewer.diagrams.net/?highlight=0000ff&edit=_blank&layers=1&nav=1&title=ERD#R${encodedDiagram}`;
+                                    
+                                    el.innerHTML = '';
+                                    el.appendChild(iframe);
+                                } catch (error) {
+                                    console.error('Draw.io rendering error:', error);
+                                    el.innerHTML = '<div class="loading-mermaid">Cannot render Draw.io diagram. Switch to Text view to see the source.</div>';
+                                }
+                            })();
+                        }}
+                    />
+                );
+            } else if (selectedFormat === 'drawio') {
+                // Render Draw.io diagram using embedded viewer
+                return (
+                    <div
+                        className="diagram-visual"
+                        ref={(el) => {
+                            (async () => {
+                                if (!el) return;
+                                try {
+                                    // Encode the draw.io XML for embedding
+                                    const encodedDiagram = encodeURIComponent(currentDiagram);
                                     
                                     // Create an iframe with the draw.io viewer
                                     const iframe = document.createElement('iframe');
@@ -354,7 +405,7 @@ function App() {
         // Fallback: show text view
         return (
             <pre className="diagram-text">
-                {generatedDiagram}
+                {currentDiagram}
             </pre>
         );
     };
@@ -369,69 +420,35 @@ function App() {
 
     return (
         <div className="container">
-            <header className="header">
-                <h1>🗺️ Dataverse ERD Generator</h1>
-                <p>Generate Entity Relationship Diagrams from your Dataverse solutions</p>
-            </header>
-
             {error && (
                 <div className="error">
                     {error}
                 </div>
             )}
 
-            <div className="card">
-                <div className="info-message">
-                    <strong>✓ Connected to Dataverse</strong><br />
-                    Environment: <span>{connectionUrl || "Not connected"}</span>
-                </div>
-
-                <div className="form-group">
-                    <label htmlFor="solutionSelect">Select a Solution</label>
-                    <select 
-                        id="solutionSelect" 
-                        value={selectedSolution}
-                        onChange={(e) => setSelectedSolution(e.target.value)}
-                        disabled={solutions.length === 0}
-                    >
-                        <option value="">-- Select a Solution --</option>
-                        {solutions.map((solution) => (
-                            <option key={solution.uniqueName} value={solution.uniqueName}>
-                                {solution.displayName} ({solution.version})
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                <div className="generate-section">
-                    <h2>Generate ERD</h2>
-                    <div className="format-selector">
-                        <label style={{ fontWeight: 600, marginRight: '10px' }}>Output Format:</label>
-                        <button 
-                            className={`format-btn ${selectedFormat === 'mermaid' ? 'active' : ''}`}
-                            onClick={() => setSelectedFormat('mermaid')}
+            <div className="main-content">
+                <div className="controls-panel">
+                    <div className="form-group">
+                        <label htmlFor="solutionSelect">Solution</label>
+                        <select 
+                            id="solutionSelect" 
+                            value={selectedSolution}
+                            onChange={(e) => setSelectedSolution(e.target.value)}
+                            disabled={solutions.length === 0}
                         >
-                            Mermaid
-                        </button>
-                        <button 
-                            className={`format-btn ${selectedFormat === 'plantuml' ? 'active' : ''}`}
-                            onClick={() => setSelectedFormat('plantuml')}
-                        >
-                            PlantUML
-                        </button>
-                        <button 
-                            className={`format-btn ${selectedFormat === 'drawio' ? 'active' : ''}`}
-                            onClick={() => setSelectedFormat('drawio')}
-                        >
-                            Draw.io
-                        </button>
+                            <option value="">Select a solution</option>
+                            {solutions.map((solution) => (
+                                <option key={solution.uniqueName} value={solution.uniqueName}>
+                                    {solution.displayName} ({solution.version})
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
-                    <div className="config-section">
-                        <h3>Configuration</h3>
-                        
-                        <div className="config-group">
-                            <label>
+                    <div className="form-group">
+                        <label>Options</label>
+                        <div className="options-list">
+                            <label className="option-item">
                                 <input 
                                     type="checkbox" 
                                     checked={includeAttributes}
@@ -439,11 +456,8 @@ function App() {
                                 />
                                 <span>Include Attributes</span>
                             </label>
-                            <div className="config-help">Show table columns/fields in the diagram</div>
-                        </div>
-
-                        <div className="config-group">
-                            <label>
+                            
+                            <label className="option-item">
                                 <input 
                                     type="checkbox" 
                                     checked={includeRelationships}
@@ -451,12 +465,11 @@ function App() {
                                 />
                                 <span>Include Relationships</span>
                             </label>
-                            <div className="config-help">Show relationships between tables</div>
-                        </div>
-
-                        <div className="config-group">
-                            <div className="config-label-group">
-                                <label htmlFor="maxAttributesInput">Max Attributes per Table:</label>
+                            
+                            <div className="option-item">
+                                <label htmlFor="maxAttributesInput" className="inline-label">
+                                    Max Attributes:
+                                </label>
                                 <input 
                                     type="number" 
                                     id="maxAttributesInput"
@@ -464,9 +477,9 @@ function App() {
                                     onChange={(e) => setMaxAttributesPerTable(parseInt(e.target.value) || 0)}
                                     min="0" 
                                     max="100"
+                                    className="number-input"
                                 />
                             </div>
-                            <div className="config-help">Maximum number of attributes to display per table (0 = show all)</div>
                         </div>
                     </div>
 
@@ -477,31 +490,57 @@ function App() {
                     >
                         Generate ERD
                     </button>
-                </div>
-            </div>
 
-            {generatedDiagram && (
-                <div className="card">
-                    <h2>Generated ERD</h2>
-                    <div className="diagram-controls">
-                        <button 
-                            className="btn btn-secondary"
-                            onClick={() => setViewMode(viewMode === 'visual' ? 'text' : 'visual')}
-                        >
-                            {viewMode === 'visual' ? '📝 Show Text' : '🎨 Show Visual'}
-                        </button>
-                        <button className="btn btn-secondary" onClick={handleDownload}>
-                            📥 Download Source
-                        </button>
-                        <button className="btn btn-secondary" onClick={handleCopyToClipboard}>
-                            📋 Copy to Clipboard
-                        </button>
+                    <div className="form-group">
+                        <label>Format</label>
+                        <div className="format-selector">
+                            <button 
+                                className={`format-btn ${selectedFormat === 'mermaid' ? 'active' : ''}`}
+                                onClick={() => setSelectedFormat('mermaid')}
+                            >
+                                Mermaid
+                            </button>
+                            <button 
+                                className={`format-btn ${selectedFormat === 'plantuml' ? 'active' : ''}`}
+                                onClick={() => setSelectedFormat('plantuml')}
+                            >
+                                PlantUML
+                            </button>
+                            <button 
+                                className={`format-btn ${selectedFormat === 'drawio' ? 'active' : ''}`}
+                                onClick={() => setSelectedFormat('drawio')}
+                            >
+                                Draw.io
+                            </button>
+                        </div>
                     </div>
-                    <div className="diagram-container">
-                        {renderDiagram()}
-                    </div>
+
+                    {generatedDiagrams[selectedFormat] && (
+                        <div className="action-buttons">
+                            <button 
+                                className="btn btn-secondary"
+                                onClick={() => setViewMode(viewMode === 'visual' ? 'text' : 'visual')}
+                            >
+                                {viewMode === 'visual' ? '📝 Text' : '🎨 Visual'}
+                            </button>
+                            <button className="btn btn-secondary" onClick={handleDownload}>
+                                📥 Download
+                            </button>
+                            <button className="btn btn-secondary" onClick={handleCopyToClipboard}>
+                                📋 Copy
+                            </button>
+                        </div>
+                    )}
                 </div>
-            )}
+
+                {generatedDiagrams[selectedFormat] && (
+                    <div className="diagram-panel">
+                        <div className="diagram-container">
+                            {renderDiagram()}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

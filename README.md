@@ -41,6 +41,7 @@ The tool uses `window.toolboxAPI` for:
 Based on [PCF-CustomControlBuilder](https://github.com/Power-Maverick/PCF-CustomControlBuilder) adapted for PPTB.
 
 ### [@dvdt-tools/erd-generator](./tools/erd-generator)
+### [@power-maverick/tool-erd-generator](./tools/erd-generator)
 
 Generate Entity Relationship Diagrams (ERD) from Dataverse solutions. **React-based tool** with dual integration support for:
 - **PPTB (Power Platform Toolbox)**: Primary integration - Electron desktop app
@@ -86,6 +87,29 @@ See [VSCODE_INTEGRATION.md](./VSCODE_INTEGRATION.md) for complete WebView integr
 - **PPTB Testing**: Install the tool in Power Platform ToolBox and test with your Dataverse environment.
 - **Local DVDT Integration**: See [LOCAL_TESTING.md](./LOCAL_TESTING.md) for step-by-step instructions on integrating with a local copy of Dataverse DevTools.
 
+### [@power-maverick/tool-view-layout-replicator](./tools/view-layout-replicator)
+
+Copy layout from one view to multiple views of the same entity in a single operation. **React-based tool** with PPTB-only integration.
+
+**Key Features:**
+- **React + TypeScript**: Modern component-based architecture with Vite build system
+- **PPTB-Only Integration**: Designed exclusively for Power Platform ToolBox (uses @pptb/types v1.0.12)
+- **Entity & View Management**: Browse entities and their views with an intuitive interface
+- **Layout Copying**: Copy view layouts from one view to multiple target views in one operation
+- **Real-time Progress Tracking**: See the status of each view update as it happens
+- **Error Handling**: Clear feedback on success and failure for each operation
+
+**PPTB Integration:**
+The tool uses `window.toolboxAPI` for:
+- Getting active connection details via `connections.getActiveConnection()`
+- Getting access tokens via `connections.getAccessToken()`
+- Showing notifications via `utils.showNotification()`
+
+**Use Cases:**
+- Standardize view layouts across multiple views of an entity
+- Quickly copy column configurations
+- Maintain consistency in view designs across your Dataverse environment
+
 ## Getting Started
 
 ### Prerequisites
@@ -104,6 +128,14 @@ npm install
 Build all tools:
 
 ```bash
+# Build erd-generator
+cd tools/erd-generator
+npm install
+npm run build
+
+# Build view-layout-replicator
+cd tools/view-layout-replicator
+npm install
 npm run build
 ```
 
@@ -112,14 +144,19 @@ npm run build
 Watch mode for development:
 
 ```bash
+# ERD Generator
 cd tools/erd-generator
+npm run dev
+
+# View Layout Copier
+cd tools/view-layout-replicator
 npm run dev
 ```
 
 ## Repository Structure
 
 ```
-PPTB-Tools/
+DVDT-Tools/
 ├── tools/
 │   ├── pcf-builder/         # PCF Custom Control Builder tool (PPTB-only)
 │   │   ├── src/
@@ -137,8 +174,26 @@ PPTB-Tools/
 │       │   ├── App.tsx
 │       │   ├── main.tsx
 │       │   └── components/
+│   ├── erd-generator/              # ERD generation tool
+│   │   ├── src/
+│   │   │   ├── components/
+│   │   │   ├── models/
+│   │   │   ├── utils/
+│   │   │   ├── App.tsx
+│   │   │   └── main.tsx
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   ├── vite.config.ts
+│   │   └── README.md
+│   └── view-layout-replicator/    # View layout copying tool
+│       ├── src/
+│       │   ├── models/
+│       │   ├── utils/
+│       │   ├── App.tsx
+│       │   └── main.tsx
 │       ├── package.json
 │       ├── tsconfig.json
+│       ├── vite.config.ts
 │       └── README.md
 ├── LICENSE
 └── README.md
