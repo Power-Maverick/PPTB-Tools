@@ -137,29 +137,17 @@ function App() {
 
             const solution: DataverseSolution = await client.fetchSolution(selectedSolution);
             
+            // Common configuration for all generators
+            const generatorConfig = {
+                includeAttributes,
+                includeRelationships,
+                maxAttributesPerTable
+            };
+            
             // Generate all 3 formats at once
-            const mermaidGenerator = new ERDGenerator({
-                format: 'mermaid',
-                includeAttributes,
-                includeRelationships,
-                maxAttributesPerTable
-            });
-            const plantumlGenerator = new ERDGenerator({
-                format: 'plantuml',
-                includeAttributes,
-                includeRelationships,
-                maxAttributesPerTable
-            });
-            const drawioGenerator = new ERDGenerator({
-                format: 'drawio',
-                includeAttributes,
-                includeRelationships,
-                maxAttributesPerTable
-            });
-
-            const mermaidDiagram = mermaidGenerator.generate(solution);
-            const plantumlDiagram = plantumlGenerator.generate(solution);
-            const drawioDiagram = drawioGenerator.generate(solution);
+            const mermaidDiagram = new ERDGenerator({ ...generatorConfig, format: 'mermaid' }).generate(solution);
+            const plantumlDiagram = new ERDGenerator({ ...generatorConfig, format: 'plantuml' }).generate(solution);
+            const drawioDiagram = new ERDGenerator({ ...generatorConfig, format: 'drawio' }).generate(solution);
             
             setGeneratedDiagrams({
                 mermaid: mermaidDiagram,
