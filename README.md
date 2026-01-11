@@ -78,6 +78,28 @@ Export comprehensive entity and field metadata from Dataverse solutions to Excel
 - **Vite** for fast development and optimized production builds
 - **XLSX library** for Excel export functionality
 - **@pptb/types v1.0.13** - Latest PPTB type definitions
+### [@power-maverick/tool-view-layout-replicator](./tools/view-layout-replicator)
+
+Copy layout from one view to multiple views of the same entity in a single operation. **React-based tool** with PPTB-only integration.
+
+**Key Features:**
+- **React + TypeScript**: Modern component-based architecture with Vite build system
+- **PPTB-Only Integration**: Designed exclusively for Power Platform ToolBox (uses @pptb/types v1.0.12)
+- **Entity & View Management**: Browse entities and their views with an intuitive interface
+- **Layout Copying**: Copy view layouts from one view to multiple target views in one operation
+- **Real-time Progress Tracking**: See the status of each view update as it happens
+- **Error Handling**: Clear feedback on success and failure for each operation
+
+**PPTB Integration:**
+The tool uses `window.toolboxAPI` for:
+- Getting active connection details via `connections.getActiveConnection()`
+- Getting access tokens via `connections.getAccessToken()`
+- Showing notifications via `utils.showNotification()`
+
+**Use Cases:**
+- Standardize view layouts across multiple views of an entity
+- Quickly copy column configurations
+- Maintain consistency in view designs across your Dataverse environment
 
 ## Getting Started
 
@@ -97,6 +119,14 @@ npm install
 Build all tools:
 
 ```bash
+# Build erd-generator
+cd tools/erd-generator
+npm install
+npm run build
+
+# Build view-layout-replicator
+cd tools/view-layout-replicator
+npm install
 npm run build
 ```
 
@@ -106,7 +136,12 @@ Watch mode for development:
 
 **ERD Generator:**
 ```bash
+# ERD Generator
 cd tools/erd-generator
+npm run dev
+
+# View Layout Copier
+cd tools/view-layout-replicator
 npm run dev
 ```
 
@@ -119,7 +154,7 @@ npm run dev
 ## Repository Structure
 
 ```
-PPTB-Tools/
+DVDT-Tools/
 ├── tools/
 │   ├── erd-generator/              # ERD generation tool
 │   │   ├── src/
@@ -134,12 +169,17 @@ PPTB-Tools/
 │   └── entity-field-catalog/       # Entity field catalog tool
 │       ├── src/
 │       │   ├── components/
+│   │   ├── vite.config.ts
+│   │   └── README.md
+│   └── view-layout-replicator/    # View layout copying tool
+│       ├── src/
 │       │   ├── models/
 │       │   ├── utils/
 │       │   ├── App.tsx
 │       │   └── main.tsx
 │       ├── package.json
 │       ├── tsconfig.json
+│       ├── vite.config.ts
 │       └── README.md
 ├── LICENSE
 └── README.md
