@@ -30,7 +30,7 @@ The Entity Field Catalog is a React-based tool designed exclusively for Power Pl
 - **Fluent UI React Components** for modern, accessible UI
 - **Vite** for fast development and optimized builds
 - **ExcelJS** for secure Excel export functionality
-- **Axios** for HTTP requests (fallback mode)
+- **PPTB API** for all Dataverse operations (no direct HTTP calls)
 
 ## Installation
 

@@ -1,4 +1,3 @@
-import axios, { AxiosInstance } from 'axios';
 import { DataverseEntity, DataverseField, DataverseSolution } from '../models/interfaces';
 import { Helper } from './Helper';
 
@@ -10,32 +9,15 @@ function escapeODataString(value: string): string {
 }
 
 /**
- * Client for interacting with Dataverse Web API
+ * Client for interacting with Dataverse using PPTB API
  */
 export class DataverseClient {
-  private axiosInstance: AxiosInstance;
-  private environmentUrl: string;
-  private apiVersion: string;
   private isPPTB: boolean;
   private helper: Helper;
 
-  constructor(config: { environmentUrl: string; accessToken?: string; apiVersion?: string }, isPPTB: boolean) {
-    this.environmentUrl = config.environmentUrl.replace(/\/$/, '');
-    this.apiVersion = config.apiVersion || '9.2';
+  constructor(config: { environmentUrl?: string; accessToken?: string; apiVersion?: string }, isPPTB: boolean) {
     this.isPPTB = isPPTB;
-
-    this.axiosInstance = axios.create({
-      baseURL: `${this.environmentUrl}/api/data/v${this.apiVersion}`,
-      headers: {
-        'Authorization': `Bearer ${config.accessToken}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'OData-MaxVersion': '4.0',
-        'OData-Version': '4.0',
-      },
-    });
-
-    this.helper = new Helper(this.axiosInstance, isPPTB);
+    this.helper = new Helper(isPPTB);
   }
 
   /**

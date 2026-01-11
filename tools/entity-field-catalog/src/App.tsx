@@ -121,7 +121,6 @@ function App() {
   const styles = useStyles();
   const [isPPTB, setIsPPTB] = useState<boolean>(false);
   const [connectionUrl, setConnectionUrl] = useState<string>('');
-  const [accessToken, setAccessToken] = useState<string>('');
   const [solutions, setSolutions] = useState<DataverseSolution[]>([]);
   const [selectedSolution, setSelectedSolution] = useState<string>('');
   const [entities, setEntities] = useState<DataverseEntity[]>([]);
@@ -170,7 +169,6 @@ function App() {
       const client = new DataverseClient(
         {
           environmentUrl: connectionUrl,
-          accessToken: accessToken,
         },
         isPPTB
       );
@@ -200,7 +198,6 @@ function App() {
       const client = new DataverseClient(
         {
           environmentUrl: connectionUrl,
-          accessToken: accessToken,
         },
         isPPTB
       );

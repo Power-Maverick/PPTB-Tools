@@ -41,7 +41,6 @@
   "dependencies": {
     "@fluentui/react-components": "^9.56.2",
     "@fluentui/react-icons": "^2.0.264",
-    "axios": "^1.7.9",
     "exceljs": "^4.4.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
