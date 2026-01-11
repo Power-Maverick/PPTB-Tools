@@ -527,7 +527,7 @@ function App() {
                         Generate ERD
                     </button>
 
-                    {generatedDiagrams.mermaid && (
+                    {generatedDiagrams[selectedFormat] && (
                         <div className="action-buttons">
                             <button 
                                 className="btn btn-secondary"
@@ -545,7 +545,7 @@ function App() {
                     )}
                 </div>
 
-                {generatedDiagrams.mermaid && (
+                {generatedDiagrams[selectedFormat] && (
                     <div className="diagram-panel">
                         <div className="diagram-container">
                             {renderDiagram()}
