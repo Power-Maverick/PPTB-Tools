@@ -446,30 +446,6 @@ function App() {
                     </div>
 
                     <div className="form-group">
-                        <label>Format</label>
-                        <div className="format-selector">
-                            <button 
-                                className={`format-btn ${selectedFormat === 'mermaid' ? 'active' : ''}`}
-                                onClick={() => setSelectedFormat('mermaid')}
-                            >
-                                Mermaid
-                            </button>
-                            <button 
-                                className={`format-btn ${selectedFormat === 'plantuml' ? 'active' : ''}`}
-                                onClick={() => setSelectedFormat('plantuml')}
-                            >
-                                PlantUML
-                            </button>
-                            <button 
-                                className={`format-btn ${selectedFormat === 'drawio' ? 'active' : ''}`}
-                                onClick={() => setSelectedFormat('drawio')}
-                            >
-                                Draw.io
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="form-group">
                         <label>Options</label>
                         <div className="options-list">
                             <label className="option-item">
@@ -514,6 +490,30 @@ function App() {
                     >
                         Generate ERD
                     </button>
+
+                    <div className="form-group">
+                        <label>Format</label>
+                        <div className="format-selector">
+                            <button 
+                                className={`format-btn ${selectedFormat === 'mermaid' ? 'active' : ''}`}
+                                onClick={() => setSelectedFormat('mermaid')}
+                            >
+                                Mermaid
+                            </button>
+                            <button 
+                                className={`format-btn ${selectedFormat === 'plantuml' ? 'active' : ''}`}
+                                onClick={() => setSelectedFormat('plantuml')}
+                            >
+                                PlantUML
+                            </button>
+                            <button 
+                                className={`format-btn ${selectedFormat === 'drawio' ? 'active' : ''}`}
+                                onClick={() => setSelectedFormat('drawio')}
+                            >
+                                Draw.io
+                            </button>
+                        </div>
+                    </div>
 
                     {generatedDiagrams[selectedFormat] && (
                         <div className="action-buttons">
