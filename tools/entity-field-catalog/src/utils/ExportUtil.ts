@@ -157,7 +157,7 @@ export class ExportUtil {
 
     // Combine headers and rows
     const csvContent = [headers, ...rows]
-      .map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+      .map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))
       .join('\n');
 
     // Create blob and download

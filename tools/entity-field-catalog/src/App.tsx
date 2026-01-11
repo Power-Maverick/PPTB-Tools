@@ -223,7 +223,7 @@ function App() {
       const entityList = await client.fetchSolutionEntities(solutionName);
       setEntities(entityList);
 
-      if (isPPTB) {
+      if (isPPTB && window.toolboxAPI?.utils?.showNotification) {
         await window.toolboxAPI.utils.showNotification({
           title: 'Success',
           body: `Loaded ${entityList.length} entities from solution`,
@@ -268,7 +268,7 @@ function App() {
       
       ExportUtil.export(entitiesToExport, exportFormat, selectedSolution);
 
-      if (isPPTB) {
+      if (isPPTB && window.toolboxAPI?.utils?.showNotification) {
         await window.toolboxAPI.utils.showNotification({
           title: 'Success',
           body: `Exported ${selectedEntities.size} entities to ${exportFormat.toUpperCase()}`,

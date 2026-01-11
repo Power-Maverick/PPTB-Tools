@@ -29,7 +29,7 @@ export class Helper {
    */
   async getOData(endpoint: string): Promise<any[]> {
     try {
-      if (this.isPPTB && window.toolboxAPI) {
+      if (this.isPPTB && window.toolboxAPI?.dataverse?.retrieveMultiple) {
         // Use PPTB API for data retrieval
         const response = await window.toolboxAPI.dataverse.retrieveMultiple(endpoint);
         return response.value || response;

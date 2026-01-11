@@ -3,6 +3,13 @@ import { DataverseEntity, DataverseField, DataverseSolution } from '../models/in
 import { Helper } from './Helper';
 
 /**
+ * Escape OData string literals to prevent injection
+ */
+function escapeODataString(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+/**
  * Client for interacting with Dataverse Web API
  */
 export class DataverseClient {
@@ -57,9 +64,12 @@ export class DataverseClient {
    */
   async fetchSolutionEntities(solutionUniqueName: string): Promise<DataverseEntity[]> {
     try {
+      // Escape solution name for OData query
+      const escapedSolutionName = escapeODataString(solutionUniqueName);
+      
       // Fetch solution details
       const responseSolution = await this.helper.getOData(
-        `solutions?$filter=uniquename eq '${solutionUniqueName}'&$select=solutionid,friendlyname,uniquename,version`
+        `solutions?$filter=uniquename eq '${escapedSolutionName}'&$select=solutionid,friendlyname,uniquename,version`
       );
       
       if (!responseSolution || responseSolution.length === 0) {
@@ -130,8 +140,11 @@ export class DataverseClient {
    */
   private async fetchEntityFields(entityLogicalName: string): Promise<DataverseField[]> {
     try {
+      // Escape entity name for OData query
+      const escapedEntityName = escapeODataString(entityLogicalName);
+      
       const response = await this.helper.getOData(
-        `EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes?$select=LogicalName,DisplayName,SchemaName,AttributeType,IsPrimaryId,IsPrimaryName,RequiredLevel,Description,MaxLength,Precision,Format`
+        `EntityDefinitions(LogicalName='${escapedEntityName}')/Attributes?$select=LogicalName,DisplayName,SchemaName,AttributeType,IsPrimaryId,IsPrimaryName,RequiredLevel,Description,MaxLength,Precision,Format`
       );
 
       return response.map((attr: any) => ({
