@@ -159,19 +159,14 @@ function App() {
 
   // Load solutions when connection is available
   useEffect(() => {
-    if (connectionUrl && isPPTB) {
+    if (connectionUrl) {
       loadSolutions();
     }
-  }, [connectionUrl, isPPTB]);
+  }, [connectionUrl]);
 
   const loadSolutions = async () => {
     try {
-      const client = new DataverseClient(
-        {
-          environmentUrl: connectionUrl,
-        },
-        isPPTB
-      );
+      const client = new DataverseClient();
 
       const solutionList = await client.listSolutions();
       setSolutions(solutionList);
@@ -195,12 +190,7 @@ function App() {
 
     try {
       setLoadingEntities(true);
-      const client = new DataverseClient(
-        {
-          environmentUrl: connectionUrl,
-        },
-        isPPTB
-      );
+      const client = new DataverseClient();
 
       const entityList = await client.fetchSolutionEntities(solutionName);
       setEntities(entityList);
