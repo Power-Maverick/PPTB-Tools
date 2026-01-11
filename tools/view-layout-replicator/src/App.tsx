@@ -150,7 +150,7 @@ function App() {
         }
     };
 
-    const handleReplicateLayout = async () => {
+    const handleCopyLayout = async () => {
         if (!sourceView || targetViews.length === 0) {
             showError("Please select a source view and at least one target view");
             return;
