@@ -83,7 +83,7 @@ Analyze and view Plugin Trace Logs from Microsoft Dataverse. **React-based tool*
 
 **Key Features:**
 - **React + TypeScript**: Modern component-based architecture with Vite build system
-- **PPTB-Only Integration**: Designed exclusively for Power Platform ToolBox (uses @pptb/types v1.0.13)
+- **PPTB-Only Integration**: Designed exclusively for Power Platform ToolBox (uses @pptb/types v1.0.14)
 - **Modern Minimalist UI**: Clean design with no header and optimized to avoid excessive scrolling
 - **Smart Filtering**: Filter trace logs by message name, entity, correlation ID, or show only exceptions
 - **Detailed Analysis**: View complete trace details including execution duration, message blocks, and exception information

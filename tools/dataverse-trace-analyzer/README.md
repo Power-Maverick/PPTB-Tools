@@ -91,7 +91,7 @@ A unique identifier that links related plugin executions together, helping you t
 - **React 18**: Modern functional components with hooks
 - **TypeScript**: Full type safety
 - **Vite**: Fast development and optimized production builds
-- **@pptb/types v1.0.13**: Latest PPTB type definitions
+- **@pptb/types v1.0.14**: Latest PPTB type definitions
 
 ## License
 

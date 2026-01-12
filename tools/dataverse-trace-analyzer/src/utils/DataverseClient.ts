@@ -5,6 +5,19 @@ export class DataverseClient {
         // Using window.dataverseAPI from @pptb/types
     }
 
+    /**
+     * Escape and sanitize values for OData queries to prevent injection attacks
+     */
+    private escapeODataValue(value: string): string {
+        if (!value) return "''";
+        
+        // Remove any single quotes and replace with double single quotes (OData escaping)
+        const escaped = value.replace(/'/g, "''");
+        
+        // Wrap in single quotes for OData string literals
+        return `'${escaped}'`;
+    }
+
     async fetchPluginTraceLogs(filter?: TraceLogFilter): Promise<PluginTraceLog[]> {
         try {
             const entitySetName = await window.dataverseAPI.getEntitySetName("plugintracelog");
@@ -13,23 +26,33 @@ export class DataverseClient {
             let filterQuery = "$filter=statecode eq 0";
             
             if (filter?.startDate) {
-                filterQuery += ` and createdon ge ${filter.startDate}`;
+                // Properly format date for OData query
+                const escapedDate = this.escapeODataValue(filter.startDate);
+                filterQuery += ` and createdon ge ${escapedDate}`;
             }
             
             if (filter?.endDate) {
-                filterQuery += ` and createdon le ${filter.endDate}`;
+                // Properly format date for OData query
+                const escapedDate = this.escapeODataValue(filter.endDate);
+                filterQuery += ` and createdon le ${escapedDate}`;
             }
             
             if (filter?.entityName) {
-                filterQuery += ` and contains(primaryentity, '${filter.entityName}')`;
+                // Escape and sanitize entity name to prevent OData injection
+                const escapedEntity = this.escapeODataValue(filter.entityName);
+                filterQuery += ` and contains(primaryentity, ${escapedEntity})`;
             }
             
             if (filter?.messageName) {
-                filterQuery += ` and messagename eq '${filter.messageName}'`;
+                // Escape and sanitize message name to prevent OData injection
+                const escapedMessage = this.escapeODataValue(filter.messageName);
+                filterQuery += ` and messagename eq ${escapedMessage}`;
             }
             
             if (filter?.correlationId) {
-                filterQuery += ` and correlationid eq '${filter.correlationId}'`;
+                // Escape and sanitize correlation ID to prevent OData injection
+                const escapedCorrelation = this.escapeODataValue(filter.correlationId);
+                filterQuery += ` and correlationid eq ${escapedCorrelation}`;
             }
             
             if (filter?.hasException) {

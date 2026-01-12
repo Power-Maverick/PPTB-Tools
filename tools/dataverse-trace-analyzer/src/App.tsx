@@ -57,7 +57,7 @@ function App() {
                 messageName: messageFilter || undefined,
                 entityName: entityFilter || undefined,
                 correlationId: correlationFilter || undefined,
-                hasException: exceptionOnly || undefined,
+                hasException: exceptionOnly ? true : undefined,
             };
 
             const logs = await client.fetchPluginTraceLogs(filter);
@@ -105,6 +105,7 @@ function App() {
     };
 
     const handleDeleteLog = async (logId: string) => {
+        // TODO: Replace with custom confirmation dialog for better UX
         if (!confirm("Are you sure you want to delete this trace log?")) {
             return;
         }
