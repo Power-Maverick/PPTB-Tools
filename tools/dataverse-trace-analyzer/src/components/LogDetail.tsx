@@ -1,5 +1,6 @@
 import { PluginTraceLog } from "../models/interfaces";
-import { parsePluginTypeName } from "../utils/pluginParser";
+import { formatDateTime, formatDuration, getModeLabel, getOperationTypeLabel } from "../utils/DataParser";
+import { parsePluginTypeName } from "../utils/luginParser";
 
 interface LogDetailProps {
     log: PluginTraceLog;
@@ -7,30 +8,6 @@ interface LogDetailProps {
 }
 
 export function LogDetail({ log, onDelete }: LogDetailProps) {
-    const formatDateTime = (dateString: string) => {
-        if (!dateString) return "";
-        const date = new Date(dateString);
-        return date.toLocaleString();
-    };
-
-    const formatDuration = (duration: number) => {
-        if (duration < 1000) return `${duration}ms`;
-        return `${(duration / 1000).toFixed(2)}s`;
-    };
-
-    const getOperationTypeLabel = (type: number) => {
-        const types: { [key: number]: string } = {
-            1: "Plugin",
-            2: "Workflow Activity",
-        };
-        return types[type] || `Type ${type}`;
-    };
-
-    const getModeLabel = (mode: number | undefined) => {
-        if (mode === undefined || mode === null) return "N/A";
-        return mode === 0 ? "Synchronous" : "Asynchronous";
-    };
-
     const pluginInfo = parsePluginTypeName(log.typename);
 
     return (

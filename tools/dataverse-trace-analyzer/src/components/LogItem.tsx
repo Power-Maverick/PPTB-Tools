@@ -1,5 +1,6 @@
 import { PluginTraceLog } from "../models/interfaces";
-import { parsePluginTypeName } from "../utils/pluginParser";
+import { formatDateTime, formatDuration, getOperationTypeLabel } from "../utils/DataParser";
+import { parsePluginTypeName } from "../utils/luginParser";
 
 interface LogItemProps {
     log: PluginTraceLog;
@@ -8,34 +9,28 @@ interface LogItemProps {
 }
 
 export function LogItem({ log, isSelected, onSelect }: LogItemProps) {
-    const formatDateTime = (dateString: string) => {
-        if (!dateString) return "";
-        const date = new Date(dateString);
-        return date.toLocaleString();
-    };
-
-    const formatDuration = (duration: number) => {
-        if (duration < 1000) return `${duration}ms`;
-        return `${(duration / 1000).toFixed(2)}s`;
-    };
-
     const pluginInfo = parsePluginTypeName(log.typename);
 
     return (
-        <div
-            className={`log-item ${isSelected ? "selected" : ""} ${log.exceptiondetails ? "error" : ""}`}
-            onClick={() => onSelect(log)}
-        >
+        <div className={`log-item ${isSelected ? "selected" : ""} ${log.exceptiondetails ? "error" : ""}`} onClick={() => onSelect(log)}>
             <div className="log-header">
-                <span className="log-step" title={pluginInfo.step}>{pluginInfo.step}</span>
+                <span className="log-step" title={pluginInfo.step}>
+                    {pluginInfo.step}
+                </span>
                 {log.exceptiondetails && <span className="error-badge">ERROR</span>}
             </div>
             <div className="log-info">
-                <span className="log-assembly" title={pluginInfo.assembly}>Assembly: {pluginInfo.assembly}</span>
-                <span className="log-message">{log.messagename}</span>
+                <span className="log-assembly" title={pluginInfo.assembly}>
+                    Assembly: {pluginInfo.assembly} (v{pluginInfo.version}) | {getOperationTypeLabel(log.operationtype)}
+                </span>
             </div>
             <div className="log-info">
-                <span className="log-entity">{log.primaryentity || "-"}</span>
+                <span className="log-message">Message: {log.messagename}</span>
+            </div>
+            <div className="log-info">
+                <span className="log-entity">Entity: {log.primaryentity || "-"}</span>
+            </div>
+            <div className="log-info">
                 <span className="duration">{formatDuration(log.performanceexecutionduration)}</span>
             </div>
             <div className="log-meta">
