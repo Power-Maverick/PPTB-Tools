@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { FilterOption, PluginTraceLog, TraceLogFilter } from "./models/interfaces";
+import { FilterOption, PluginTraceLog, SavedFilter, TraceLogFilter } from "./models/interfaces";
 import { DataverseClient } from "./utils/DataverseClient";
+import { FilterStorage } from "./utils/filterStorage";
 import { CommandBar } from "./components/CommandBar";
 import { FilterModal } from "./components/FilterModal";
+import { SaveFilterModal } from "./components/SaveFilterModal";
+import { LoadFilterModal } from "./components/LoadFilterModal";
 import { LogList } from "./components/LogList";
 import { LogDetail } from "./components/LogDetail";
 
@@ -18,6 +21,11 @@ function App() {
 
     // Filter modal state
     const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
+    const [showSaveFilterModal, setShowSaveFilterModal] = useState<boolean>(false);
+    const [showLoadFilterModal, setShowLoadFilterModal] = useState<boolean>(false);
+    
+    // Saved filters
+    const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
 
     // Enhanced Filters
     const [dateFrom, setDateFrom] = useState<string>("");
@@ -247,6 +255,72 @@ function App() {
         );
     };
 
+    // Load saved filters on initialization
+    useEffect(() => {
+        const loadSavedFilters = async () => {
+            const filters = await FilterStorage.loadFilters();
+            setSavedFilters(filters);
+        };
+        if (isPPTB) {
+            loadSavedFilters();
+        }
+    }, [isPPTB]);
+
+    const handleSaveFilter = async (name: string) => {
+        try {
+            const currentFilter: TraceLogFilter = {
+                startDate: dateFrom || undefined,
+                endDate: dateTo || undefined,
+                pluginNames: selectedPlugins.length > 0 ? selectedPlugins : undefined,
+                messageName: selectedMessage || undefined,
+                entityNames: selectedEntities.length > 0 ? selectedEntities : undefined,
+                modes: selectedModes.length > 0 ? selectedModes : undefined,
+                correlationId: correlationFilter || undefined,
+                hasException: exceptionOnly || undefined,
+            };
+
+            await FilterStorage.saveFilter(name, currentFilter);
+            await showNotification("Success", `Filter "${name}" saved successfully`, "success");
+            
+            // Reload saved filters
+            const filters = await FilterStorage.loadFilters();
+            setSavedFilters(filters);
+        } catch (error: any) {
+            showError(`Failed to save filter: ${error.message}`);
+        }
+    };
+
+    const handleLoadFilter = (filter: SavedFilter) => {
+        // Apply the loaded filter
+        setDateFrom(filter.filter.startDate || "");
+        setDateTo(filter.filter.endDate || "");
+        setSelectedPlugins(filter.filter.pluginNames || []);
+        setSelectedMessage(filter.filter.messageName || "");
+        setSelectedEntities(filter.filter.entityNames || []);
+        setSelectedModes(filter.filter.modes || []);
+        setCorrelationFilter(filter.filter.correlationId || "");
+        setExceptionOnly(filter.filter.hasException || false);
+        
+        showNotification("Success", `Filter "${filter.name}" loaded successfully`, "info");
+    };
+
+    const handleDeleteFilter = async (name: string) => {
+        try {
+            await FilterStorage.deleteFilter(name);
+            await showNotification("Success", `Filter "${name}" deleted successfully`, "success");
+            
+            // Reload saved filters
+            const filters = await FilterStorage.loadFilters();
+            setSavedFilters(filters);
+        } catch (error: any) {
+            showError(`Failed to delete filter: ${error.message}`);
+        }
+    };
+
+    const hasActiveFilters = () => {
+        return getActiveFilterCount() > 0;
+    };
+
     if (loading && !connectionUrl) {
         return (
             <div className="container">
@@ -270,9 +344,12 @@ function App() {
             <CommandBar
                 onRetrieve={handleRetrieve}
                 onOpenFilters={openFilterModal}
+                onSaveFilter={() => setShowSaveFilterModal(true)}
+                onLoadFilter={() => setShowLoadFilterModal(true)}
                 isLoading={loadingLogs}
                 logCount={traceLogs.length}
                 activeFilterCount={getActiveFilterCount()}
+                hasFiltersToSave={hasActiveFilters()}
             />
 
             <FilterModal
@@ -299,6 +376,21 @@ function App() {
                 pluginOptions={pluginOptions}
                 messageOptions={messageOptions}
                 entityOptions={entityOptions}
+            />
+
+            <SaveFilterModal
+                isOpen={showSaveFilterModal}
+                onClose={() => setShowSaveFilterModal(false)}
+                onSave={handleSaveFilter}
+                existingNames={savedFilters.map(f => f.name)}
+            />
+
+            <LoadFilterModal
+                isOpen={showLoadFilterModal}
+                onClose={() => setShowLoadFilterModal(false)}
+                onLoad={handleLoadFilter}
+                onDelete={handleDeleteFilter}
+                savedFilters={savedFilters}
             />
 
             <div className="main-content">

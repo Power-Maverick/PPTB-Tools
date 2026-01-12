@@ -572,3 +572,125 @@ body {
     width: 16px;
     height: 16px;
 }
+
+/* Save Filter Modal */
+.save-filter-modal {
+    max-width: 450px;
+    width: 90%;
+}
+
+.filter-name-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.filter-name-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.form-group {
+    margin: 12px 0;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.error-message {
+    margin-top: 6px;
+    color: var(--danger-color);
+    font-size: 12px;
+}
+
+/* Load Filter Modal */
+.load-filter-modal {
+    max-width: 600px;
+    width: 90%;
+}
+
+.load-filter-modal .modal-body {
+    max-height: 450px;
+    overflow-y: auto;
+}
+
+.no-saved-filters {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.no-saved-filters p {
+    margin: 8px 0;
+}
+
+.no-saved-filters .hint {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.saved-filters-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.saved-filter-item {
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-color: var(--background);
+}
+
+.saved-filter-item:hover {
+    background-color: var(--surface);
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-sm);
+}
+
+.filter-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.filter-name {
+    font-size: 14px;
+    color: var(--text-color);
+    font-weight: 500;
+}
+
+.btn-delete-filter {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 16px;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.btn-delete-filter:hover {
+    opacity: 1;
+}
+
+.filter-item-summary {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.filter-item-date {
+    font-size: 11px;
+    color: var(--text-muted);
+}

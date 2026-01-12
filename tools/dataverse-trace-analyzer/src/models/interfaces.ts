@@ -31,3 +31,13 @@ export interface FilterOption {
     label: string;
     count?: number;
 }
+
+export interface SavedFilter {
+    name: string;
+    filter: TraceLogFilter;
+    createdAt: string;
+}
+
+export interface SavedFiltersCollection {
+    filters: SavedFilter[];
+}
