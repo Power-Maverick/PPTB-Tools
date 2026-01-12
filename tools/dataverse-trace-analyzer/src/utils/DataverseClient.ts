@@ -38,45 +38,52 @@ export class DataverseClient {
             const entitySetName = await window.dataverseAPI.getEntitySetName("plugintracelog");
 
             // Build OData filter query
-            let filterQuery = "$filter=statecode eq 0";
+            // Note: plugintracelog entity doesn't have statecode property
+            let filterQuery = "";
+            const filterConditions: string[] = [];
             
             if (filter?.startDate) {
                 // Properly format date for OData query
                 const formattedDate = this.formatODataDate(filter.startDate);
-                filterQuery += ` and createdon ge ${formattedDate}`;
+                filterConditions.push(`createdon ge ${formattedDate}`);
             }
             
             if (filter?.endDate) {
                 // Properly format date for OData query
                 const formattedDate = this.formatODataDate(filter.endDate);
-                filterQuery += ` and createdon le ${formattedDate}`;
+                filterConditions.push(`createdon le ${formattedDate}`);
             }
             
             if (filter?.entityName) {
                 // Escape and sanitize entity name to prevent OData injection
                 const escapedEntity = this.escapeODataValue(filter.entityName);
-                filterQuery += ` and contains(primaryentity, ${escapedEntity})`;
+                filterConditions.push(`contains(primaryentity, ${escapedEntity})`);
             }
             
             if (filter?.messageName) {
                 // Escape and sanitize message name to prevent OData injection
                 const escapedMessage = this.escapeODataValue(filter.messageName);
-                filterQuery += ` and messagename eq ${escapedMessage}`;
+                filterConditions.push(`messagename eq ${escapedMessage}`);
             }
             
             if (filter?.correlationId) {
                 // Escape and sanitize correlation ID to prevent OData injection
                 const escapedCorrelation = this.escapeODataValue(filter.correlationId);
-                filterQuery += ` and correlationid eq ${escapedCorrelation}`;
+                filterConditions.push(`correlationid eq ${escapedCorrelation}`);
             }
             
             if (filter?.hasException) {
-                filterQuery += ` and exceptiondetails ne null`;
+                filterConditions.push(`exceptiondetails ne null`);
+            }
+
+            // Construct the filter query
+            if (filterConditions.length > 0) {
+                filterQuery = `$filter=${filterConditions.join(' and ')}&`;
             }
 
             // TODO: Add pagination support for datasets larger than 100 records
             // Consider making the limit configurable via settings or adding infinite scroll
-            const query = `${entitySetName}?$select=plugintracelogid,typename,messageblock,messagename,performanceexecutionstarttime,performanceexecutionduration,exceptiondetails,depth,correlationid,operationtype,primaryentity,createdon,mode&${filterQuery}&$orderby=createdon desc&$top=100`;
+            const query = `${entitySetName}?$select=plugintracelogid,typename,messageblock,messagename,performanceexecutionstarttime,performanceexecutionduration,exceptiondetails,depth,correlationid,operationtype,primaryentity,createdon,mode&${filterQuery}$orderby=createdon desc&$top=100`;
 
             const response = await window.dataverseAPI.queryData(query);
 
