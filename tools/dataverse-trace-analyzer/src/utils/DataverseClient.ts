@@ -54,16 +54,47 @@ export class DataverseClient {
                 filterConditions.push(`createdon le ${formattedDate}`);
             }
             
-            if (filter?.entityName) {
-                // Escape and sanitize entity name to prevent OData injection
-                const escapedEntity = this.escapeODataValue(filter.entityName);
-                filterConditions.push(`contains(primaryentity, ${escapedEntity})`);
+            // Multi-select entity filter
+            if (filter?.entityNames && filter.entityNames.length > 0) {
+                const entityConditions = filter.entityNames.map(entity => {
+                    const escaped = this.escapeODataValue(entity);
+                    return `contains(primaryentity, ${escaped})`;
+                });
+                if (entityConditions.length === 1) {
+                    filterConditions.push(entityConditions[0]);
+                } else {
+                    filterConditions.push(`(${entityConditions.join(' or ')})`);
+                }
             }
             
+            // Multi-select plugin filter
+            if (filter?.pluginNames && filter.pluginNames.length > 0) {
+                const pluginConditions = filter.pluginNames.map(plugin => {
+                    const escaped = this.escapeODataValue(plugin);
+                    return `contains(typename, ${escaped})`;
+                });
+                if (pluginConditions.length === 1) {
+                    filterConditions.push(pluginConditions[0]);
+                } else {
+                    filterConditions.push(`(${pluginConditions.join(' or ')})`);
+                }
+            }
+            
+            // Single-select message filter
             if (filter?.messageName) {
                 // Escape and sanitize message name to prevent OData injection
                 const escapedMessage = this.escapeODataValue(filter.messageName);
                 filterConditions.push(`messagename eq ${escapedMessage}`);
+            }
+            
+            // Multi-select mode filter (0=Sync, 1=Async)
+            if (filter?.modes && filter.modes.length > 0) {
+                if (filter.modes.length === 1) {
+                    filterConditions.push(`mode eq ${filter.modes[0]}`);
+                } else {
+                    const modeConditions = filter.modes.map(mode => `mode eq ${mode}`);
+                    filterConditions.push(`(${modeConditions.join(' or ')})`);
+                }
             }
             
             if (filter?.correlationId) {

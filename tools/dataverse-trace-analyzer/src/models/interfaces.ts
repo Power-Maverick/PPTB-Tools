@@ -18,8 +18,16 @@ export interface PluginTraceLog {
 export interface TraceLogFilter {
     startDate?: string;
     endDate?: string;
-    entityName?: string;
-    messageName?: string;
+    entityNames?: string[]; // Changed to array for multi-select
+    messageName?: string; // Single select
+    pluginNames?: string[]; // Multi-select for plugins
     correlationId?: string;
     hasException?: boolean;
+    modes?: number[]; // Multi-select for modes (0=Sync, 1=Async)
+}
+
+export interface FilterOption {
+    value: string;
+    label: string;
+    count?: number;
 }

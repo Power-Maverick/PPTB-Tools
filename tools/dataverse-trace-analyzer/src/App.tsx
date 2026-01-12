@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { PluginTraceLog, TraceLogFilter } from "./models/interfaces";
+import { FilterOption, PluginTraceLog, TraceLogFilter } from "./models/interfaces";
 import { DataverseClient } from "./utils/DataverseClient";
 
 function App() {
@@ -12,11 +12,23 @@ function App() {
     const [selectedLog, setSelectedLog] = useState<PluginTraceLog | null>(null);
     const [loadingLogs, setLoadingLogs] = useState<boolean>(false);
 
-    // Filters
-    const [messageFilter, setMessageFilter] = useState<string>("");
-    const [entityFilter, setEntityFilter] = useState<string>("");
+    // Collapsible filter state
+    const [filtersExpanded, setFiltersExpanded] = useState<boolean>(false);
+
+    // Enhanced Filters
+    const [dateFrom, setDateFrom] = useState<string>("");
+    const [dateTo, setDateTo] = useState<string>("");
+    const [selectedPlugins, setSelectedPlugins] = useState<string[]>([]);
+    const [selectedMessage, setSelectedMessage] = useState<string>("");
+    const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
+    const [selectedModes, setSelectedModes] = useState<number[]>([]);
     const [correlationFilter, setCorrelationFilter] = useState<string>("");
     const [exceptionOnly, setExceptionOnly] = useState<boolean>(false);
+
+    // Filter options (populated from trace logs)
+    const [pluginOptions, setPluginOptions] = useState<FilterOption[]>([]);
+    const [messageOptions, setMessageOptions] = useState<FilterOption[]>([]);
+    const [entityOptions, setEntityOptions] = useState<FilterOption[]>([]);
 
     // Detect environment and initialize
     useEffect(() => {
@@ -41,14 +53,44 @@ function App() {
         initializeEnvironment();
     }, []);
 
+    // Extract unique filter options from trace logs
+    useEffect(() => {
+        if (traceLogs.length > 0) {
+            // Extract unique plugins
+            const plugins = new Map<string, number>();
+            const messages = new Map<string, number>();
+            const entities = new Map<string, number>();
+
+            traceLogs.forEach(log => {
+                if (log.typename) {
+                    plugins.set(log.typename, (plugins.get(log.typename) || 0) + 1);
+                }
+                if (log.messagename) {
+                    messages.set(log.messagename, (messages.get(log.messagename) || 0) + 1);
+                }
+                if (log.primaryentity) {
+                    entities.set(log.primaryentity, (entities.get(log.primaryentity) || 0) + 1);
+                }
+            });
+
+            setPluginOptions(Array.from(plugins.entries()).map(([value, count]) => ({ value, label: value, count })).sort((a, b) => a.label.localeCompare(b.label)));
+            setMessageOptions(Array.from(messages.entries()).map(([value, count]) => ({ value, label: value, count })).sort((a, b) => a.label.localeCompare(b.label)));
+            setEntityOptions(Array.from(entities.entries()).map(([value, count]) => ({ value, label: value, count })).sort((a, b) => a.label.localeCompare(b.label)));
+        }
+    }, [traceLogs]);
+
     const loadTraceLogs = useCallback(async () => {
         try {
             setLoadingLogs(true);
             const client = new DataverseClient();
 
             const filter: TraceLogFilter = {
-                messageName: messageFilter || undefined,
-                entityName: entityFilter || undefined,
+                startDate: dateFrom || undefined,
+                endDate: dateTo || undefined,
+                pluginNames: selectedPlugins.length > 0 ? selectedPlugins : undefined,
+                messageName: selectedMessage || undefined,
+                entityNames: selectedEntities.length > 0 ? selectedEntities : undefined,
+                modes: selectedModes.length > 0 ? selectedModes : undefined,
                 correlationId: correlationFilter || undefined,
                 hasException: exceptionOnly ? true : undefined,
             };
@@ -61,7 +103,7 @@ function App() {
         } finally {
             setLoadingLogs(false);
         }
-    }, [messageFilter, entityFilter, correlationFilter, exceptionOnly]);
+    }, [dateFrom, dateTo, selectedPlugins, selectedMessage, selectedEntities, selectedModes, correlationFilter, exceptionOnly]);
 
     // Load trace logs when connection is available
     useEffect(() => {
@@ -85,7 +127,7 @@ function App() {
         }
     };
 
-    const handleRefresh = () => {
+    const handleRetrieve = () => {
         loadTraceLogs();
     };
 
@@ -136,15 +178,44 @@ function App() {
 
     const getOperationTypeLabel = (type: number) => {
         const types: { [key: number]: string } = {
-            1: "Create",
-            2: "Update",
-            3: "Delete",
-            4: "Retrieve",
-            5: "RetrieveMultiple",
-            6: "Associate",
-            7: "Disassociate",
+            1: "Plugin",
+            2: "Workflow Activity",
         };
-        return types[type] || `Operation ${type}`;
+        return types[type] || `Type ${type}`;
+    };
+
+    const getModeLabel = (mode: number | undefined) => {
+        if (mode === undefined || mode === null) return "N/A";
+        return mode === 0 ? "Synchronous" : "Asynchronous";
+    };
+
+    const togglePlugin = (plugin: string) => {
+        setSelectedPlugins(prev =>
+            prev.includes(plugin) ? prev.filter(p => p !== plugin) : [...prev, plugin]
+        );
+    };
+
+    const toggleEntity = (entity: string) => {
+        setSelectedEntities(prev =>
+            prev.includes(entity) ? prev.filter(e => e !== entity) : [...prev, entity]
+        );
+    };
+
+    const toggleMode = (mode: number) => {
+        setSelectedModes(prev =>
+            prev.includes(mode) ? prev.filter(m => m !== mode) : [...prev, mode]
+        );
+    };
+
+    const clearFilters = () => {
+        setDateFrom("");
+        setDateTo("");
+        setSelectedPlugins([]);
+        setSelectedMessage("");
+        setSelectedEntities([]);
+        setSelectedModes([]);
+        setCorrelationFilter("");
+        setExceptionOnly(false);
     };
 
     if (loading && !connectionUrl) {
@@ -167,47 +238,180 @@ function App() {
         <div className="container">
             {error && <div className="error-banner">{error}</div>}
 
-            {/* Compact Filter Bar */}
-            <div className="filter-bar">
-                <div className="filter-group">
-                    <input
-                        type="text"
-                        placeholder="Message Name..."
-                        value={messageFilter}
-                        onChange={(e) => setMessageFilter(e.target.value)}
-                        className="filter-input"
-                    />
-                    <input
-                        type="text"
-                        placeholder="Entity..."
-                        value={entityFilter}
-                        onChange={(e) => setEntityFilter(e.target.value)}
-                        className="filter-input"
-                    />
-                    <input
-                        type="text"
-                        placeholder="Correlation ID..."
-                        value={correlationFilter}
-                        onChange={(e) => setCorrelationFilter(e.target.value)}
-                        className="filter-input"
-                    />
-                    <label className="checkbox-label">
-                        <input type="checkbox" checked={exceptionOnly} onChange={(e) => setExceptionOnly(e.target.checked)} />
-                        <span>Exceptions Only</span>
-                    </label>
-                </div>
-                <button className="btn btn-primary" onClick={handleRefresh} disabled={loadingLogs}>
-                    {loadingLogs ? "Loading..." : "🔄 Refresh"}
+            {/* Command Bar */}
+            <div className="command-bar">
+                <button className="btn btn-primary" onClick={handleRetrieve} disabled={loadingLogs}>
+                    {loadingLogs ? "Loading..." : "📥 Retrieve"}
                 </button>
+                <button className="btn btn-secondary" onClick={() => setFiltersExpanded(!filtersExpanded)}>
+                    {filtersExpanded ? "▲ Hide Filters" : "▼ Show Filters"}
+                </button>
+                <div className="command-spacer"></div>
+                <span className="log-count">{traceLogs.length} logs</span>
             </div>
+
+            {/* Collapsible Filter Panel */}
+            {filtersExpanded && (
+                <div className="filter-panel">
+                    <div className="filter-panel-content">
+                        {/* Date Filters */}
+                        <div className="filter-section">
+                            <div className="filter-group-horizontal">
+                                <div className="filter-field">
+                                    <label>Date From</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={dateFrom}
+                                        onChange={(e) => setDateFrom(e.target.value)}
+                                        className="filter-input-date"
+                                    />
+                                </div>
+                                <div className="filter-field">
+                                    <label>Date To</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={dateTo}
+                                        onChange={(e) => setDateTo(e.target.value)}
+                                        className="filter-input-date"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Plugin Multi-Select */}
+                        <div className="filter-section">
+                            <label>Plugin/Step (multi-select)</label>
+                            <div className="multi-select-dropdown">
+                                <div className="selected-items">
+                                    {selectedPlugins.length === 0 && <span className="placeholder">Select plugins...</span>}
+                                    {selectedPlugins.map(plugin => (
+                                        <span key={plugin} className="selected-tag">
+                                            {plugin}
+                                            <button onClick={() => togglePlugin(plugin)} className="tag-remove">×</button>
+                                        </span>
+                                    ))}
+                                </div>
+                                <select
+                                    className="filter-select"
+                                    value=""
+                                    onChange={(e) => e.target.value && togglePlugin(e.target.value)}
+                                >
+                                    <option value="">Add plugin...</option>
+                                    {pluginOptions.map(opt => (
+                                        <option key={opt.value} value={opt.value} disabled={selectedPlugins.includes(opt.value)}>
+                                            {opt.label} ({opt.count})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Message Single-Select */}
+                        <div className="filter-section">
+                            <label>Message</label>
+                            <select
+                                className="filter-select"
+                                value={selectedMessage}
+                                onChange={(e) => setSelectedMessage(e.target.value)}
+                            >
+                                <option value="">All messages</option>
+                                {messageOptions.map(opt => (
+                                    <option key={opt.value} value={opt.value}>
+                                        {opt.label} ({opt.count})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Entity Multi-Select */}
+                        <div className="filter-section">
+                            <label>Entity (multi-select)</label>
+                            <div className="multi-select-dropdown">
+                                <div className="selected-items">
+                                    {selectedEntities.length === 0 && <span className="placeholder">Select entities...</span>}
+                                    {selectedEntities.map(entity => (
+                                        <span key={entity} className="selected-tag">
+                                            {entity}
+                                            <button onClick={() => toggleEntity(entity)} className="tag-remove">×</button>
+                                        </span>
+                                    ))}
+                                </div>
+                                <select
+                                    className="filter-select"
+                                    value=""
+                                    onChange={(e) => e.target.value && toggleEntity(e.target.value)}
+                                >
+                                    <option value="">Add entity...</option>
+                                    {entityOptions.map(opt => (
+                                        <option key={opt.value} value={opt.value} disabled={selectedEntities.includes(opt.value)}>
+                                            {opt.label} ({opt.count})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Mode Multi-Select */}
+                        <div className="filter-section">
+                            <label>Mode</label>
+                            <div className="checkbox-group">
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedModes.includes(0)}
+                                        onChange={() => toggleMode(0)}
+                                    />
+                                    <span>Synchronous</span>
+                                </label>
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedModes.includes(1)}
+                                        onChange={() => toggleMode(1)}
+                                    />
+                                    <span>Asynchronous</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Correlation ID and Exception Only */}
+                        <div className="filter-section">
+                            <div className="filter-group-horizontal">
+                                <div className="filter-field">
+                                    <label>Correlation ID</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Enter correlation ID..."
+                                        value={correlationFilter}
+                                        onChange={(e) => setCorrelationFilter(e.target.value)}
+                                        className="filter-input"
+                                    />
+                                </div>
+                                <div className="filter-field">
+                                    <label className="checkbox-label">
+                                        <input
+                                            type="checkbox"
+                                            checked={exceptionOnly}
+                                            onChange={(e) => setExceptionOnly(e.target.checked)}
+                                        />
+                                        <span>Exceptions Only</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Filter Actions */}
+                        <div className="filter-actions">
+                            <button className="btn btn-secondary" onClick={clearFilters}>Clear All Filters</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Main Content Area */}
             <div className="main-content">
                 {/* Trace Logs List */}
                 <div className="logs-panel">
-                    <div className="panel-header">
-                        <span className="count">{traceLogs.length} logs</span>
-                    </div>
                     <div className="logs-list">
                         {traceLogs.length === 0 && !loadingLogs && <div className="empty-state">No trace logs found</div>}
                         {traceLogs.map((log) => (
@@ -257,8 +461,12 @@ function App() {
                                     <span>{selectedLog.primaryentity || "N/A"}</span>
                                 </div>
                                 <div className="detail-row">
-                                    <label>Operation Type:</label>
+                                    <label>Operation:</label>
                                     <span>{getOperationTypeLabel(selectedLog.operationtype)}</span>
+                                </div>
+                                <div className="detail-row">
+                                    <label>Mode:</label>
+                                    <span>{getModeLabel(selectedLog.mode)}</span>
                                 </div>
                                 <div className="detail-row">
                                     <label>Depth:</label>

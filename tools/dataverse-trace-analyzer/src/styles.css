@@ -379,3 +379,168 @@ body {
 .detail-content::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
 }
+
+/* Command Bar */
+.command-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.command-spacer {
+    flex: 1;
+}
+
+.log-count {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+/* Collapsible Filter Panel */
+.filter-panel {
+    background-color: var(--background);
+    border-bottom: 1px solid var(--border-color);
+    max-height: 400px;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.filter-panel-content {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.filter-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.filter-section label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.filter-group-horizontal {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.filter-field {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.filter-input-date {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    font-size: 13px;
+    background-color: var(--background);
+}
+
+.filter-input-date:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.filter-select {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    font-size: 13px;
+    background-color: var(--background);
+    cursor: pointer;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* Multi-Select Dropdown */
+.multi-select-dropdown {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.selected-items {
+    min-height: 32px;
+    padding: 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    background-color: var(--background);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.placeholder {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.selected-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: 2px;
+    font-size: 12px;
+}
+
+.tag-remove {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+    margin: 0;
+}
+
+.tag-remove:hover {
+    opacity: 0.8;
+}
+
+.checkbox-group {
+    display: flex;
+    gap: 16px;
+}
+
+.filter-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 8px;
+}
+
+.btn-secondary {
+    background-color: var(--surface);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: var(--border-color);
+}
+
+/* Update logs panel to remove header */
+.logs-panel .panel-header {
+    display: none;
+}
