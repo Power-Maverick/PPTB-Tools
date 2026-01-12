@@ -18,6 +18,21 @@ export class DataverseClient {
         return `'${escaped}'`;
     }
 
+    /**
+     * Format date for OData datetime literal
+     */
+    private formatODataDate(dateString: string): string {
+        // OData expects datetime'YYYY-MM-DDTHH:MM:SS' format
+        // Assuming dateString is ISO format or can be parsed
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) {
+            throw new Error(`Invalid date format: ${dateString}`);
+        }
+        
+        const isoString = date.toISOString();
+        return `datetime'${isoString}'`;
+    }
+
     async fetchPluginTraceLogs(filter?: TraceLogFilter): Promise<PluginTraceLog[]> {
         try {
             const entitySetName = await window.dataverseAPI.getEntitySetName("plugintracelog");
@@ -27,14 +42,14 @@ export class DataverseClient {
             
             if (filter?.startDate) {
                 // Properly format date for OData query
-                const escapedDate = this.escapeODataValue(filter.startDate);
-                filterQuery += ` and createdon ge ${escapedDate}`;
+                const formattedDate = this.formatODataDate(filter.startDate);
+                filterQuery += ` and createdon ge ${formattedDate}`;
             }
             
             if (filter?.endDate) {
                 // Properly format date for OData query
-                const escapedDate = this.escapeODataValue(filter.endDate);
-                filterQuery += ` and createdon le ${escapedDate}`;
+                const formattedDate = this.formatODataDate(filter.endDate);
+                filterQuery += ` and createdon le ${formattedDate}`;
             }
             
             if (filter?.entityName) {
@@ -59,6 +74,8 @@ export class DataverseClient {
                 filterQuery += ` and exceptiondetails ne null`;
             }
 
+            // TODO: Add pagination support for datasets larger than 100 records
+            // Consider making the limit configurable via settings or adding infinite scroll
             const query = `${entitySetName}?$select=plugintracelogid,typename,messageblock,messagename,performanceexecutionstarttime,performanceexecutionduration,exceptiondetails,depth,correlationid,operationtype,primaryentity,createdon,mode&${filterQuery}&$orderby=createdon desc&$top=100`;
 
             const response = await window.dataverseAPI.queryData(query);
