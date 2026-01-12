@@ -22,15 +22,4 @@ export interface TraceLogFilter {
     messageName?: string;
     correlationId?: string;
     hasException?: boolean;
-    searchText?: string;
-}
-
-export interface OperationType {
-    value: number;
-    label: string;
-}
-
-export interface MessageType {
-    value: string;
-    label: string;
 }

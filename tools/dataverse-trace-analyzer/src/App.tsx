@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PluginTraceLog, TraceLogFilter } from "./models/interfaces";
 import { DataverseClient } from "./utils/DataverseClient";
 
@@ -41,14 +41,7 @@ function App() {
         initializeEnvironment();
     }, []);
 
-    // Load trace logs when connection is available
-    useEffect(() => {
-        if (connectionUrl) {
-            loadTraceLogs();
-        }
-    }, [connectionUrl]);
-
-    const loadTraceLogs = async () => {
+    const loadTraceLogs = useCallback(async () => {
         try {
             setLoadingLogs(true);
             const client = new DataverseClient();
@@ -68,7 +61,14 @@ function App() {
         } finally {
             setLoadingLogs(false);
         }
-    };
+    }, [messageFilter, entityFilter, correlationFilter, exceptionOnly]);
+
+    // Load trace logs when connection is available
+    useEffect(() => {
+        if (connectionUrl) {
+            loadTraceLogs();
+        }
+    }, [connectionUrl, loadTraceLogs]);
 
     const showError = (message: string) => {
         setError(message);
