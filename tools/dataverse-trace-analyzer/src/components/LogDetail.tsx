@@ -11,7 +11,7 @@ export function LogDetail({ log, onDelete }: LogDetailProps) {
     const pluginInfo = parsePluginTypeName(log.typename);
 
     return (
-        <div className="detail-panel">
+        <>
             <div className="detail-header">
                 <h3>Trace Details</h3>
                 <button className="btn btn-danger btn-sm" onClick={() => onDelete(log.plugintracelogid)}>
@@ -87,6 +87,6 @@ export function LogDetail({ log, onDelete }: LogDetailProps) {
                     </div>
                 )}
             </div>
-        </div>
+        </>
     );
 }

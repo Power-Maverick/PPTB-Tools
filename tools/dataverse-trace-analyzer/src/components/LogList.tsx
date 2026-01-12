@@ -11,7 +11,7 @@ interface LogListProps {
 
 export function LogList({ logs, selectedLogId, highlightedLogIds, onSelectLog, isLoading }: LogListProps) {
     return (
-        <div className="logs-panel">
+        <>
             <div className="logs-list">
                 {logs.length === 0 && !isLoading && (
                     <div className="empty-state">No trace logs found</div>
@@ -26,6 +26,6 @@ export function LogList({ logs, selectedLogId, highlightedLogIds, onSelectLog, i
                     />
                 ))}
             </div>
-        </div>
+        </>
     );
 }

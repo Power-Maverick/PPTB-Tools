@@ -40,6 +40,36 @@ function App() {
     // Highlighting similar records
     const [highlightedLogIds, setHighlightedLogIds] = useState<Set<string>>(new Set());
 
+    // Resizable panel state
+    const [logsPanelWidth, setLogsPanelWidth] = useState<number>(400);
+    const [isResizing, setIsResizing] = useState<boolean>(false);
+
+    // Resizing logic
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (isResizing) {
+                const newWidth = Math.min(Math.max(e.clientX, 300), 800);
+                setLogsPanelWidth(newWidth);
+            }
+        };
+
+        const handleMouseUp = () => {
+            if (isResizing) {
+                setIsResizing(false);
+            }
+        };
+
+        if (isResizing) {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        }
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isResizing]);
+
     // Enhanced Filters
     const [dateFrom, setDateFrom] = useState<string>("");
     const [dateTo, setDateTo] = useState<string>("");
@@ -511,19 +541,28 @@ function App() {
             />
 
             <div className="main-content">
-                <LogList
-                    logs={traceLogs}
-                    selectedLogId={selectedLog?.plugintracelogid || null}
-                    highlightedLogIds={highlightedLogIds}
-                    onSelectLog={handleLogSelect}
-                    isLoading={loadingLogs}
+                <div className="logs-panel" style={{ width: `${logsPanelWidth}px` }}>
+                    <LogList
+                        logs={traceLogs}
+                        selectedLogId={selectedLog?.plugintracelogid || null}
+                        highlightedLogIds={highlightedLogIds}
+                        onSelectLog={handleLogSelect}
+                        isLoading={loadingLogs}
+                    />
+                </div>
+                
+                <div 
+                    className="resize-handle"
+                    onMouseDown={() => setIsResizing(true)}
                 />
 
                 {selectedLog && (
-                    <LogDetail
-                        log={selectedLog}
-                        onDelete={handleDeleteLog}
-                    />
+                    <div className="detail-panel">
+                        <LogDetail
+                            log={selectedLog}
+                            onDelete={handleDeleteLog}
+                        />
+                    </div>
                 )}
             </div>
         </div>

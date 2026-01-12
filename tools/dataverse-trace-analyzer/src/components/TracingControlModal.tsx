@@ -31,9 +31,10 @@ export const TracingControlModal: React.FC<TracingControlModalProps> = ({
     setError(null);
     try {
       // Query the plugintracelogsetting table to get current tracing configuration
+      const fetchXml = '<fetch top="1"><entity name="plugintracelogsetting"><attribute name="plugintracelogsettingid" /><attribute name="isenabled" /><attribute name="tracelogstatus" /></entity></fetch>';
       const result = await window.toolboxAPI.dataverse.queryData({
         entityName: 'plugintracelogsetting',
-        fetchXml: `<fetch top="1"><entity name="plugintracelogsetting"><attribute name="plugintracelogsettingid" /><attribute name="isenabled" /><attribute name="tracelogstatus" /></entity></fetch>`,
+        fetchXml: fetchXml,
       });
 
       if (result && result.length > 0) {
@@ -67,9 +68,10 @@ export const TracingControlModal: React.FC<TracingControlModalProps> = ({
       // tracelogstatus: 0 = All, 1 = Exception
       const tracelogstatus = tracingMode === 'Exception' ? 1 : 0;
       
+      const fetchXml = '<fetch top="1"><entity name="plugintracelogsetting"><attribute name="plugintracelogsettingid" /></entity></fetch>';
       const result = await window.toolboxAPI.dataverse.queryData({
         entityName: 'plugintracelogsetting',
-        fetchXml: `<fetch top="1"><entity name="plugintracelogsetting"><attribute name="plugintracelogsettingid" /></entity></fetch>`,
+        fetchXml: fetchXml,
       });
 
       if (result && result.length > 0) {

@@ -71,16 +71,43 @@ body {
     display: flex;
     flex: 1;
     overflow: hidden;
-    gap: 1px;
+    gap: 0;
     background-color: var(--border-color);
+    position: relative;
 }
 
 .logs-panel {
-    width: 400px;
+    min-width: 300px;
+    max-width: 800px;
     background-color: var(--background);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border-right: 1px solid var(--border-color);
+}
+
+.resize-handle {
+    width: 4px;
+    background-color: var(--border-color);
+    cursor: ew-resize;
+    transition: background-color 0.2s;
+    flex-shrink: 0;
+}
+
+.resize-handle:hover {
+    background-color: var(--primary-color);
+}
+
+.resize-handle:active {
+    background-color: var(--primary-hover);
+}
+
+.detail-panel {
+    flex: 1;
+    background-color: var(--background);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .panel-header {
