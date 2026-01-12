@@ -120,7 +120,6 @@ body {
 
 .error {
     padding: 40px 20px;
-    text-align: center;
     color: var(--danger-color);
     font-size: 13px;
 }
