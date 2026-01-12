@@ -161,7 +161,6 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 320px;
 }
 
 .log-type {
@@ -196,7 +195,6 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 250px;
 }
 
 .log-message {
@@ -207,7 +205,7 @@ body {
 }
 
 .log-entity {
-    color: var(--text-muted);
+    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

@@ -20,14 +20,13 @@ export function LogItem({ log, isSelected, onSelect }: LogItemProps) {
                 {log.exceptiondetails && <span className="error-badge">ERROR</span>}
             </div>
             <div className="log-info">
-                <span className="log-assembly" title={pluginInfo.assembly}>
-                    Assembly: {pluginInfo.assembly} (v{pluginInfo.version}) | {getOperationTypeLabel(log.operationtype)}
+                <span className="log-assembly" title={`${pluginInfo.assembly} (v${pluginInfo.version}) | ${getOperationTypeLabel(log.operationtype)}`}>
+                    {pluginInfo.assembly} (v{pluginInfo.version}) | {getOperationTypeLabel(log.operationtype)}
                 </span>
             </div>
             <div className="log-info">
                 <span className="log-message">Message: {log.messagename}</span>
-            </div>
-            <div className="log-info">
+                <span> | </span>
                 <span className="log-entity">Entity: {log.primaryentity || "-"}</span>
             </div>
             <div className="log-info">
