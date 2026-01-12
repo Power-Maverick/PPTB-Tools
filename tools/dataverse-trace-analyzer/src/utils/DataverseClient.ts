@@ -22,15 +22,16 @@ export class DataverseClient {
      * Format date for OData datetime literal
      */
     private formatODataDate(dateString: string): string {
-        // OData expects datetime'YYYY-MM-DDTHH:MM:SS' format
-        // Assuming dateString is ISO format or can be parsed
+        // OData expects just the ISO date string, not wrapped in datetime''
+        // The datetime'' wrapper should be added by the caller
         const date = new Date(dateString);
         if (isNaN(date.getTime())) {
             throw new Error(`Invalid date format: ${dateString}`);
         }
         
-        const isoString = date.toISOString();
-        return `datetime'${isoString}'`;
+        // Return ISO string without milliseconds for OData compatibility
+        const isoString = date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+        return isoString;
     }
 
     async fetchPluginTraceLogs(filter?: TraceLogFilter): Promise<PluginTraceLog[]> {

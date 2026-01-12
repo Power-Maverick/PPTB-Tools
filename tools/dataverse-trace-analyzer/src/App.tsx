@@ -105,7 +105,7 @@ function App() {
                 entityNames: selectedEntities.length > 0 ? selectedEntities : undefined,
                 modes: selectedModes.length > 0 ? selectedModes : undefined,
                 correlationId: correlationFilter || undefined,
-                hasException: exceptionOnly ? true : undefined,
+                hasException: exceptionOnly || undefined,
             };
 
             const logs = await client.fetchPluginTraceLogs(filter);
