@@ -1,6 +1,6 @@
 import { PluginTraceLog } from "../models/interfaces";
 import { formatDateTime, formatDuration, getModeLabel, getOperationTypeLabel } from "../utils/DataParser";
-import { parsePluginTypeName } from "../utils/luginParser";
+import { parsePluginTypeName } from "../utils/PluginParser";
 
 interface LogDetailProps {
     log: PluginTraceLog;
