@@ -1,8 +1,23 @@
 {
   "name": "@power-maverick/tool-dataverse-trace-analyzer",
   "displayName": "Dataverse Trace Analyzer",
-  "version": "1.0.0",
-  "description": "Analyze and view Plugin Trace Logs from Dataverse - React-based tool for PowerPlatform ToolBox",
+  "version": "0.0.1",
+  "description": "Analyze and view Plugin Trace Logs from Dataverse",
+  "contributors": [
+    {
+      "name": "Power Maverick",
+      "url": "https://github.com/Power-Maverick"
+    },
+    {
+      "name": "Jonas Rapp",
+      "url": "https://github.com/rappen"
+    }
+  ],
+  "license": "GPL-2.0",
+  "configurations": {
+    "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/dataverse-trace-analyzer",
+    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/dataverse-trace-analyzer/README.md"
+  },
   "type": "module",
   "scripts": {
     "build": "vite build",
@@ -25,7 +40,6 @@
     "toolbox"
   ],
   "author": "Power Maverick",
-  "license": "GPL-2.0",
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
