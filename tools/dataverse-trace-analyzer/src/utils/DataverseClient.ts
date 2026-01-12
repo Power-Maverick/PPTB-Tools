@@ -78,12 +78,13 @@ export class DataverseClient {
 
             // Construct the filter query
             if (filterConditions.length > 0) {
-                filterQuery = `$filter=${filterConditions.join(' and ')}&`;
+                filterQuery = `$filter=${filterConditions.join(' and ')}`;
             }
 
             // TODO: Add pagination support for datasets larger than 100 records
             // Consider making the limit configurable via settings or adding infinite scroll
-            const query = `${entitySetName}?$select=plugintracelogid,typename,messageblock,messagename,performanceexecutionstarttime,performanceexecutionduration,exceptiondetails,depth,correlationid,operationtype,primaryentity,createdon,mode&${filterQuery}$orderby=createdon desc&$top=100`;
+            const filterPart = filterQuery ? `${filterQuery}&` : '';
+            const query = `${entitySetName}?$select=plugintracelogid,typename,messageblock,messagename,performanceexecutionstarttime,performanceexecutionduration,exceptiondetails,depth,correlationid,operationtype,primaryentity,createdon,mode&${filterPart}$orderby=createdon desc&$top=100`;
 
             const response = await window.dataverseAPI.queryData(query);
 
