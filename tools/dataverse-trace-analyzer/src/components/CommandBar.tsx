@@ -4,6 +4,7 @@ interface CommandBarProps {
     onSaveFilter: () => void;
     onLoadFilter: () => void;
     onOpenAutoRefresh: () => void;
+    onOpenTracingControl: () => void;
     isLoading: boolean;
     logCount: number;
     activeFilterCount: number;
@@ -18,6 +19,7 @@ export function CommandBar({
     onSaveFilter, 
     onLoadFilter, 
     onOpenAutoRefresh,
+    onOpenTracingControl,
     isLoading, 
     logCount, 
     activeFilterCount,
@@ -56,6 +58,13 @@ export function CommandBar({
                 title="Configure auto-refresh settings"
             >
                 {getAutoRefreshButtonText()}
+            </button>
+            <button 
+                className="btn btn-secondary"
+                onClick={onOpenTracingControl}
+                title="Enable/disable plugin tracing"
+            >
+                ⚙️ Tracing
             </button>
             <div className="command-spacer"></div>
             {newLogsCount !== undefined && newLogsCount > 0 && (

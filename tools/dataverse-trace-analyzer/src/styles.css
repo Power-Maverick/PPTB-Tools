@@ -820,3 +820,117 @@ body {
 .log-item.highlighted:hover {
     background-color: #ffec99;
 }
+
+/* Tracing Control Modal */
+.tracing-control-modal {
+    max-width: 500px;
+}
+
+.tracing-control-modal .current-status {
+    background-color: var(--surface);
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    font-size: 13px;
+}
+
+.tracing-control-modal .status-enabled {
+    color: var(--success-color);
+    font-weight: 600;
+}
+
+.tracing-control-modal .status-disabled {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.tracing-control-modal .form-group {
+    margin-bottom: 20px;
+}
+
+.tracing-control-modal .form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-color);
+}
+
+.tracing-control-modal .checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: normal;
+}
+
+.tracing-control-modal .checkbox-label input[type="checkbox"] {
+    margin-right: 8px;
+    cursor: pointer;
+}
+
+.tracing-control-modal .checkbox-label span {
+    font-weight: 600;
+}
+
+.tracing-control-modal .field-description {
+    margin-top: 6px;
+    margin-left: 24px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.tracing-control-modal .radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.tracing-control-modal .radio-label {
+    display: flex;
+    align-items: flex-start;
+    cursor: pointer;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.tracing-control-modal .radio-label:hover {
+    background-color: var(--surface);
+    border-color: var(--primary-color);
+}
+
+.tracing-control-modal .radio-label input[type="radio"] {
+    margin-right: 12px;
+    margin-top: 2px;
+    cursor: pointer;
+}
+
+.tracing-control-modal .radio-label > span {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tracing-control-modal .mode-description {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: normal;
+    display: block;
+}
+
+.tracing-control-modal .loading-state {
+    padding: 20px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.tracing-control-modal .error-message {
+    background-color: var(--error-bg);
+    border: 1px solid var(--error-border);
+    border-radius: 4px;
+    padding: 12px;
+    color: var(--danger-color);
+    font-size: 13px;
+    margin-top: 12px;
+}

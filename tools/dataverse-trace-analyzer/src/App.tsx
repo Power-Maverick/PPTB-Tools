@@ -7,6 +7,7 @@ import { FilterModal } from "./components/FilterModal";
 import { SaveFilterModal } from "./components/SaveFilterModal";
 import { LoadFilterModal } from "./components/LoadFilterModal";
 import { AutoRefreshModal } from "./components/AutoRefreshModal";
+import { TracingControlModal } from "./components/TracingControlModal";
 import { LogList } from "./components/LogList";
 import { LogDetail } from "./components/LogDetail";
 
@@ -25,6 +26,7 @@ function App() {
     const [showSaveFilterModal, setShowSaveFilterModal] = useState<boolean>(false);
     const [showLoadFilterModal, setShowLoadFilterModal] = useState<boolean>(false);
     const [showAutoRefreshModal, setShowAutoRefreshModal] = useState<boolean>(false);
+    const [showTracingControlModal, setShowTracingControlModal] = useState<boolean>(false);
     
     // Saved filters
     const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
@@ -258,6 +260,12 @@ function App() {
         setNewLogsCount(0);
     };
 
+    const handleTracingSave = (enabled: boolean, mode: 'Exception' | 'All') => {
+        // The TracingControlModal handles the actual API calls
+        // This callback is just for confirmation
+        console.log(`Tracing ${enabled ? 'enabled' : 'disabled'} with mode: ${mode}`);
+    };
+
     const handleDeleteLog = async (logId: string) => {
         if (!confirm("Are you sure you want to delete this trace log?")) {
             return;
@@ -438,6 +446,7 @@ function App() {
                 onSaveFilter={() => setShowSaveFilterModal(true)}
                 onLoadFilter={() => setShowLoadFilterModal(true)}
                 onOpenAutoRefresh={() => setShowAutoRefreshModal(true)}
+                onOpenTracingControl={() => setShowTracingControlModal(true)}
                 isLoading={loadingLogs}
                 logCount={traceLogs.length}
                 activeFilterCount={getActiveFilterCount()}
@@ -493,6 +502,12 @@ function App() {
                 currentMode={autoRefreshMode}
                 currentInterval={autoRefreshInterval}
                 onSave={handleAutoRefreshSave}
+            />
+
+            <TracingControlModal
+                isOpen={showTracingControlModal}
+                onClose={() => setShowTracingControlModal(false)}
+                onSave={handleTracingSave}
             />
 
             <div className="main-content">
