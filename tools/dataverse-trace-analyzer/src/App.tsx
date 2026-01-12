@@ -15,6 +15,10 @@ function App() {
     // Collapsible filter state
     const [filtersExpanded, setFiltersExpanded] = useState<boolean>(false);
 
+    // Modal states
+    const [showPluginModal, setShowPluginModal] = useState<boolean>(false);
+    const [showEntityModal, setShowEntityModal] = useState<boolean>(false);
+
     // Enhanced Filters
     const [dateFrom, setDateFrom] = useState<string>("");
     const [dateTo, setDateTo] = useState<string>("");
@@ -29,6 +33,10 @@ function App() {
     const [pluginOptions, setPluginOptions] = useState<FilterOption[]>([]);
     const [messageOptions, setMessageOptions] = useState<FilterOption[]>([]);
     const [entityOptions, setEntityOptions] = useState<FilterOption[]>([]);
+
+    // Temporary selections for modals (before applying)
+    const [tempSelectedPlugins, setTempSelectedPlugins] = useState<string[]>([]);
+    const [tempSelectedEntities, setTempSelectedEntities] = useState<string[]>([]);
 
     // Detect environment and initialize
     useEffect(() => {
@@ -189,18 +197,6 @@ function App() {
         return mode === 0 ? "Synchronous" : "Asynchronous";
     };
 
-    const togglePlugin = (plugin: string) => {
-        setSelectedPlugins(prev =>
-            prev.includes(plugin) ? prev.filter(p => p !== plugin) : [...prev, plugin]
-        );
-    };
-
-    const toggleEntity = (entity: string) => {
-        setSelectedEntities(prev =>
-            prev.includes(entity) ? prev.filter(e => e !== entity) : [...prev, entity]
-        );
-    };
-
     const toggleMode = (mode: number) => {
         setSelectedModes(prev =>
             prev.includes(mode) ? prev.filter(m => m !== mode) : [...prev, mode]
@@ -216,6 +212,64 @@ function App() {
         setSelectedModes([]);
         setCorrelationFilter("");
         setExceptionOnly(false);
+    };
+
+    // Plugin Modal Functions
+    const openPluginModal = () => {
+        setTempSelectedPlugins([...selectedPlugins]);
+        setShowPluginModal(true);
+    };
+
+    const closePluginModal = () => {
+        setShowPluginModal(false);
+    };
+
+    const applyPluginSelection = () => {
+        setSelectedPlugins([...tempSelectedPlugins]);
+        setShowPluginModal(false);
+    };
+
+    const toggleTempPlugin = (plugin: string) => {
+        setTempSelectedPlugins(prev =>
+            prev.includes(plugin) ? prev.filter(p => p !== plugin) : [...prev, plugin]
+        );
+    };
+
+    const selectAllPlugins = () => {
+        setTempSelectedPlugins(pluginOptions.map(opt => opt.value));
+    };
+
+    const clearAllPlugins = () => {
+        setTempSelectedPlugins([]);
+    };
+
+    // Entity Modal Functions
+    const openEntityModal = () => {
+        setTempSelectedEntities([...selectedEntities]);
+        setShowEntityModal(true);
+    };
+
+    const closeEntityModal = () => {
+        setShowEntityModal(false);
+    };
+
+    const applyEntitySelection = () => {
+        setSelectedEntities([...tempSelectedEntities]);
+        setShowEntityModal(false);
+    };
+
+    const toggleTempEntity = (entity: string) => {
+        setTempSelectedEntities(prev =>
+            prev.includes(entity) ? prev.filter(e => e !== entity) : [...prev, entity]
+        );
+    };
+
+    const selectAllEntities = () => {
+        setTempSelectedEntities(entityOptions.map(opt => opt.value));
+    };
+
+    const clearAllEntities = () => {
+        setTempSelectedEntities([]);
     };
 
     if (loading && !connectionUrl) {
@@ -278,31 +332,20 @@ function App() {
                             </div>
                         </div>
 
-                        {/* Plugin Multi-Select */}
+                        {/* Plugin Multi-Select with Modal */}
                         <div className="filter-section">
                             <label>Plugin/Step (multi-select)</label>
-                            <div className="multi-select-dropdown">
-                                <div className="selected-items">
-                                    {selectedPlugins.length === 0 && <span className="placeholder">Select plugins...</span>}
-                                    {selectedPlugins.map(plugin => (
-                                        <span key={plugin} className="selected-tag">
-                                            {plugin}
-                                            <button onClick={() => togglePlugin(plugin)} className="tag-remove">×</button>
-                                        </span>
-                                    ))}
+                            <div className="filter-input-group">
+                                <div className="selected-display">
+                                    {selectedPlugins.length === 0 ? (
+                                        <span className="placeholder">No plugins selected</span>
+                                    ) : (
+                                        <span>{selectedPlugins.length} plugin(s) selected</span>
+                                    )}
                                 </div>
-                                <select
-                                    className="filter-select"
-                                    value=""
-                                    onChange={(e) => e.target.value && togglePlugin(e.target.value)}
-                                >
-                                    <option value="">Add plugin...</option>
-                                    {pluginOptions.map(opt => (
-                                        <option key={opt.value} value={opt.value} disabled={selectedPlugins.includes(opt.value)}>
-                                            {opt.label} ({opt.count})
-                                        </option>
-                                    ))}
-                                </select>
+                                <button className="btn btn-select" onClick={openPluginModal}>
+                                    Select...
+                                </button>
                             </div>
                         </div>
 
@@ -323,31 +366,20 @@ function App() {
                             </select>
                         </div>
 
-                        {/* Entity Multi-Select */}
+                        {/* Entity Multi-Select with Modal */}
                         <div className="filter-section">
                             <label>Entity (multi-select)</label>
-                            <div className="multi-select-dropdown">
-                                <div className="selected-items">
-                                    {selectedEntities.length === 0 && <span className="placeholder">Select entities...</span>}
-                                    {selectedEntities.map(entity => (
-                                        <span key={entity} className="selected-tag">
-                                            {entity}
-                                            <button onClick={() => toggleEntity(entity)} className="tag-remove">×</button>
-                                        </span>
-                                    ))}
+                            <div className="filter-input-group">
+                                <div className="selected-display">
+                                    {selectedEntities.length === 0 ? (
+                                        <span className="placeholder">No entities selected</span>
+                                    ) : (
+                                        <span>{selectedEntities.length} entit{selectedEntities.length === 1 ? 'y' : 'ies'} selected</span>
+                                    )}
                                 </div>
-                                <select
-                                    className="filter-select"
-                                    value=""
-                                    onChange={(e) => e.target.value && toggleEntity(e.target.value)}
-                                >
-                                    <option value="">Add entity...</option>
-                                    {entityOptions.map(opt => (
-                                        <option key={opt.value} value={opt.value} disabled={selectedEntities.includes(opt.value)}>
-                                            {opt.label} ({opt.count})
-                                        </option>
-                                    ))}
-                                </select>
+                                <button className="btn btn-select" onClick={openEntityModal}>
+                                    Select...
+                                </button>
                             </div>
                         </div>
 
@@ -403,6 +435,80 @@ function App() {
                         {/* Filter Actions */}
                         <div className="filter-actions">
                             <button className="btn btn-secondary" onClick={clearFilters}>Clear All Filters</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Plugin Selection Modal */}
+            {showPluginModal && (
+                <div className="modal-overlay" onClick={closePluginModal}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>Select Plugins/Steps</h3>
+                            <button className="modal-close" onClick={closePluginModal}>×</button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="modal-actions">
+                                <button className="btn btn-link" onClick={selectAllPlugins}>Select All</button>
+                                <button className="btn btn-link" onClick={clearAllPlugins}>Clear All</button>
+                            </div>
+                            <div className="modal-list">
+                                {pluginOptions.map(opt => (
+                                    <label key={opt.value} className="modal-item">
+                                        <input
+                                            type="checkbox"
+                                            checked={tempSelectedPlugins.includes(opt.value)}
+                                            onChange={() => toggleTempPlugin(opt.value)}
+                                        />
+                                        <span className="modal-item-label">
+                                            {opt.label}
+                                            <span className="modal-item-count">({opt.count})</span>
+                                        </span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={closePluginModal}>Cancel</button>
+                            <button className="btn btn-primary" onClick={applyPluginSelection}>Apply</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Entity Selection Modal */}
+            {showEntityModal && (
+                <div className="modal-overlay" onClick={closeEntityModal}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>Select Entities</h3>
+                            <button className="modal-close" onClick={closeEntityModal}>×</button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="modal-actions">
+                                <button className="btn btn-link" onClick={selectAllEntities}>Select All</button>
+                                <button className="btn btn-link" onClick={clearAllEntities}>Clear All</button>
+                            </div>
+                            <div className="modal-list">
+                                {entityOptions.map(opt => (
+                                    <label key={opt.value} className="modal-item">
+                                        <input
+                                            type="checkbox"
+                                            checked={tempSelectedEntities.includes(opt.value)}
+                                            onChange={() => toggleTempEntity(opt.value)}
+                                        />
+                                        <span className="modal-item-label">
+                                            {opt.label}
+                                            <span className="modal-item-count">({opt.count})</span>
+                                        </span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={closeEntityModal}>Cancel</button>
+                            <button className="btn btn-primary" onClick={applyEntitySelection}>Apply</button>
                         </div>
                     </div>
                 </div>
