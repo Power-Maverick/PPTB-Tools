@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { FilterOption, PluginTraceLog, SavedFilter, TraceLogFilter } from "./models/interfaces";
 import { DataverseClient } from "./utils/DataverseClient";
 import { FilterStorage } from "./utils/filterStorage";
@@ -6,6 +6,7 @@ import { CommandBar } from "./components/CommandBar";
 import { FilterModal } from "./components/FilterModal";
 import { SaveFilterModal } from "./components/SaveFilterModal";
 import { LoadFilterModal } from "./components/LoadFilterModal";
+import { AutoRefreshModal } from "./components/AutoRefreshModal";
 import { LogList } from "./components/LogList";
 import { LogDetail } from "./components/LogDetail";
 
@@ -23,9 +24,19 @@ function App() {
     const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
     const [showSaveFilterModal, setShowSaveFilterModal] = useState<boolean>(false);
     const [showLoadFilterModal, setShowLoadFilterModal] = useState<boolean>(false);
+    const [showAutoRefreshModal, setShowAutoRefreshModal] = useState<boolean>(false);
     
     // Saved filters
     const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
+
+    // Auto-refresh state
+    const [autoRefreshMode, setAutoRefreshMode] = useState<'off' | 'auto' | 'notify'>('off');
+    const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(30);
+    const [newLogsCount, setNewLogsCount] = useState<number>(0);
+    const autoRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Highlighting similar records
+    const [highlightedLogIds, setHighlightedLogIds] = useState<Set<string>>(new Set());
 
     // Enhanced Filters
     const [dateFrom, setDateFrom] = useState<string>("");
@@ -155,6 +166,7 @@ function App() {
     const handleLogSelect = async (log: PluginTraceLog) => {
         if (selectedLog?.plugintracelogid === log.plugintracelogid) {
             setSelectedLog(null);
+            setHighlightedLogIds(new Set());
             return;
         }
 
@@ -162,9 +174,88 @@ function App() {
             const client = new DataverseClient();
             const detailedLog = await client.getTraceLogDetails(log.plugintracelogid);
             setSelectedLog(detailedLog);
+            
+            // Highlight similar records (same correlation ID)
+            const similarLogIds = new Set<string>();
+            if (log.correlationid) {
+                traceLogs.forEach(tl => {
+                    if (tl.correlationid === log.correlationid && tl.plugintracelogid !== log.plugintracelogid) {
+                        similarLogIds.add(tl.plugintracelogid);
+                    }
+                });
+            }
+            setHighlightedLogIds(similarLogIds);
         } catch (error: any) {
             showError(`Failed to load trace log details: ${error.message}`);
         }
+    };
+
+    // Auto-refresh functionality
+    const loadTraceLogsForAutoRefresh = useCallback(async () => {
+        try {
+            const client = new DataverseClient();
+
+            const filter: TraceLogFilter = {
+                startDate: dateFrom || undefined,
+                endDate: dateTo || undefined,
+                pluginNames: selectedPlugins.length > 0 ? selectedPlugins : undefined,
+                messageName: selectedMessage || undefined,
+                entityNames: selectedEntities.length > 0 ? selectedEntities : undefined,
+                modes: selectedModes.length > 0 ? selectedModes : undefined,
+                correlationId: correlationFilter || undefined,
+                hasException: exceptionOnly || undefined,
+            };
+
+            const logs = await client.fetchPluginTraceLogs(filter);
+            
+            // Compare with existing logs to find new ones
+            const existingIds = new Set(traceLogs.map(log => log.plugintracelogid));
+            const newLogs = logs.filter(log => !existingIds.has(log.plugintracelogid));
+            
+            if (newLogs.length > 0) {
+                setTraceLogs(logs);
+                setNewLogsCount(newLogs.length);
+                
+                if (autoRefreshMode === 'notify') {
+                    await showNotification(
+                        "New Trace Logs",
+                        `${newLogs.length} new trace log(s) found`,
+                        "info"
+                    );
+                }
+                
+                // Clear new logs count after 5 seconds
+                setTimeout(() => setNewLogsCount(0), 5000);
+            }
+        } catch (error: any) {
+            console.error('Auto-refresh failed:', error);
+        }
+    }, [dateFrom, dateTo, selectedPlugins, selectedMessage, selectedEntities, selectedModes, correlationFilter, exceptionOnly, traceLogs, autoRefreshMode]);
+
+    // Setup auto-refresh timer
+    useEffect(() => {
+        if (autoRefreshTimerRef.current) {
+            clearInterval(autoRefreshTimerRef.current);
+            autoRefreshTimerRef.current = null;
+        }
+
+        if (autoRefreshMode !== 'off' && connectionUrl) {
+            autoRefreshTimerRef.current = setInterval(() => {
+                loadTraceLogsForAutoRefresh();
+            }, autoRefreshInterval * 1000);
+        }
+
+        return () => {
+            if (autoRefreshTimerRef.current) {
+                clearInterval(autoRefreshTimerRef.current);
+            }
+        };
+    }, [autoRefreshMode, autoRefreshInterval, connectionUrl, loadTraceLogsForAutoRefresh]);
+
+    const handleAutoRefreshSave = (mode: 'off' | 'auto' | 'notify', intervalSeconds: number) => {
+        setAutoRefreshMode(mode);
+        setAutoRefreshInterval(intervalSeconds);
+        setNewLogsCount(0);
     };
 
     const handleDeleteLog = async (logId: string) => {
@@ -346,10 +437,13 @@ function App() {
                 onOpenFilters={openFilterModal}
                 onSaveFilter={() => setShowSaveFilterModal(true)}
                 onLoadFilter={() => setShowLoadFilterModal(true)}
+                onOpenAutoRefresh={() => setShowAutoRefreshModal(true)}
                 isLoading={loadingLogs}
                 logCount={traceLogs.length}
                 activeFilterCount={getActiveFilterCount()}
                 hasFiltersToSave={hasActiveFilters()}
+                autoRefreshMode={autoRefreshMode}
+                newLogsCount={newLogsCount}
             />
 
             <FilterModal
@@ -393,10 +487,19 @@ function App() {
                 savedFilters={savedFilters}
             />
 
+            <AutoRefreshModal
+                isOpen={showAutoRefreshModal}
+                onClose={() => setShowAutoRefreshModal(false)}
+                currentMode={autoRefreshMode}
+                currentInterval={autoRefreshInterval}
+                onSave={handleAutoRefreshSave}
+            />
+
             <div className="main-content">
                 <LogList
                     logs={traceLogs}
                     selectedLogId={selectedLog?.plugintracelogid || null}
+                    highlightedLogIds={highlightedLogIds}
                     onSelectLog={handleLogSelect}
                     isLoading={loadingLogs}
                 />

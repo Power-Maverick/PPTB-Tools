@@ -5,14 +5,15 @@ import { parsePluginTypeName } from "../utils/PluginParser";
 interface LogItemProps {
     log: PluginTraceLog;
     isSelected: boolean;
+    isHighlighted: boolean;
     onSelect: (log: PluginTraceLog) => void;
 }
 
-export function LogItem({ log, isSelected, onSelect }: LogItemProps) {
+export function LogItem({ log, isSelected, isHighlighted, onSelect }: LogItemProps) {
     const pluginInfo = parsePluginTypeName(log.typename);
 
     return (
-        <div className={`log-item ${isSelected ? "selected" : ""} ${log.exceptiondetails ? "error" : ""}`} onClick={() => onSelect(log)}>
+        <div className={`log-item ${isSelected ? "selected" : ""} ${isHighlighted ? "highlighted" : ""} ${log.exceptiondetails ? "error" : ""}`} onClick={() => onSelect(log)}>
             <div className="log-header">
                 <span className="log-step" title={pluginInfo.step}>
                     {pluginInfo.step}

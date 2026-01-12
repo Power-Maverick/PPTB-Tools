@@ -4,11 +4,12 @@ import { LogItem } from "./LogItem";
 interface LogListProps {
     logs: PluginTraceLog[];
     selectedLogId: string | null;
+    highlightedLogIds: Set<string>;
     onSelectLog: (log: PluginTraceLog) => void;
     isLoading: boolean;
 }
 
-export function LogList({ logs, selectedLogId, onSelectLog, isLoading }: LogListProps) {
+export function LogList({ logs, selectedLogId, highlightedLogIds, onSelectLog, isLoading }: LogListProps) {
     return (
         <div className="logs-panel">
             <div className="logs-list">
@@ -20,6 +21,7 @@ export function LogList({ logs, selectedLogId, onSelectLog, isLoading }: LogList
                         key={log.plugintracelogid}
                         log={log}
                         isSelected={selectedLogId === log.plugintracelogid}
+                        isHighlighted={highlightedLogIds.has(log.plugintracelogid)}
                         onSelect={onSelectLog}
                     />
                 ))}

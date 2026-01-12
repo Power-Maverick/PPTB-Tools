@@ -700,3 +700,123 @@ body {
     font-size: 11px;
     color: var(--text-muted);
 }
+
+/* Auto-Refresh Styles */
+.btn-success {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background-color: #0e6a0e;
+}
+
+.new-logs-badge {
+    padding: 4px 10px;
+    background-color: var(--success-color);
+    color: white;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 8px;
+    animation: fadeInOut 5s ease-in-out;
+}
+
+@keyframes fadeInOut {
+    0%, 100% { opacity: 0; }
+    10%, 90% { opacity: 1; }
+}
+
+.auto-refresh-modal .modal-content {
+    max-width: 500px;
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.radio-option {
+    display: flex;
+    align-items: flex-start;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.radio-option:hover {
+    background-color: var(--surface);
+    border-color: var(--primary-color);
+}
+
+.radio-option input[type="radio"] {
+    margin-right: 10px;
+    margin-top: 2px;
+    cursor: pointer;
+}
+
+.radio-option span {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.radio-option small {
+    display: block;
+    color: var(--text-secondary);
+    font-weight: normal;
+    margin-top: 2px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-color);
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    transition: border-color 0.2s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+.form-hint {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* Highlighting Styles */
+.log-item.highlighted {
+    background-color: #fff4ce;
+    border-left: 4px solid var(--warning-color);
+    padding-left: 8px;
+}
+
+.log-item.highlighted.selected {
+    background-color: #e6f2ff;
+    border-left-color: var(--primary-color);
+}
+
+.log-item.highlighted:hover {
+    background-color: #ffec99;
+}
