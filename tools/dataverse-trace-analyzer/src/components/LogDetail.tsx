@@ -1,4 +1,5 @@
 import { PluginTraceLog } from "../models/interfaces";
+import { parsePluginTypeName } from "../utils/pluginParser";
 
 interface LogDetailProps {
     log: PluginTraceLog;
@@ -30,6 +31,8 @@ export function LogDetail({ log, onDelete }: LogDetailProps) {
         return mode === 0 ? "Synchronous" : "Asynchronous";
     };
 
+    const pluginInfo = parsePluginTypeName(log.typename);
+
     return (
         <div className="detail-panel">
             <div className="detail-header">
@@ -41,8 +44,16 @@ export function LogDetail({ log, onDelete }: LogDetailProps) {
             <div className="detail-content">
                 <div className="detail-section">
                     <div className="detail-row">
-                        <label>Plugin/Step:</label>
-                        <span>{log.typename}</span>
+                        <label>Step:</label>
+                        <span>{pluginInfo.step}</span>
+                    </div>
+                    <div className="detail-row">
+                        <label>Assembly:</label>
+                        <span>{pluginInfo.assembly}</span>
+                    </div>
+                    <div className="detail-row">
+                        <label>Version:</label>
+                        <span>{pluginInfo.version}</span>
                     </div>
                     <div className="detail-row">
                         <label>Message:</label>

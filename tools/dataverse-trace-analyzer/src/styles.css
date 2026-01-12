@@ -154,6 +154,16 @@ body {
     margin-bottom: 4px;
 }
 
+.log-step {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 320px;
+}
+
 .log-type {
     font-weight: 600;
     font-size: 13px;
@@ -168,6 +178,7 @@ body {
     font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
+    flex-shrink: 0;
 }
 
 .log-info {
@@ -176,14 +187,30 @@ body {
     margin-bottom: 4px;
     font-size: 12px;
     color: var(--text-secondary);
+    overflow: hidden;
+}
+
+.log-assembly {
+    font-size: 11px;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 250px;
 }
 
 .log-message {
     font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .log-entity {
     color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .log-meta {
