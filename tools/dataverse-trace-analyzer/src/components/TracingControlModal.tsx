@@ -33,15 +33,7 @@ export const TracingControlModal: React.FC<TracingControlModalProps> = ({
       // Query the plugintracelogsetting table to get current tracing configuration
       const result = await window.toolboxAPI.dataverse.queryData({
         entityName: 'plugintracelogsetting',
-        fetchXml: `
-          <fetch top="1">
-            <entity name="plugintracelogsetting">
-              <attribute name="plugintracelogsettingid" />
-              <attribute name="isenabled" />
-              <attribute name="tracelogstatus" />
-            </entity>
-          </fetch>
-        `,
+        fetchXml: `<fetch top="1"><entity name="plugintracelogsetting"><attribute name="plugintracelogsettingid" /><attribute name="isenabled" /><attribute name="tracelogstatus" /></entity></fetch>`,
       });
 
       if (result && result.length > 0) {
@@ -77,13 +69,7 @@ export const TracingControlModal: React.FC<TracingControlModalProps> = ({
       
       const result = await window.toolboxAPI.dataverse.queryData({
         entityName: 'plugintracelogsetting',
-        fetchXml: `
-          <fetch top="1">
-            <entity name="plugintracelogsetting">
-              <attribute name="plugintracelogsettingid" />
-            </entity>
-          </fetch>
-        `,
+        fetchXml: `<fetch top="1"><entity name="plugintracelogsetting"><attribute name="plugintracelogsettingid" /></entity></fetch>`,
       });
 
       if (result && result.length > 0) {
@@ -132,12 +118,12 @@ export const TracingControlModal: React.FC<TracingControlModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content tracing-control-modal">
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content tracing-control-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Tracing Control</h2>
           <button className="modal-close" onClick={onClose}>
-            ×
+            &times;
           </button>
         </div>
 
@@ -174,9 +160,9 @@ export const TracingControlModal: React.FC<TracingControlModalProps> = ({
 
               {tracingEnabled && (
                 <div className="form-group">
-                  <label>Tracing Mode:</label>
+                  <label className="form-label">Tracing Mode:</label>
                   <div className="radio-group">
-                    <label className="radio-label">
+                    <label className="radio-option">
                       <input
                         type="radio"
                         name="tracingMode"
@@ -185,14 +171,10 @@ export const TracingControlModal: React.FC<TracingControlModalProps> = ({
                         onChange={(e) => setTracingMode('Exception')}
                         disabled={loading}
                       />
-                      <span>
-                        <strong>Exception Only</strong>
-                        <span className="mode-description">
-                          Only log when plugin throws an exception
-                        </span>
-                      </span>
+                      <span>Exception Only</span>
+                      <small>Only log when plugin throws an exception</small>
                     </label>
-                    <label className="radio-label">
+                    <label className="radio-option">
                       <input
                         type="radio"
                         name="tracingMode"
@@ -201,12 +183,8 @@ export const TracingControlModal: React.FC<TracingControlModalProps> = ({
                         onChange={(e) => setTracingMode('All')}
                         disabled={loading}
                       />
-                      <span>
-                        <strong>All</strong>
-                        <span className="mode-description">
-                          Log all plugin executions (generates more data)
-                        </span>
-                      </span>
+                      <span>All</span>
+                      <small>Log all plugin executions (generates more data)</small>
                     </label>
                   </div>
                 </div>
@@ -218,10 +196,10 @@ export const TracingControlModal: React.FC<TracingControlModalProps> = ({
         </div>
 
         <div className="modal-footer">
-          <button onClick={onClose} disabled={loading} className="btn-secondary">
+          <button className="btn btn-secondary" onClick={onClose} disabled={loading}>
             Cancel
           </button>
-          <button onClick={handleSave} disabled={loading} className="btn-primary">
+          <button className="btn btn-primary" onClick={handleSave} disabled={loading}>
             {loading ? 'Saving...' : 'Apply Changes'}
           </button>
         </div>

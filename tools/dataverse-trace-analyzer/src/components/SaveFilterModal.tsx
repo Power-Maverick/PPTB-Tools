@@ -54,19 +54,19 @@ export function SaveFilterModal({ isOpen, onClose, onSave, existingNames }: Save
     };
 
     return (
-        <div className="modal-overlay">
-            <div className="modal save-filter-modal">
+        <div className="modal-overlay" onClick={handleCancel}>
+            <div className="modal-content save-filter-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h3>Save Filter</h3>
-                    <button className="close-button" onClick={handleCancel}>&times;</button>
+                    <h2>Save Filter</h2>
+                    <button className="modal-close" onClick={handleCancel}>&times;</button>
                 </div>
                 <div className="modal-body">
                     <div className="form-group">
-                        <label htmlFor="filterName">Filter Name:</label>
+                        <label className="form-label" htmlFor="filterName">Filter Name:</label>
                         <input
                             type="text"
                             id="filterName"
-                            className="filter-name-input"
+                            className="form-control"
                             value={filterName}
                             onChange={(e) => {
                                 setFilterName(e.target.value);

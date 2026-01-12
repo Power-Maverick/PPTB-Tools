@@ -576,50 +576,14 @@ body {
 }
 
 /* Save Filter Modal */
+/* Save Filter Modal */
 .save-filter-modal {
     max-width: 450px;
-    background: #ffffff;
-    border-radius: 10px;
-    width: 250px;
-}
-
-.filter-name-input {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    font-size: 13px;
-    font-family: inherit;
-}
-
-.filter-name-input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-}
-
-.form-group {
-    margin: 12px 0;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 6px;
-    font-weight: 500;
-    color: var(--text-color);
-}
-
-.error-message {
-    margin-top: 6px;
-    color: var(--danger-color);
-    font-size: 12px;
 }
 
 /* Load Filter Modal */
 .load-filter-modal {
     max-width: 600px;
-    background: #ffffff;
-    border-radius: 10px;
-    width: 300px;
 }
 
 .load-filter-modal .modal-body {
@@ -727,10 +691,49 @@ body {
     10%, 90% { opacity: 1; }
 }
 
-.auto-refresh-modal .modal-content {
-    max-width: 500px;
+
+/* Common Form Styles */
+.form-group {
+    margin-bottom: 20px;
 }
 
+.form-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-color);
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    transition: border-color 0.2s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+.form-hint {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.error-message {
+    margin-top: 6px;
+    color: var(--danger-color);
+    font-size: 12px;
+}
+
+/* Common Radio Button Styles */
 .radio-group {
     display: flex;
     flex-direction: column;
@@ -771,40 +774,6 @@ body {
     margin-top: 2px;
 }
 
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-label {
-    display: block;
-    font-weight: 600;
-    margin-bottom: 8px;
-    color: var(--text-color);
-}
-
-.form-control {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    font-size: 13px;
-    font-family: inherit;
-    transition: border-color 0.2s ease;
-}
-
-.form-control:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 1px var(--primary-color);
-}
-
-.form-hint {
-    display: block;
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 4px;
-}
-
 /* Highlighting Styles */
 .log-item.highlighted {
     background-color: #fff4ce;
@@ -819,6 +788,11 @@ body {
 
 .log-item.highlighted:hover {
     background-color: #ffec99;
+}
+
+/* Auto Refresh Modal */
+.auto-refresh-modal {
+    max-width: 500px;
 }
 
 /* Tracing Control Modal */
@@ -844,17 +818,6 @@ body {
     font-weight: 600;
 }
 
-.tracing-control-modal .form-group {
-    margin-bottom: 20px;
-}
-
-.tracing-control-modal .form-group label {
-    display: block;
-    font-weight: 600;
-    margin-bottom: 8px;
-    color: var(--text-color);
-}
-
 .tracing-control-modal .checkbox-label {
     display: flex;
     align-items: center;
@@ -876,47 +839,6 @@ body {
     margin-left: 24px;
     font-size: 12px;
     color: var(--text-secondary);
-}
-
-.tracing-control-modal .radio-group {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-top: 8px;
-}
-
-.tracing-control-modal .radio-label {
-    display: flex;
-    align-items: flex-start;
-    cursor: pointer;
-    padding: 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    transition: all 0.2s ease;
-}
-
-.tracing-control-modal .radio-label:hover {
-    background-color: var(--surface);
-    border-color: var(--primary-color);
-}
-
-.tracing-control-modal .radio-label input[type="radio"] {
-    margin-right: 12px;
-    margin-top: 2px;
-    cursor: pointer;
-}
-
-.tracing-control-modal .radio-label > span {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.tracing-control-modal .mode-description {
-    font-size: 12px;
-    color: var(--text-secondary);
-    font-weight: normal;
-    display: block;
 }
 
 .tracing-control-modal .loading-state {

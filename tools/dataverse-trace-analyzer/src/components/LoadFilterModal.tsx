@@ -46,11 +46,11 @@ export function LoadFilterModal({ isOpen, onClose, onLoad, onDelete, savedFilter
     };
 
     return (
-        <div className="modal-overlay">
-            <div className="modal load-filter-modal">
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content load-filter-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h3>Load Saved Filter</h3>
-                    <button className="close-button" onClick={onClose}>&times;</button>
+                    <h2>Load Saved Filter</h2>
+                    <button className="modal-close" onClick={onClose}>&times;</button>
                 </div>
                 <div className="modal-body">
                     {savedFilters.length === 0 ? (
