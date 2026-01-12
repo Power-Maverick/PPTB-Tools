@@ -385,18 +385,20 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 10000;
+    padding: 20px;
 }
 
 .modal-content {
     background-color: var(--background);
     border-radius: 4px;
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     width: 90%;
     max-width: 600px;
     max-height: 85vh;
     display: flex;
     flex-direction: column;
+    position: relative;
 }
 
 .filter-modal {
@@ -576,7 +578,6 @@ body {
 /* Save Filter Modal */
 .save-filter-modal {
     max-width: 450px;
-    width: 90%;
 }
 
 .filter-name-input {
@@ -613,11 +614,10 @@ body {
 /* Load Filter Modal */
 .load-filter-modal {
     max-width: 600px;
-    width: 90%;
 }
 
 .load-filter-modal .modal-body {
-    max-height: 450px;
+    max-height: 500px;
     overflow-y: auto;
 }
 

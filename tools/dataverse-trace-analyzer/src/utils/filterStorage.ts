@@ -16,7 +16,7 @@ export class FilterStorage {
                 return [];
             }
 
-            const settings = await window.toolboxAPI.settings.getTool(SETTINGS_KEY);
+            const settings = await window.toolboxAPI.settings.get(SETTINGS_KEY);
             if (settings && settings.filters) {
                 return settings.filters as SavedFilter[];
             }
@@ -59,7 +59,7 @@ export class FilterStorage {
                 filters: existingFilters
             };
 
-            await window.toolboxAPI.settings.setTool(SETTINGS_KEY, collection);
+            await window.toolboxAPI.settings.set(SETTINGS_KEY, collection);
         } catch (error) {
             console.error("Error saving filter:", error);
             throw error;
@@ -82,7 +82,7 @@ export class FilterStorage {
                 filters: updatedFilters
             };
 
-            await window.toolboxAPI.settings.setTool(SETTINGS_KEY, collection);
+            await window.toolboxAPI.settings.set(SETTINGS_KEY, collection);
         } catch (error) {
             console.error("Error deleting filter:", error);
             throw error;
