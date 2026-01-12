@@ -1,8 +1,23 @@
 {
-  "name": "@power-maverick/tool-view-layout-replicator",
+  "name": "@power-maverick/tool-view-layout-copier",
   "displayName": "View Layout Copier",
-  "version": "1.0.0",
-  "description": "Copy layout from one view to multiple views of the same entity in a single operation - React-based tool for PowerPlatform ToolBox",
+  "version": "0.0.1",
+  "description": "Copy layout from one view to multiple views of the same entity in a single operation",
+  "contributors": [
+    {
+      "name": "Power Maverick",
+      "url": "https://github.com/Power-Maverick"
+    },
+    {
+      "name": "MscrmTools",
+      "url": "https://github.com/MscrmTools"
+    }
+  ],
+  "license": "GPL-2.0",
+  "configurations": {
+    "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/view-layout-copier",
+    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/view-layout-copier/README.md"
+  },
   "type": "module",
   "scripts": {
     "build": "vite build",
@@ -24,7 +39,6 @@
     "toolbox"
   ],
   "author": "Power Maverick",
-  "license": "GPL-2.0",
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
