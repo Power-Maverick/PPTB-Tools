@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { FilterOption, PluginTraceLog, TraceLogFilter } from "./models/interfaces";
 import { DataverseClient } from "./utils/DataverseClient";
+import { CommandBar } from "./components/CommandBar";
+import { FilterModal } from "./components/FilterModal";
+import { LogList } from "./components/LogList";
+import { LogDetail } from "./components/LogDetail";
 
 function App() {
     const [isPPTB, setIsPPTB] = useState<boolean>(false);
@@ -12,12 +16,8 @@ function App() {
     const [selectedLog, setSelectedLog] = useState<PluginTraceLog | null>(null);
     const [loadingLogs, setLoadingLogs] = useState<boolean>(false);
 
-    // Collapsible filter state
-    const [filtersExpanded, setFiltersExpanded] = useState<boolean>(false);
-
-    // Modal states
-    const [showPluginModal, setShowPluginModal] = useState<boolean>(false);
-    const [showEntityModal, setShowEntityModal] = useState<boolean>(false);
+    // Filter modal state
+    const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
 
     // Enhanced Filters
     const [dateFrom, setDateFrom] = useState<string>("");
@@ -29,14 +29,20 @@ function App() {
     const [correlationFilter, setCorrelationFilter] = useState<string>("");
     const [exceptionOnly, setExceptionOnly] = useState<boolean>(false);
 
+    // Temporary filter states (for modal before applying)
+    const [tempDateFrom, setTempDateFrom] = useState<string>("");
+    const [tempDateTo, setTempDateTo] = useState<string>("");
+    const [tempSelectedPlugins, setTempSelectedPlugins] = useState<string[]>([]);
+    const [tempSelectedMessage, setTempSelectedMessage] = useState<string>("");
+    const [tempSelectedEntities, setTempSelectedEntities] = useState<string[]>([]);
+    const [tempSelectedModes, setTempSelectedModes] = useState<number[]>([]);
+    const [tempCorrelationFilter, setTempCorrelationFilter] = useState<string>("");
+    const [tempExceptionOnly, setTempExceptionOnly] = useState<boolean>(false);
+
     // Filter options (populated from trace logs)
     const [pluginOptions, setPluginOptions] = useState<FilterOption[]>([]);
     const [messageOptions, setMessageOptions] = useState<FilterOption[]>([]);
     const [entityOptions, setEntityOptions] = useState<FilterOption[]>([]);
-
-    // Temporary selections for modals (before applying)
-    const [tempSelectedPlugins, setTempSelectedPlugins] = useState<string[]>([]);
-    const [tempSelectedEntities, setTempSelectedEntities] = useState<string[]>([]);
 
     // Detect environment and initialize
     useEffect(() => {
@@ -64,7 +70,6 @@ function App() {
     // Extract unique filter options from trace logs
     useEffect(() => {
         if (traceLogs.length > 0) {
-            // Extract unique plugins
             const plugins = new Map<string, number>();
             const messages = new Map<string, number>();
             const entities = new Map<string, number>();
@@ -155,7 +160,6 @@ function App() {
     };
 
     const handleDeleteLog = async (logId: string) => {
-        // TODO: Replace with custom confirmation dialog for better UX
         if (!confirm("Are you sure you want to delete this trace log?")) {
             return;
         }
@@ -173,60 +177,56 @@ function App() {
         }
     };
 
-    const formatDateTime = (dateString: string) => {
-        if (!dateString) return "";
-        const date = new Date(dateString);
-        return date.toLocaleString();
+    const openFilterModal = () => {
+        setTempDateFrom(dateFrom);
+        setTempDateTo(dateTo);
+        setTempSelectedPlugins([...selectedPlugins]);
+        setTempSelectedMessage(selectedMessage);
+        setTempSelectedEntities([...selectedEntities]);
+        setTempSelectedModes([...selectedModes]);
+        setTempCorrelationFilter(correlationFilter);
+        setTempExceptionOnly(exceptionOnly);
+        setShowFilterModal(true);
     };
 
-    const formatDuration = (duration: number) => {
-        if (duration < 1000) return `${duration}ms`;
-        return `${(duration / 1000).toFixed(2)}s`;
+    const closeFilterModal = () => {
+        setShowFilterModal(false);
     };
 
-    const getOperationTypeLabel = (type: number) => {
-        const types: { [key: number]: string } = {
-            1: "Plugin",
-            2: "Workflow Activity",
-        };
-        return types[type] || `Type ${type}`;
-    };
-
-    const getModeLabel = (mode: number | undefined) => {
-        if (mode === undefined || mode === null) return "N/A";
-        return mode === 0 ? "Synchronous" : "Asynchronous";
-    };
-
-    const toggleMode = (mode: number) => {
-        setSelectedModes(prev =>
-            prev.includes(mode) ? prev.filter(m => m !== mode) : [...prev, mode]
-        );
+    const applyFilters = () => {
+        setDateFrom(tempDateFrom);
+        setDateTo(tempDateTo);
+        setSelectedPlugins([...tempSelectedPlugins]);
+        setSelectedMessage(tempSelectedMessage);
+        setSelectedEntities([...tempSelectedEntities]);
+        setSelectedModes([...tempSelectedModes]);
+        setCorrelationFilter(tempCorrelationFilter);
+        setExceptionOnly(tempExceptionOnly);
+        setShowFilterModal(false);
     };
 
     const clearFilters = () => {
-        setDateFrom("");
-        setDateTo("");
-        setSelectedPlugins([]);
-        setSelectedMessage("");
-        setSelectedEntities([]);
-        setSelectedModes([]);
-        setCorrelationFilter("");
-        setExceptionOnly(false);
+        setTempDateFrom("");
+        setTempDateTo("");
+        setTempSelectedPlugins([]);
+        setTempSelectedMessage("");
+        setTempSelectedEntities([]);
+        setTempSelectedModes([]);
+        setTempCorrelationFilter("");
+        setTempExceptionOnly(false);
     };
 
-    // Plugin Modal Functions
-    const openPluginModal = () => {
-        setTempSelectedPlugins([...selectedPlugins]);
-        setShowPluginModal(true);
-    };
-
-    const closePluginModal = () => {
-        setShowPluginModal(false);
-    };
-
-    const applyPluginSelection = () => {
-        setSelectedPlugins([...tempSelectedPlugins]);
-        setShowPluginModal(false);
+    const getActiveFilterCount = () => {
+        let count = 0;
+        if (dateFrom) count++;
+        if (dateTo) count++;
+        if (selectedPlugins.length > 0) count++;
+        if (selectedMessage) count++;
+        if (selectedEntities.length > 0) count++;
+        if (selectedModes.length > 0) count++;
+        if (correlationFilter) count++;
+        if (exceptionOnly) count++;
+        return count;
     };
 
     const toggleTempPlugin = (plugin: string) => {
@@ -235,41 +235,16 @@ function App() {
         );
     };
 
-    const selectAllPlugins = () => {
-        setTempSelectedPlugins(pluginOptions.map(opt => opt.value));
-    };
-
-    const clearAllPlugins = () => {
-        setTempSelectedPlugins([]);
-    };
-
-    // Entity Modal Functions
-    const openEntityModal = () => {
-        setTempSelectedEntities([...selectedEntities]);
-        setShowEntityModal(true);
-    };
-
-    const closeEntityModal = () => {
-        setShowEntityModal(false);
-    };
-
-    const applyEntitySelection = () => {
-        setSelectedEntities([...tempSelectedEntities]);
-        setShowEntityModal(false);
-    };
-
     const toggleTempEntity = (entity: string) => {
         setTempSelectedEntities(prev =>
             prev.includes(entity) ? prev.filter(e => e !== entity) : [...prev, entity]
         );
     };
 
-    const selectAllEntities = () => {
-        setTempSelectedEntities(entityOptions.map(opt => opt.value));
-    };
-
-    const clearAllEntities = () => {
-        setTempSelectedEntities([]);
+    const toggleTempMode = (mode: number) => {
+        setTempSelectedModes(prev =>
+            prev.includes(mode) ? prev.filter(m => m !== mode) : [...prev, mode]
+        );
     };
 
     if (loading && !connectionUrl) {
@@ -292,328 +267,53 @@ function App() {
         <div className="container">
             {error && <div className="error-banner">{error}</div>}
 
-            {/* Command Bar */}
-            <div className="command-bar">
-                <button className="btn btn-primary" onClick={handleRetrieve} disabled={loadingLogs}>
-                    {loadingLogs ? "Loading..." : "📥 Retrieve"}
-                </button>
-                <button className="btn btn-secondary" onClick={() => setFiltersExpanded(!filtersExpanded)}>
-                    {filtersExpanded ? "▲ Hide Filters" : "▼ Show Filters"}
-                </button>
-                <div className="command-spacer"></div>
-                <span className="log-count">{traceLogs.length} logs</span>
-            </div>
+            <CommandBar
+                onRetrieve={handleRetrieve}
+                onOpenFilters={openFilterModal}
+                isLoading={loadingLogs}
+                logCount={traceLogs.length}
+                activeFilterCount={getActiveFilterCount()}
+            />
 
-            {/* Collapsible Filter Panel */}
-            {filtersExpanded && (
-                <div className="filter-panel">
-                    <div className="filter-panel-content">
-                        {/* Date Filters */}
-                        <div className="filter-section">
-                            <div className="filter-group-horizontal">
-                                <div className="filter-field">
-                                    <label>Date From</label>
-                                    <input
-                                        type="datetime-local"
-                                        value={dateFrom}
-                                        onChange={(e) => setDateFrom(e.target.value)}
-                                        className="filter-input-date"
-                                    />
-                                </div>
-                                <div className="filter-field">
-                                    <label>Date To</label>
-                                    <input
-                                        type="datetime-local"
-                                        value={dateTo}
-                                        onChange={(e) => setDateTo(e.target.value)}
-                                        className="filter-input-date"
-                                    />
-                                </div>
-                            </div>
-                        </div>
+            <FilterModal
+                isOpen={showFilterModal}
+                onClose={closeFilterModal}
+                onApply={applyFilters}
+                onClearAll={clearFilters}
+                dateFrom={tempDateFrom}
+                dateTo={tempDateTo}
+                selectedPlugins={tempSelectedPlugins}
+                selectedMessage={tempSelectedMessage}
+                selectedEntities={tempSelectedEntities}
+                selectedModes={tempSelectedModes}
+                correlationFilter={tempCorrelationFilter}
+                exceptionOnly={tempExceptionOnly}
+                onDateFromChange={setTempDateFrom}
+                onDateToChange={setTempDateTo}
+                onTogglePlugin={toggleTempPlugin}
+                onMessageChange={setTempSelectedMessage}
+                onToggleEntity={toggleTempEntity}
+                onToggleMode={toggleTempMode}
+                onCorrelationChange={setTempCorrelationFilter}
+                onExceptionOnlyChange={setTempExceptionOnly}
+                pluginOptions={pluginOptions}
+                messageOptions={messageOptions}
+                entityOptions={entityOptions}
+            />
 
-                        {/* Plugin Multi-Select with Modal */}
-                        <div className="filter-section">
-                            <label>Plugin/Step (multi-select)</label>
-                            <div className="filter-input-group">
-                                <div className="selected-display">
-                                    {selectedPlugins.length === 0 ? (
-                                        <span className="placeholder">No plugins selected</span>
-                                    ) : (
-                                        <span>{selectedPlugins.length} plugin(s) selected</span>
-                                    )}
-                                </div>
-                                <button className="btn btn-select" onClick={openPluginModal}>
-                                    Select...
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Message Single-Select */}
-                        <div className="filter-section">
-                            <label>Message</label>
-                            <select
-                                className="filter-select"
-                                value={selectedMessage}
-                                onChange={(e) => setSelectedMessage(e.target.value)}
-                            >
-                                <option value="">All messages</option>
-                                {messageOptions.map(opt => (
-                                    <option key={opt.value} value={opt.value}>
-                                        {opt.label} ({opt.count})
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Entity Multi-Select with Modal */}
-                        <div className="filter-section">
-                            <label>Entity (multi-select)</label>
-                            <div className="filter-input-group">
-                                <div className="selected-display">
-                                    {selectedEntities.length === 0 ? (
-                                        <span className="placeholder">No entities selected</span>
-                                    ) : (
-                                        <span>{selectedEntities.length} entit{selectedEntities.length === 1 ? 'y' : 'ies'} selected</span>
-                                    )}
-                                </div>
-                                <button className="btn btn-select" onClick={openEntityModal}>
-                                    Select...
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Mode Multi-Select */}
-                        <div className="filter-section">
-                            <label>Mode</label>
-                            <div className="checkbox-group">
-                                <label className="checkbox-label">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedModes.includes(0)}
-                                        onChange={() => toggleMode(0)}
-                                    />
-                                    <span>Synchronous</span>
-                                </label>
-                                <label className="checkbox-label">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedModes.includes(1)}
-                                        onChange={() => toggleMode(1)}
-                                    />
-                                    <span>Asynchronous</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* Correlation ID and Exception Only */}
-                        <div className="filter-section">
-                            <div className="filter-group-horizontal">
-                                <div className="filter-field">
-                                    <label>Correlation ID</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Enter correlation ID..."
-                                        value={correlationFilter}
-                                        onChange={(e) => setCorrelationFilter(e.target.value)}
-                                        className="filter-input"
-                                    />
-                                </div>
-                                <div className="filter-field">
-                                    <label className="checkbox-label">
-                                        <input
-                                            type="checkbox"
-                                            checked={exceptionOnly}
-                                            onChange={(e) => setExceptionOnly(e.target.checked)}
-                                        />
-                                        <span>Exceptions Only</span>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Filter Actions */}
-                        <div className="filter-actions">
-                            <button className="btn btn-secondary" onClick={clearFilters}>Clear All Filters</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Plugin Selection Modal */}
-            {showPluginModal && (
-                <div className="modal-overlay" onClick={closePluginModal}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3>Select Plugins/Steps</h3>
-                            <button className="modal-close" onClick={closePluginModal}>×</button>
-                        </div>
-                        <div className="modal-body">
-                            <div className="modal-actions">
-                                <button className="btn btn-link" onClick={selectAllPlugins}>Select All</button>
-                                <button className="btn btn-link" onClick={clearAllPlugins}>Clear All</button>
-                            </div>
-                            <div className="modal-list">
-                                {pluginOptions.map(opt => (
-                                    <label key={opt.value} className="modal-item">
-                                        <input
-                                            type="checkbox"
-                                            checked={tempSelectedPlugins.includes(opt.value)}
-                                            onChange={() => toggleTempPlugin(opt.value)}
-                                        />
-                                        <span className="modal-item-label">
-                                            {opt.label}
-                                            <span className="modal-item-count">({opt.count})</span>
-                                        </span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={closePluginModal}>Cancel</button>
-                            <button className="btn btn-primary" onClick={applyPluginSelection}>Apply</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Entity Selection Modal */}
-            {showEntityModal && (
-                <div className="modal-overlay" onClick={closeEntityModal}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3>Select Entities</h3>
-                            <button className="modal-close" onClick={closeEntityModal}>×</button>
-                        </div>
-                        <div className="modal-body">
-                            <div className="modal-actions">
-                                <button className="btn btn-link" onClick={selectAllEntities}>Select All</button>
-                                <button className="btn btn-link" onClick={clearAllEntities}>Clear All</button>
-                            </div>
-                            <div className="modal-list">
-                                {entityOptions.map(opt => (
-                                    <label key={opt.value} className="modal-item">
-                                        <input
-                                            type="checkbox"
-                                            checked={tempSelectedEntities.includes(opt.value)}
-                                            onChange={() => toggleTempEntity(opt.value)}
-                                        />
-                                        <span className="modal-item-label">
-                                            {opt.label}
-                                            <span className="modal-item-count">({opt.count})</span>
-                                        </span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={closeEntityModal}>Cancel</button>
-                            <button className="btn btn-primary" onClick={applyEntitySelection}>Apply</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Main Content Area */}
             <div className="main-content">
-                {/* Trace Logs List */}
-                <div className="logs-panel">
-                    <div className="logs-list">
-                        {traceLogs.length === 0 && !loadingLogs && <div className="empty-state">No trace logs found</div>}
-                        {traceLogs.map((log) => (
-                            <div
-                                key={log.plugintracelogid}
-                                className={`log-item ${selectedLog?.plugintracelogid === log.plugintracelogid ? "selected" : ""} ${log.exceptiondetails ? "error" : ""}`}
-                                onClick={() => handleLogSelect(log)}
-                            >
-                                <div className="log-header">
-                                    <span className="log-type">{log.typename || "Unknown"}</span>
-                                    {log.exceptiondetails && <span className="error-badge">ERROR</span>}
-                                </div>
-                                <div className="log-info">
-                                    <span className="log-message">{log.messagename}</span>
-                                    <span className="log-entity">{log.primaryentity || "-"}</span>
-                                </div>
-                                <div className="log-meta">
-                                    <span>{formatDateTime(log.createdon)}</span>
-                                    <span className="duration">{formatDuration(log.performanceexecutionduration)}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                <LogList
+                    logs={traceLogs}
+                    selectedLogId={selectedLog?.plugintracelogid || null}
+                    onSelectLog={handleLogSelect}
+                    isLoading={loadingLogs}
+                />
 
-                {/* Detail Panel */}
                 {selectedLog && (
-                    <div className="detail-panel">
-                        <div className="detail-header">
-                            <h3>Trace Details</h3>
-                            <button className="btn btn-danger btn-sm" onClick={() => handleDeleteLog(selectedLog.plugintracelogid)}>
-                                🗑️ Delete
-                            </button>
-                        </div>
-                        <div className="detail-content">
-                            <div className="detail-section">
-                                <div className="detail-row">
-                                    <label>Plugin/Step:</label>
-                                    <span>{selectedLog.typename}</span>
-                                </div>
-                                <div className="detail-row">
-                                    <label>Message:</label>
-                                    <span>{selectedLog.messagename}</span>
-                                </div>
-                                <div className="detail-row">
-                                    <label>Entity:</label>
-                                    <span>{selectedLog.primaryentity || "N/A"}</span>
-                                </div>
-                                <div className="detail-row">
-                                    <label>Operation:</label>
-                                    <span>{getOperationTypeLabel(selectedLog.operationtype)}</span>
-                                </div>
-                                <div className="detail-row">
-                                    <label>Mode:</label>
-                                    <span>{getModeLabel(selectedLog.mode)}</span>
-                                </div>
-                                <div className="detail-row">
-                                    <label>Depth:</label>
-                                    <span>{selectedLog.depth}</span>
-                                </div>
-                                <div className="detail-row">
-                                    <label>Duration:</label>
-                                    <span>{formatDuration(selectedLog.performanceexecutionduration)}</span>
-                                </div>
-                                <div className="detail-row">
-                                    <label>Created:</label>
-                                    <span>{formatDateTime(selectedLog.createdon)}</span>
-                                </div>
-                                <div className="detail-row">
-                                    <label>Correlation ID:</label>
-                                    <span className="correlation-id">{selectedLog.correlationid}</span>
-                                </div>
-                            </div>
-
-                            {selectedLog.messageblock && (
-                                <div className="detail-section">
-                                    <label className="section-label">Message Block:</label>
-                                    <pre className="code-block">{selectedLog.messageblock}</pre>
-                                </div>
-                            )}
-
-                            {selectedLog.exceptiondetails && (
-                                <div className="detail-section error-section">
-                                    <label className="section-label">Exception Details:</label>
-                                    <pre className="code-block error-block">{selectedLog.exceptiondetails}</pre>
-                                </div>
-                            )}
-
-                            {selectedLog.profile && (
-                                <div className="detail-section">
-                                    <label className="section-label">Profile:</label>
-                                    <pre className="code-block">{selectedLog.profile}</pre>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    <LogDetail
+                        log={selectedLog}
+                        onDelete={handleDeleteLog}
+                    />
                 )}
             </div>
         </div>

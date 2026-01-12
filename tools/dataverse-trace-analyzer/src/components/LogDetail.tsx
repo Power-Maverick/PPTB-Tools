@@ -1,0 +1,104 @@
+import { PluginTraceLog } from "../models/interfaces";
+
+interface LogDetailProps {
+    log: PluginTraceLog;
+    onDelete: (logId: string) => void;
+}
+
+export function LogDetail({ log, onDelete }: LogDetailProps) {
+    const formatDateTime = (dateString: string) => {
+        if (!dateString) return "";
+        const date = new Date(dateString);
+        return date.toLocaleString();
+    };
+
+    const formatDuration = (duration: number) => {
+        if (duration < 1000) return `${duration}ms`;
+        return `${(duration / 1000).toFixed(2)}s`;
+    };
+
+    const getOperationTypeLabel = (type: number) => {
+        const types: { [key: number]: string } = {
+            1: "Plugin",
+            2: "Workflow Activity",
+        };
+        return types[type] || `Type ${type}`;
+    };
+
+    const getModeLabel = (mode: number | undefined) => {
+        if (mode === undefined || mode === null) return "N/A";
+        return mode === 0 ? "Synchronous" : "Asynchronous";
+    };
+
+    return (
+        <div className="detail-panel">
+            <div className="detail-header">
+                <h3>Trace Details</h3>
+                <button className="btn btn-danger btn-sm" onClick={() => onDelete(log.plugintracelogid)}>
+                    🗑️ Delete
+                </button>
+            </div>
+            <div className="detail-content">
+                <div className="detail-section">
+                    <div className="detail-row">
+                        <label>Plugin/Step:</label>
+                        <span>{log.typename}</span>
+                    </div>
+                    <div className="detail-row">
+                        <label>Message:</label>
+                        <span>{log.messagename}</span>
+                    </div>
+                    <div className="detail-row">
+                        <label>Entity:</label>
+                        <span>{log.primaryentity || "N/A"}</span>
+                    </div>
+                    <div className="detail-row">
+                        <label>Operation:</label>
+                        <span>{getOperationTypeLabel(log.operationtype)}</span>
+                    </div>
+                    <div className="detail-row">
+                        <label>Mode:</label>
+                        <span>{getModeLabel(log.mode)}</span>
+                    </div>
+                    <div className="detail-row">
+                        <label>Depth:</label>
+                        <span>{log.depth}</span>
+                    </div>
+                    <div className="detail-row">
+                        <label>Duration:</label>
+                        <span>{formatDuration(log.performanceexecutionduration)}</span>
+                    </div>
+                    <div className="detail-row">
+                        <label>Created:</label>
+                        <span>{formatDateTime(log.createdon)}</span>
+                    </div>
+                    <div className="detail-row">
+                        <label>Correlation ID:</label>
+                        <span className="correlation-id">{log.correlationid}</span>
+                    </div>
+                </div>
+
+                {log.messageblock && (
+                    <div className="detail-section">
+                        <label className="section-label">Message Block:</label>
+                        <pre className="code-block">{log.messageblock}</pre>
+                    </div>
+                )}
+
+                {log.exceptiondetails && (
+                    <div className="detail-section error-section">
+                        <label className="section-label">Exception Details:</label>
+                        <pre className="code-block error-block">{log.exceptiondetails}</pre>
+                    </div>
+                )}
+
+                {log.profile && (
+                    <div className="detail-section">
+                        <label className="section-label">Profile:</label>
+                        <pre className="code-block">{log.profile}</pre>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
