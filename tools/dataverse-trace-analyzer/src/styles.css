@@ -578,6 +578,9 @@ body {
 /* Save Filter Modal */
 .save-filter-modal {
     max-width: 450px;
+    background: #ffffff;
+    border-radius: 10px;
+    width: 250px;
 }
 
 .filter-name-input {
@@ -614,6 +617,9 @@ body {
 /* Load Filter Modal */
 .load-filter-modal {
     max-width: 600px;
+    background: #ffffff;
+    border-radius: 10px;
+    width: 300px;
 }
 
 .load-filter-modal .modal-body {
