@@ -142,9 +142,9 @@ export class DataverseClient {
   private async fetchEntityFields(entityLogicalName: string): Promise<DataverseField[]> {
     try {
       // Use getEntityMetadata to get attributes
-      const entityMetadata = await window.dataverseAPI.getEntityMetadata(
+      const entityMetadata = await window.dataverseAPI.getEntityRelatedMetadata(
         entityLogicalName,
-        ['Attributes']
+        'Attributes'
       );
 
       if (!entityMetadata.Attributes) {
