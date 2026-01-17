@@ -1,19 +1,19 @@
 {
-  "name": "@power-maverick/tool-view-layout-replicator",
-  "version": "1.0.0",
+  "name": "@power-maverick/tool-dataverse-trace-analyzer",
+  "version": "0.0.1",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
-      "name": "@power-maverick/tool-view-layout-replicator",
-      "version": "1.0.0",
+      "name": "@power-maverick/tool-dataverse-trace-analyzer",
+      "version": "0.0.1",
       "license": "GPL-2.0",
       "dependencies": {
         "react": "^18.3.1",
         "react-dom": "^18.3.1"
       },
       "devDependencies": {
-        "@pptb/types": "^1.0.13",
+        "@pptb/types": "^1.0.14",
         "@types/react": "^18.3.1",
         "@types/react-dom": "^18.3.0",
         "@vitejs/plugin-react": "^4.3.4",
@@ -796,9 +796,9 @@
       }
     },
     "node_modules/@pptb/types": {
-      "version": "1.0.13",
-      "resolved": "https://registry.npmjs.org/@pptb/types/-/types-1.0.13.tgz",
-      "integrity": "sha512-yHfoih24JDmSZU2oTow3rjBl6cujGV5rC6ZaTwiAV6kWpkd2kVWVwuPhKOq83rnqdnx5zCAImOy80sm5E3TIlw==",
+      "version": "1.0.14",
+      "resolved": "https://registry.npmjs.org/@pptb/types/-/types-1.0.14.tgz",
+      "integrity": "sha512-ApbygIMhfHJ7zabUHaEtVuc/pKKu1a+6T5cA1UMslDmR370HQang3GQ3m8FXYETkXgx8/wlQlqOyyjuVmyliQQ==",
       "dev": true,
       "license": "GPL-3.0"
     },
@@ -1305,9 +1305,9 @@
       }
     },
     "node_modules/caniuse-lite": {
-      "version": "1.0.30001763",
-      "resolved": "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001763.tgz",
-      "integrity": "sha512-mh/dGtq56uN98LlNX9qdbKnzINhX0QzhiWBFEkFfsFO4QyCvL8YegrJAazCwXIeqkIob8BlZPGM3xdnY+sgmvQ==",
+      "version": "1.0.30001764",
+      "resolved": "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001764.tgz",
+      "integrity": "sha512-9JGuzl2M+vPL+pz70gtMF9sHdMFbY9FJaQBi186cHKH3pSzDvzoUJUPV6fqiKIMyXbud9ZLg4F3Yza1vJ1+93g==",
       "dev": true,
       "funding": [
         {

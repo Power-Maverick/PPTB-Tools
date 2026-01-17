@@ -101,6 +101,34 @@ The tool uses `window.toolboxAPI` for:
 - Quickly copy column configurations
 - Maintain consistency in view designs across your Dataverse environment
 
+### [@power-maverick/tool-dataverse-trace-analyzer](./tools/dataverse-trace-analyzer)
+
+Analyze and view Plugin Trace Logs from Microsoft Dataverse. **React-based tool** with PPTB-only integration.
+
+**Key Features:**
+- **React + TypeScript**: Modern component-based architecture with Vite build system
+- **PPTB-Only Integration**: Designed exclusively for Power Platform ToolBox (uses @pptb/types v1.0.14)
+- **Modern Minimalist UI**: Clean design with no header and optimized to avoid excessive scrolling
+- **Smart Filtering**: Filter trace logs by message name, entity, correlation ID, or show only exceptions
+- **Detailed Analysis**: View complete trace details including execution duration, message blocks, and exception information
+- **Log Management**: Delete individual trace logs when no longer needed
+- **Real-time Data**: Refresh to get the latest trace logs from your environment
+
+**PPTB Integration:**
+The tool uses `window.toolboxAPI` and `window.dataverseAPI` for:
+- Getting active connection details via `connections.getActiveConnection()`
+- Querying plugin trace logs via `queryData()`
+- Retrieving detailed trace information via `retrieve()`
+- Deleting trace logs via `delete()`
+- Showing notifications via `utils.showNotification()`
+
+**Use Cases:**
+- Debug plugin execution issues
+- Monitor plugin performance and execution duration
+- Investigate exceptions in plugin code
+- Track related operations using correlation IDs
+- Clean up old trace logs
+
 ## Getting Started
 
 ### Prerequisites
@@ -128,6 +156,11 @@ npm run build
 cd tools/view-layout-replicator
 npm install
 npm run build
+
+# Build dataverse-trace-analyzer
+cd tools/dataverse-trace-analyzer
+npm install
+npm run build
 ```
 
 ### Development
@@ -143,6 +176,10 @@ npm run dev
 # View Layout Copier
 cd tools/view-layout-replicator
 npm run dev
+
+# Dataverse Trace Analyzer
+cd tools/dataverse-trace-analyzer
+npm run dev
 ```
 
 **Entity Field Catalog:**
@@ -154,7 +191,7 @@ npm run dev
 ## Repository Structure
 
 ```
-DVDT-Tools/
+PPTB-Tools/
 ├── tools/
 │   ├── erd-generator/              # ERD generation tool
 │   │   ├── src/
@@ -171,7 +208,17 @@ DVDT-Tools/
 │       │   ├── components/
 │   │   ├── vite.config.ts
 │   │   └── README.md
-│   └── view-layout-replicator/    # View layout copying tool
+│   ├── view-layout-replicator/    # View layout copying tool
+│   │   ├── src/
+│   │   │   ├── models/
+│   │   │   ├── utils/
+│   │   │   ├── App.tsx
+│   │   │   └── main.tsx
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   ├── vite.config.ts
+│   │   └── README.md
+│   └── dataverse-trace-analyzer/  # Plugin trace log analyzer tool
 │       ├── src/
 │       │   ├── models/
 │       │   ├── utils/

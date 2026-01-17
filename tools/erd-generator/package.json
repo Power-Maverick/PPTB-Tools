@@ -1,8 +1,8 @@
 {
   "name": "@power-maverick/tool-erd-generator",
   "displayName": "ERD Generator",
-  "version": "1.0.5",
-  "description": "Generate Entity Relationship Diagrams (ERD) for Dataverse solutions - React-based tool for PowerPlatform ToolBox",
+  "version": "1.0.6",
+  "description": "Generate Entity Relationship Diagrams (ERD) for Dataverse solutions",
   "contributors": [
     {
       "name": "Power Maverick",

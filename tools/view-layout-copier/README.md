@@ -54,6 +54,4 @@ Power Maverick
 
 ## Reference
 
-## Reference
-
 This tool is inspired by the [XrmToolBox View Layout Replicator](https://github.com/MscrmTools/MsCrmTools.ViewLayoutReplicator) by MscrmTools.
