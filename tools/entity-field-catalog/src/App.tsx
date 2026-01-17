@@ -206,8 +206,11 @@ function App() {
 
   // Load saved configurations on mount
   useEffect(() => {
-    const configs = ConfigurationManager.loadConfigurations();
-    setSavedConfigs(configs);
+    const loadConfigs = async () => {
+      const configs = await ConfigurationManager.loadConfigurations();
+      setSavedConfigs(configs);
+    };
+    loadConfigs();
   }, []);
 
   const loadSolutions = async () => {
@@ -297,7 +300,7 @@ function App() {
     setCustomColumns(customColumns.filter((col) => col.id !== columnId));
   };
 
-  const handleSaveConfiguration = () => {
+  const handleSaveConfiguration = async () => {
     if (!configName.trim()) {
       showError("Please enter a configuration name");
       return;
@@ -309,8 +312,8 @@ function App() {
     }
 
     try {
-      ConfigurationManager.saveConfiguration(configName.trim(), customColumns);
-      const updatedConfigs = ConfigurationManager.loadConfigurations();
+      await ConfigurationManager.saveConfiguration(configName.trim(), customColumns);
+      const updatedConfigs = await ConfigurationManager.loadConfigurations();
       setSavedConfigs(updatedConfigs);
       setConfigName("");
       
@@ -326,7 +329,7 @@ function App() {
     }
   };
 
-  const handleLoadConfiguration = (_event: any, data: any) => {
+  const handleLoadConfiguration = async (_event: any, data: any) => {
     const configId = data.optionValue;
     setSelectedConfig(configId);
 
@@ -335,18 +338,18 @@ function App() {
       return;
     }
 
-    const config = ConfigurationManager.getConfiguration(configId);
+    const config = await ConfigurationManager.getConfiguration(configId);
     if (config) {
       setCustomColumns(config.columns);
     }
   };
 
-  const handleDeleteConfiguration = () => {
+  const handleDeleteConfiguration = async () => {
     if (!selectedConfig) return;
 
     try {
-      ConfigurationManager.deleteConfiguration(selectedConfig);
-      const updatedConfigs = ConfigurationManager.loadConfigurations();
+      await ConfigurationManager.deleteConfiguration(selectedConfig);
+      const updatedConfigs = await ConfigurationManager.loadConfigurations();
       setSavedConfigs(updatedConfigs);
       setSelectedConfig("");
       setCustomColumns([]);
