@@ -2,6 +2,7 @@ import {
   Button,
   Checkbox,
   Dropdown,
+  Input,
   Option,
   Spinner,
   Text,
@@ -10,13 +11,20 @@ import {
   shorthands,
   tokens,
 } from "@fluentui/react-components";
-import { ArrowDownload24Regular } from "@fluentui/react-icons";
+import {
+  Add24Regular,
+  ArrowDownload24Regular,
+  Delete24Regular,
+  Save24Regular,
+} from "@fluentui/react-icons";
 import { useEffect, useState } from "react";
 import {
+  ColumnConfiguration,
+  CustomColumn,
   DataverseEntity,
   DataverseSolution,
-  ExportFormat,
 } from "./models/interfaces";
+import { ConfigurationManager } from "./utils/ConfigurationManager";
 import { DataverseClient } from "./utils/DataverseClient";
 import { ExportUtil } from "./utils/ExportUtil";
 
@@ -119,6 +127,24 @@ const useStyles = makeStyles({
     fontWeight: tokens.fontWeightSemibold,
     color: tokens.colorBrandForeground1,
   },
+  customColumnRow: {
+    display: "flex",
+    gap: "8px",
+    marginBottom: "8px",
+    alignItems: "flex-start",
+  },
+  customColumnInput: {
+    flex: "1",
+  },
+  columnList: {
+    marginTop: "12px",
+  },
+  configRow: {
+    display: "flex",
+    gap: "8px",
+    marginBottom: "12px",
+    alignItems: "center",
+  },
 });
 
 function App() {
@@ -131,10 +157,17 @@ function App() {
   const [selectedEntities, setSelectedEntities] = useState<Set<string>>(
     new Set(),
   );
-  const [exportFormat, setExportFormat] = useState<ExportFormat>("Excel");
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingEntities, setLoadingEntities] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+
+  // Custom columns management
+  const [customColumns, setCustomColumns] = useState<CustomColumn[]>([]);
+  const [newColumnName, setNewColumnName] = useState<string>("");
+  const [newColumnDefault, setNewColumnDefault] = useState<string>("");
+  const [configName, setConfigName] = useState<string>("");
+  const [savedConfigs, setSavedConfigs] = useState<ColumnConfiguration[]>([]);
+  const [selectedConfig, setSelectedConfig] = useState<string>("");
 
   // Detect environment and initialize
   useEffect(() => {
@@ -170,6 +203,12 @@ function App() {
       loadSolutions();
     }
   }, [connectionUrl]);
+
+  // Load saved configurations on mount
+  useEffect(() => {
+    const configs = ConfigurationManager.loadConfigurations();
+    setSavedConfigs(configs);
+  }, []);
 
   const loadSolutions = async () => {
     try {
@@ -236,6 +275,94 @@ function App() {
     }
   };
 
+  // Custom column management functions
+  const handleAddColumn = () => {
+    if (!newColumnName.trim()) {
+      showError("Please enter a column name");
+      return;
+    }
+
+    const newColumn: CustomColumn = {
+      id: `col-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      name: newColumnName.trim(),
+      defaultValue: newColumnDefault.trim() || undefined,
+    };
+
+    setCustomColumns([...customColumns, newColumn]);
+    setNewColumnName("");
+    setNewColumnDefault("");
+  };
+
+  const handleRemoveColumn = (columnId: string) => {
+    setCustomColumns(customColumns.filter((col) => col.id !== columnId));
+  };
+
+  const handleSaveConfiguration = () => {
+    if (!configName.trim()) {
+      showError("Please enter a configuration name");
+      return;
+    }
+
+    if (customColumns.length === 0) {
+      showError("Please add at least one custom column");
+      return;
+    }
+
+    try {
+      ConfigurationManager.saveConfiguration(configName.trim(), customColumns);
+      const updatedConfigs = ConfigurationManager.loadConfigurations();
+      setSavedConfigs(updatedConfigs);
+      setConfigName("");
+      
+      if (isPPTB && window.toolboxAPI?.utils?.showNotification) {
+        window.toolboxAPI.utils.showNotification({
+          title: "Success",
+          body: "Configuration saved successfully",
+          type: "success",
+        });
+      }
+    } catch (error: any) {
+      showError(`Failed to save configuration: ${error.message}`);
+    }
+  };
+
+  const handleLoadConfiguration = (_event: any, data: any) => {
+    const configId = data.optionValue;
+    setSelectedConfig(configId);
+
+    if (!configId) {
+      setCustomColumns([]);
+      return;
+    }
+
+    const config = ConfigurationManager.getConfiguration(configId);
+    if (config) {
+      setCustomColumns(config.columns);
+    }
+  };
+
+  const handleDeleteConfiguration = () => {
+    if (!selectedConfig) return;
+
+    try {
+      ConfigurationManager.deleteConfiguration(selectedConfig);
+      const updatedConfigs = ConfigurationManager.loadConfigurations();
+      setSavedConfigs(updatedConfigs);
+      setSelectedConfig("");
+      setCustomColumns([]);
+      
+      if (isPPTB && window.toolboxAPI?.utils?.showNotification) {
+        window.toolboxAPI.utils.showNotification({
+          title: "Success",
+          body: "Configuration deleted successfully",
+          type: "success",
+        });
+      }
+    } catch (error: any) {
+      showError(`Failed to delete configuration: ${error.message}`);
+    }
+  };
+
   const handleExport = async () => {
     if (selectedEntities.size === 0) {
       showError("Please select at least one entity to export");
@@ -247,12 +374,12 @@ function App() {
         selectedEntities.has(e.logicalName),
       );
 
-      await ExportUtil.export(entitiesToExport, exportFormat, selectedSolution);
+      await ExportUtil.export(entitiesToExport, selectedSolution, customColumns);
 
       if (isPPTB && window.toolboxAPI?.utils?.showNotification) {
         await window.toolboxAPI.utils.showNotification({
           title: "Success",
-          body: `Exported ${selectedEntities.size} entities to ${exportFormat.toUpperCase()}`,
+          body: `Exported ${selectedEntities.size} entities to Excel`,
           type: "success",
         });
       }
@@ -369,38 +496,130 @@ function App() {
         </div>
 
         {entities.length > 0 && selectedEntities.size > 0 && (
-          <div className={styles.card}>
-            <Title3>Export Options</Title3>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Export Format</label>
-              <Dropdown
-                className={styles.dropdown}
-                placeholder="Select export format"
-                value={exportFormat}
-                onOptionSelect={(_e, data) =>
-                  setExportFormat(data.optionValue as ExportFormat)
-                }
-              >
-                <Option value="Excel" text="Excel (.xlsx)">
-                  Excel (.xlsx)
-                </Option>
-                <Option value="CSV" text="CSV (.csv)">
-                  CSV (.csv)
-                </Option>
-              </Dropdown>
+          <>
+            <div className={styles.card}>
+              <Title3>Custom Columns</Title3>
+              
+              {/* Load saved configuration */}
+              <div className={styles.formGroup}>
+                <label className={styles.label}>Load Saved Configuration</label>
+                <div className={styles.configRow}>
+                  <Dropdown
+                    className={styles.dropdown}
+                    placeholder="Select a saved configuration"
+                    value={selectedConfig}
+                    onOptionSelect={handleLoadConfiguration}
+                  >
+                    <Option value="">None</Option>
+                    {savedConfigs.map((config) => (
+                      <Option key={config.id} value={config.id}>
+                        {config.name} ({config.columns.length} columns)
+                      </Option>
+                    ))}
+                  </Dropdown>
+                  {selectedConfig && (
+                    <Button
+                      appearance="subtle"
+                      icon={<Delete24Regular />}
+                      onClick={handleDeleteConfiguration}
+                    >
+                      Delete
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Add new column */}
+              <div className={styles.formGroup}>
+                <label className={styles.label}>Add Custom Column</label>
+                <div className={styles.customColumnRow}>
+                  <Input
+                    className={styles.customColumnInput}
+                    placeholder="Column name"
+                    value={newColumnName}
+                    onChange={(_e, data) => setNewColumnName(data.value)}
+                  />
+                  <Input
+                    className={styles.customColumnInput}
+                    placeholder="Default value (optional)"
+                    value={newColumnDefault}
+                    onChange={(_e, data) => setNewColumnDefault(data.value)}
+                  />
+                  <Button
+                    appearance="primary"
+                    icon={<Add24Regular />}
+                    onClick={handleAddColumn}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+
+              {/* Custom columns list */}
+              {customColumns.length > 0 && (
+                <div className={styles.columnList}>
+                  <label className={styles.label}>
+                    Custom Columns ({customColumns.length})
+                  </label>
+                  {customColumns.map((column) => (
+                    <div key={column.id} className={styles.customColumnRow}>
+                      <Text style={{ flex: 1 }}>
+                        <strong>{column.name}</strong>
+                        {column.defaultValue && ` (default: ${column.defaultValue})`}
+                      </Text>
+                      <Button
+                        appearance="subtle"
+                        icon={<Delete24Regular />}
+                        onClick={() => handleRemoveColumn(column.id)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Save configuration */}
+              {customColumns.length > 0 && (
+                <div className={styles.formGroup} style={{ marginTop: "20px" }}>
+                  <label className={styles.label}>Save Configuration</label>
+                  <div className={styles.customColumnRow}>
+                    <Input
+                      className={styles.customColumnInput}
+                      placeholder="Configuration name"
+                      value={configName}
+                      onChange={(_e, data) => setConfigName(data.value)}
+                    />
+                    <Button
+                      appearance="secondary"
+                      icon={<Save24Regular />}
+                      onClick={handleSaveConfiguration}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className={styles.exportSection}>
-              <Button
-                className={styles.button}
-                appearance="primary"
-                icon={<ArrowDownload24Regular />}
-                onClick={handleExport}
-              >
-                Export
-              </Button>
+            <div className={styles.card}>
+              <Title3>Export</Title3>
+              <Text style={{ marginBottom: "16px", display: "block" }}>
+                Export selected entities to Excel with custom columns. Data validation
+                will be added for Yes/No fields.
+              </Text>
+              <div className={styles.exportSection}>
+                <Button
+                  className={styles.button}
+                  appearance="primary"
+                  icon={<ArrowDownload24Regular />}
+                  onClick={handleExport}
+                >
+                  Export to Excel
+                </Button>
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         {!selectedSolution && !loadingEntities && (

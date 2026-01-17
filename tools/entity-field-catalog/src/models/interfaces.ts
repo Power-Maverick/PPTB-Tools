@@ -59,4 +59,30 @@ export interface DataverseSolution {
 /**
  * Export format options
  */
-export type ExportFormat = "Excel" | "CSV";
+export type ExportFormat = "Excel";
+
+/**
+ * Custom column definition for export
+ */
+export interface CustomColumn {
+  /** Unique ID for the column */
+  id: string;
+  /** Column header name */
+  name: string;
+  /** Default value for the column (optional) */
+  defaultValue?: string;
+}
+
+/**
+ * Saved column configuration
+ */
+export interface ColumnConfiguration {
+  /** Unique ID for the configuration */
+  id: string;
+  /** Name of the configuration */
+  name: string;
+  /** List of custom columns */
+  columns: CustomColumn[];
+  /** Creation timestamp */
+  createdAt: number;
+}

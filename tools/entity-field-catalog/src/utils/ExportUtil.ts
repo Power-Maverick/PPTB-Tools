@@ -1,43 +1,33 @@
 import ExcelJS from "exceljs";
-import JSZip from "jszip";
-import { DataverseEntity, ExportFormat } from "../models/interfaces";
+import { CustomColumn, DataverseEntity } from "../models/interfaces";
 
 /**
  * Utility class for exporting entity and field metadata
  */
 export class ExportUtil {
   /**
-   * Export entities and fields to the specified format
+   * Export entities and fields to Excel format with optional custom columns
    */
   static async export(
     entities: DataverseEntity[],
-    format: ExportFormat,
     solutionName: string,
+    customColumns: CustomColumn[] = [],
   ): Promise<void> {
-    if (format === "Excel") {
-      await this.exportToExcel(entities, solutionName);
-      return;
-    }
-
-    if (format === "CSV") {
-      await this.exportToCsvArchive(entities, solutionName);
-      return;
-    }
-
-    throw new Error(`Unsupported export format: ${format}`);
+    await this.exportToExcel(entities, solutionName, customColumns);
   }
 
   /**
-   * Export data to Excel format using ExcelJS
+   * Export data to Excel format using ExcelJS with custom columns and data validation
    */
   private static async exportToExcel(
     entities: DataverseEntity[],
     solutionName: string,
+    customColumns: CustomColumn[] = [],
   ): Promise<void> {
     const workbook = new ExcelJS.Workbook();
 
     this.addEntitySummaryWorksheet(workbook, entities);
-    this.addEntityFieldWorksheets(workbook, entities);
+    this.addEntityFieldWorksheets(workbook, entities, customColumns);
 
     const fileName = `${solutionName}-entity-field-catalog.xlsx`;
     const buffer = await workbook.xlsx.writeBuffer();
@@ -88,6 +78,7 @@ export class ExportUtil {
   private static addEntityFieldWorksheets(
     workbook: ExcelJS.Workbook,
     entities: DataverseEntity[],
+    customColumns: CustomColumn[] = [],
   ): void {
     const usedNames = new Set<string>(["Entities"]);
 
@@ -99,7 +90,9 @@ export class ExportUtil {
       usedNames.add(sheetName);
 
       const worksheet = workbook.addWorksheet(sheetName);
-      worksheet.columns = [
+      
+      // Define base columns
+      const baseColumns: Partial<ExcelJS.Column>[] = [
         { header: "Field Display Name", key: "fieldDisplayName", width: 28 },
         { header: "Field Logical Name", key: "fieldLogicalName", width: 28 },
         { header: "Field Schema Name", key: "fieldSchemaName", width: 28 },
@@ -110,10 +103,20 @@ export class ExportUtil {
         { header: "Field Description", key: "fieldDescription", width: 40 },
       ];
 
+      // Add custom columns
+      const customColumnDefs: Partial<ExcelJS.Column>[] = customColumns.map((col) => ({
+        header: col.name,
+        key: `custom_${col.id}`,
+        width: 20,
+      }));
+
+      worksheet.columns = [...baseColumns, ...customColumnDefs];
+
       this.styleHeaderRow(worksheet.getRow(1));
 
-      entity.fields.forEach((field) => {
-        worksheet.addRow({
+      // Add field data rows
+      entity.fields.forEach((field, index) => {
+        const rowData: any = {
           fieldDisplayName: field.displayName,
           fieldLogicalName: field.logicalName,
           fieldSchemaName: field.schemaName,
@@ -122,11 +125,52 @@ export class ExportUtil {
           isPrimaryName: field.isPrimaryName ? "Yes" : "No",
           isRequired: field.isRequired ? "Yes" : "No",
           fieldDescription: field.description || "",
+        };
+
+        // Add default values for custom columns
+        customColumns.forEach((col) => {
+          rowData[`custom_${col.id}`] = col.defaultValue || "";
         });
+
+        worksheet.addRow(rowData);
       });
 
       this.applyAlternatingRowFill(worksheet);
+
+      // Add data validation for Yes/No columns (including custom columns if they have Yes/No default values)
+      const yesNoColumns = [5, 6, 7]; // isPrimaryId, isPrimaryName, isRequired (1-indexed column numbers)
+      
+      const totalFields = entity.fields.length;
+      if (totalFields > 0) {
+        yesNoColumns.forEach((colIndex) => {
+          worksheet.dataValidations.add(`${this.getColumnLetter(colIndex)}2:${this.getColumnLetter(colIndex)}${totalFields + 1}`, {
+            type: 'list',
+            allowBlank: true,
+            formulae: ['"Yes,No"'],
+            showErrorMessage: true,
+            errorStyle: 'error',
+            errorTitle: 'Invalid Value',
+            error: 'Please select Yes or No from the dropdown',
+          });
+        });
+      }
     });
+  }
+
+  /**
+   * Get Excel column letter from column number (1-indexed)
+   */
+  private static getColumnLetter(columnNumber: number): string {
+    let columnLetter = '';
+    let temp = columnNumber;
+    
+    while (temp > 0) {
+      const remainder = (temp - 1) % 26;
+      columnLetter = String.fromCharCode(65 + remainder) + columnLetter;
+      temp = Math.floor((temp - 1) / 26);
+    }
+    
+    return columnLetter;
   }
 
   private static styleHeaderRow(row: ExcelJS.Row): void {
@@ -176,6 +220,7 @@ export class ExportUtil {
 
     return uniqueName;
   }
+  
   private static downloadBlob(blob: Blob, fileName: string): void {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
@@ -189,121 +234,5 @@ export class ExportUtil {
     document.body.removeChild(link);
 
     URL.revokeObjectURL(url);
-  }
-
-  private static async exportToCsvArchive(
-    entities: DataverseEntity[],
-    solutionName: string,
-  ): Promise<void> {
-    if (entities.length === 0) {
-      throw new Error("No entities selected for export");
-    }
-
-    const zip = new JSZip();
-    zip.file("Entities.csv", this.buildEntitySummaryCsv(entities));
-
-    const usedNames = new Set<string>();
-    entities.forEach((entity) => {
-      const fileName = this.sanitizeFileName(
-        entity.displayName || entity.logicalName,
-        usedNames,
-      );
-      usedNames.add(fileName);
-      zip.file(`${fileName}.csv`, this.buildEntityFieldCsv(entity));
-    });
-
-    const content = await zip.generateAsync({ type: "blob" });
-    const archiveName = `${solutionName}-entity-field-catalog.zip`;
-    this.downloadBlob(content, archiveName);
-  }
-
-  private static buildEntitySummaryCsv(entities: DataverseEntity[]): string {
-    const headers = [
-      "Entity Display Name",
-      "Entity Logical Name",
-      "Entity Schema Name",
-      "Primary ID Attribute",
-      "Primary Name Attribute",
-      "Object Type Code",
-      "Description",
-      "Field Count",
-    ];
-
-    const rows = entities.map((entity) => [
-      entity.displayName,
-      entity.logicalName,
-      entity.schemaName,
-      entity.primaryIdAttribute,
-      entity.primaryNameAttribute,
-      entity.objectTypeCode ?? "",
-      entity.description ?? "",
-      entity.fields.length.toString(),
-    ]);
-
-    return this.toCsv([headers, ...rows]);
-  }
-
-  private static buildEntityFieldCsv(entity: DataverseEntity): string {
-    const headers = [
-      "Field Display Name",
-      "Field Logical Name",
-      "Field Schema Name",
-      "Field Type",
-      "Is Primary ID",
-      "Is Primary Name",
-      "Is Required",
-      "Field Description",
-    ];
-
-    const rows = entity.fields.map((field) => [
-      field.displayName,
-      field.logicalName,
-      field.schemaName,
-      field.type,
-      field.isPrimaryId ? "Yes" : "No",
-      field.isPrimaryName ? "Yes" : "No",
-      field.isRequired ? "Yes" : "No",
-      field.description ?? "",
-    ]);
-
-    return this.toCsv([headers, ...rows]);
-  }
-
-  private static toCsv(
-    rows: (string | number | boolean | null | undefined)[][],
-  ): string {
-    return rows
-      .map((row) =>
-        row
-          .map((cell) => {
-            const value = cell ?? "";
-            const text = typeof value === "string" ? value : String(value);
-            return `"${text.replace(/"/g, '""')}"`;
-          })
-          .join(","),
-      )
-      .join("\n");
-  }
-
-  private static sanitizeFileName(
-    name: string,
-    usedNames: Set<string>,
-  ): string {
-    const invalidChars = /[<>:"/\\|?*]/g;
-    let sanitized = name.replace(invalidChars, " ").trim() || "Entity";
-
-    if (sanitized.length > 60) {
-      sanitized = sanitized.slice(0, 60).trim();
-    }
-
-    let uniqueName = sanitized;
-    let suffix = 1;
-    while (usedNames.has(uniqueName)) {
-      const suffixText = `_${suffix++}`;
-      const baseLength = Math.max(1, 60 - suffixText.length);
-      uniqueName = `${sanitized.slice(0, baseLength)}${suffixText}`;
-    }
-
-    return uniqueName;
   }
 }
