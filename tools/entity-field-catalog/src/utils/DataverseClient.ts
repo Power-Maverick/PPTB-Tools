@@ -130,7 +130,6 @@ export class DataverseClient {
         schemaName: entityMetadata.SchemaName as string,
         primaryIdAttribute: entityMetadata.PrimaryIdAttribute as string,
         primaryNameAttribute: entityMetadata.PrimaryNameAttribute as string,
-        entitySetName: entityMetadata.EntitySetName as string,
         description: entityMetadata.Description as string | undefined,
         objectTypeCode: entityMetadata.ObjectTypeCode as number | undefined,
         fields: entityAttributes.value.map((attr: any) => ({

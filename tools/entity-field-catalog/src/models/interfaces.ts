@@ -60,33 +60,3 @@ export interface DataverseSolution {
  * Export format options
  */
 export type ExportFormat = "Excel" | "CSV";
-
-/**
- * Export data structure for entities and fields
- */
-export interface EntityFieldExportData {
-  /** Entity logical name */
-  entityLogicalName: string;
-  /** Entity display name */
-  entityDisplayName: string;
-  /** Entity schema name */
-  entitySchemaName: string;
-  /** Entity description */
-  entityDescription: string;
-  /** Field logical name */
-  fieldLogicalName: string;
-  /** Field display name */
-  fieldDisplayName: string;
-  /** Field schema name */
-  fieldSchemaName: string;
-  /** Field type */
-  fieldType: string;
-  /** Is primary ID */
-  isPrimaryId: string;
-  /** Is primary name */
-  isPrimaryName: string;
-  /** Is required */
-  isRequired: string;
-  /** Field description */
-  fieldDescription: string;
-}

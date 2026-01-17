@@ -15,13 +15,12 @@ The Entity Field Catalog is a React-based tool designed exclusively for Power Pl
 - **Modern Fluent UI Design**: Built with Microsoft's Fluent UI React components for a consistent, professional look
 - **Multi-Entity Selection**: Select one or multiple entities to export at once
 - **Comprehensive Metadata Export**: Exports entity and field information including:
-  - Entity logical name, display name, schema name, type, and description
+  - Entity logical name, display name, schema name, and description
   - Field logical name, display name, schema name, type, and description
   - Field properties: isPrimaryId, isPrimaryName, isRequired
-  - Field constraints: maxLength, precision, format
-- **Multiple Export Formats**: 
-  - Excel (.xlsx) - Structured workbook format
-  - CSV (.csv) - Simple comma-separated values
+- **Multiple Export Formats**:
+  - Excel (.xlsx) - Entities tab plus one tab per entity
+  - CSV (.zip) - Entities summary CSV plus one CSV per entity, packaged together
 - **PPTB Integration**: Full integration with Power Platform ToolBox API for seamless connectivity
 
 ## Technical Stack
@@ -61,26 +60,36 @@ npm run build
 
 ## Export Format
 
-The exported file includes the following columns:
+Both export options share the same structure:
 
-| Column | Description |
-|--------|-------------|
-| Entity Logical Name | The logical name of the entity |
-| Entity Display Name | The display name of the entity |
-| Entity Schema Name | The schema name of the entity |
-| Entity Type | The type of entity |
-| Entity Description | Description of the entity |
-| Field Logical Name | The logical name of the field |
-| Field Display Name | The display name of the field |
-| Field Schema Name | The schema name of the field |
-| Field Type | The data type of the field |
-| Is Primary ID | Whether the field is the primary ID |
-| Is Primary Name | Whether the field is the primary name |
-| Is Required | Whether the field is required |
-| Field Description | Description of the field |
-| Max Length | Maximum length (for string fields) |
-| Precision | Precision (for decimal/money fields) |
-| Format | Format specification for the field |
+- **Excel**: One `Entities` tab with consolidated info and an additional tab per entity for field details.
+- **CSV**: A `.zip` file containing `Entities.csv` plus a separate CSV for each entity's fields.
+
+### Entities Summary
+
+| Column                 | Description                       |
+| ---------------------- | --------------------------------- |
+| Entity Display Name    | Human-friendly name of the entity |
+| Entity Logical Name    | Dataverse logical name            |
+| Entity Schema Name     | Dataverse schema name             |
+| Primary ID Attribute   | Primary key column                |
+| Primary Name Attribute | Primary name column               |
+| Object Type Code       | Numeric identifier (if available) |
+| Description            | Entity description                |
+| Field Count            | Number of fields exported         |
+
+### Field Details (per entity)
+
+| Column             | Description                                |
+| ------------------ | ------------------------------------------ |
+| Field Display Name | Human-friendly field label                 |
+| Field Logical Name | Dataverse logical name                     |
+| Field Schema Name  | Dataverse schema name                      |
+| Field Type         | Data type                                  |
+| Is Primary ID      | Indicates if the field is the primary ID   |
+| Is Primary Name    | Indicates if the field is the primary name |
+| Is Required        | Indicates if the field is required         |
+| Field Description  | Field description                          |
 
 ## Development
 

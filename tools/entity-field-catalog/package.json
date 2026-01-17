@@ -1,7 +1,7 @@
 {
   "name": "@power-maverick/tool-entity-field-catalog",
   "displayName": "Entity Field Catalog",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Export entity and field metadata from Dataverse solutions to Excel or CSV - React-based tool for PowerPlatform ToolBox",
   "contributors": [
     {
@@ -42,11 +42,13 @@
     "@fluentui/react-components": "^9.56.2",
     "@fluentui/react-icons": "^2.0.264",
     "exceljs": "^4.4.0",
+    "jszip": "^3.10.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@pptb/types": "^1.0.16",
+    "@types/jszip": "^3.4.0",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.4",

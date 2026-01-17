@@ -9,102 +9,106 @@ import {
   makeStyles,
   shorthands,
   tokens,
-} from '@fluentui/react-components';
-import { ArrowDownload24Regular } from '@fluentui/react-icons';
-import { useEffect, useState } from 'react';
-import { DataverseEntity, DataverseSolution, ExportFormat } from './models/interfaces';
-import { DataverseClient } from './utils/DataverseClient';
-import { ExportUtil } from './utils/ExportUtil';
+} from "@fluentui/react-components";
+import { ArrowDownload24Regular } from "@fluentui/react-icons";
+import { useEffect, useState } from "react";
+import {
+  DataverseEntity,
+  DataverseSolution,
+  ExportFormat,
+} from "./models/interfaces";
+import { DataverseClient } from "./utils/DataverseClient";
+import { ExportUtil } from "./utils/ExportUtil";
 
 const useStyles = makeStyles({
   root: {
-    display: 'flex',
-    flexDirection: 'column',
-    minHeight: '100vh',
+    display: "flex",
+    flexDirection: "column",
+    minHeight: "100vh",
     backgroundColor: tokens.colorNeutralBackground3,
   },
   container: {
-    maxWidth: '1200px',
-    width: '100%',
-    margin: '0 auto',
-    ...shorthands.padding('24px'),
+    maxWidth: "1200px",
+    width: "100%",
+    margin: "0 auto",
+    ...shorthands.padding("24px"),
   },
   card: {
     backgroundColor: tokens.colorNeutralBackground1,
     ...shorthands.borderRadius(tokens.borderRadiusLarge),
-    ...shorthands.padding('24px'),
+    ...shorthands.padding("24px"),
     boxShadow: tokens.shadow8,
-    marginBottom: '24px',
+    marginBottom: "24px",
   },
   formGroup: {
-    marginBottom: '20px',
+    marginBottom: "20px",
   },
   label: {
-    display: 'block',
-    marginBottom: '8px',
+    display: "block",
+    marginBottom: "8px",
     fontWeight: tokens.fontWeightSemibold,
     color: tokens.colorNeutralForeground1,
   },
   dropdown: {
-    width: '100%',
+    width: "100%",
   },
   entityList: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-    gap: '12px',
-    marginTop: '12px',
-    maxHeight: '400px',
-    overflowY: 'auto',
-    ...shorthands.padding('12px'),
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+    gap: "12px",
+    marginTop: "12px",
+    maxHeight: "400px",
+    overflowY: "auto",
+    ...shorthands.padding("12px"),
     backgroundColor: tokens.colorNeutralBackground2,
     ...shorthands.borderRadius(tokens.borderRadiusMedium),
   },
   entityCheckbox: {
-    display: 'block',
+    display: "block",
   },
   exportSection: {
-    display: 'flex',
-    gap: '12px',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    display: "flex",
+    gap: "12px",
+    alignItems: "center",
+    flexWrap: "wrap",
   },
   button: {
-    minWidth: '120px',
+    minWidth: "120px",
   },
   loading: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shorthands.padding('48px'),
-    gap: '16px',
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    ...shorthands.padding("48px"),
+    gap: "16px",
   },
   error: {
     backgroundColor: tokens.colorPaletteRedBackground2,
     color: tokens.colorPaletteRedForeground1,
-    ...shorthands.padding('16px'),
+    ...shorthands.padding("16px"),
     ...shorthands.borderRadius(tokens.borderRadiusMedium),
-    marginBottom: '16px',
+    marginBottom: "16px",
   },
   info: {
-    backgroundColor: tokens.colorPaletteBlueBorder2,
+    backgroundColor: tokens.colorPaletteBlueBackground2,
     color: tokens.colorNeutralForeground1,
-    ...shorthands.padding('16px'),
+    ...shorthands.padding("16px"),
     ...shorthands.borderRadius(tokens.borderRadiusMedium),
-    marginBottom: '16px',
+    marginBottom: "16px",
   },
   stats: {
-    display: 'flex',
-    gap: '24px',
-    marginTop: '16px',
-    ...shorthands.padding('16px'),
+    display: "flex",
+    gap: "24px",
+    marginTop: "16px",
+    ...shorthands.padding("16px"),
     backgroundColor: tokens.colorNeutralBackground2,
     ...shorthands.borderRadius(tokens.borderRadiusMedium),
   },
   statItem: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
   },
   statLabel: {
     fontSize: tokens.fontSizeBase200,
@@ -120,15 +124,17 @@ const useStyles = makeStyles({
 function App() {
   const styles = useStyles();
   const [isPPTB, setIsPPTB] = useState<boolean>(false);
-  const [connectionUrl, setConnectionUrl] = useState<string>('');
+  const [connectionUrl, setConnectionUrl] = useState<string>("");
   const [solutions, setSolutions] = useState<DataverseSolution[]>([]);
-  const [selectedSolution, setSelectedSolution] = useState<string>('');
+  const [selectedSolution, setSelectedSolution] = useState<string>("");
   const [entities, setEntities] = useState<DataverseEntity[]>([]);
-  const [selectedEntities, setSelectedEntities] = useState<Set<string>>(new Set());
-  const [exportFormat, setExportFormat] = useState<ExportFormat>('excel');
+  const [selectedEntities, setSelectedEntities] = useState<Set<string>>(
+    new Set(),
+  );
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("Excel");
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingEntities, setLoadingEntities] = useState<boolean>(false);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
 
   // Detect environment and initialize
   useEffect(() => {
@@ -136,20 +142,21 @@ function App() {
       // Check if we're in PPTB
       if (window.toolboxAPI) {
         setIsPPTB(true);
-        
+
         try {
           // Get active connection
-          const activeConnection = await window.toolboxAPI.connections.getActiveConnection();
-          setConnectionUrl(activeConnection?.url || '');
+          const activeConnection =
+            await window.toolboxAPI.connections.getActiveConnection();
+          setConnectionUrl(activeConnection?.url || "");
         } catch (error) {
-          console.error('Failed to get connection:', error);
-          setError('Failed to get connection from PPTB');
+          console.error("Failed to get connection:", error);
+          setError("Failed to get connection from PPTB");
         }
-        
+
         setLoading(false);
       } else {
         // Not in supported environment
-        setError('This tool only works in Power Platform ToolBox (PPTB)');
+        setError("This tool only works in Power Platform ToolBox (PPTB)");
         setLoading(false);
       }
     };
@@ -177,7 +184,7 @@ function App() {
 
   const showError = (message: string) => {
     setError(message);
-    setTimeout(() => setError(''), 5000);
+    setTimeout(() => setError(""), 5000);
   };
 
   const handleSolutionChange = async (_event: any, data: any) => {
@@ -197,9 +204,9 @@ function App() {
 
       if (isPPTB && window.toolboxAPI?.utils?.showNotification) {
         await window.toolboxAPI.utils.showNotification({
-          title: 'Success',
+          title: "Success",
           body: `Loaded ${entityList.length} entities from solution`,
-          type: 'success',
+          type: "success",
         });
       }
     } catch (error: any) {
@@ -225,26 +232,28 @@ function App() {
       setSelectedEntities(new Set());
     } else {
       // Select all
-      setSelectedEntities(new Set(entities.map(e => e.logicalName)));
+      setSelectedEntities(new Set(entities.map((e) => e.logicalName)));
     }
   };
 
   const handleExport = async () => {
     if (selectedEntities.size === 0) {
-      showError('Please select at least one entity to export');
+      showError("Please select at least one entity to export");
       return;
     }
 
     try {
-      const entitiesToExport = entities.filter(e => selectedEntities.has(e.logicalName));
-      
+      const entitiesToExport = entities.filter((e) =>
+        selectedEntities.has(e.logicalName),
+      );
+
       await ExportUtil.export(entitiesToExport, exportFormat, selectedSolution);
 
       if (isPPTB && window.toolboxAPI?.utils?.showNotification) {
         await window.toolboxAPI.utils.showNotification({
-          title: 'Success',
+          title: "Success",
           body: `Exported ${selectedEntities.size} entities to ${exportFormat.toUpperCase()}`,
-          type: 'success',
+          type: "success",
         });
       }
     } catch (error: any) {
@@ -263,7 +272,7 @@ function App() {
   }
 
   const totalFields = entities
-    .filter(e => selectedEntities.has(e.logicalName))
+    .filter((e) => selectedEntities.has(e.logicalName))
     .reduce((sum, e) => sum + e.fields.length, 0);
 
   return (
@@ -285,8 +294,12 @@ function App() {
               value={selectedSolution}
               onOptionSelect={handleSolutionChange}
             >
-              {solutions.map(solution => (
-                <Option key={solution.uniqueName} value={solution.uniqueName}>
+              {solutions.map((solution) => (
+                <Option
+                  key={solution.uniqueName}
+                  value={solution.uniqueName}
+                  text={solution.displayName}
+                >
                   {solution.displayName} (v{solution.version})
                 </Option>
               ))}
@@ -302,22 +315,36 @@ function App() {
           {entities.length > 0 && (
             <>
               <div className={styles.formGroup}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
                   <label className={styles.label}>
-                    Select Entities ({selectedEntities.size} of {entities.length} selected)
+                    Select Entities ({selectedEntities.size} of{" "}
+                    {entities.length} selected)
                   </label>
                   <Button appearance="subtle" onClick={handleSelectAll}>
-                    {selectedEntities.size === entities.length ? 'Deselect All' : 'Select All'}
+                    {selectedEntities.size === entities.length
+                      ? "Deselect All"
+                      : "Select All"}
                   </Button>
                 </div>
                 <div className={styles.entityList}>
-                  {entities.map(entity => (
+                  {entities.map((entity) => (
                     <Checkbox
                       key={entity.logicalName}
                       className={styles.entityCheckbox}
                       label={`${entity.displayName} (${entity.fields.length} fields)`}
                       checked={selectedEntities.has(entity.logicalName)}
-                      onChange={(_e, data) => handleEntityToggle(entity.logicalName, data.checked === true)}
+                      onChange={(_e, data) =>
+                        handleEntityToggle(
+                          entity.logicalName,
+                          data.checked === true,
+                        )
+                      }
                     />
                   ))}
                 </div>
@@ -327,7 +354,9 @@ function App() {
                 <div className={styles.stats}>
                   <div className={styles.statItem}>
                     <Text className={styles.statLabel}>Selected Entities</Text>
-                    <Text className={styles.statValue}>{selectedEntities.size}</Text>
+                    <Text className={styles.statValue}>
+                      {selectedEntities.size}
+                    </Text>
                   </div>
                   <div className={styles.statItem}>
                     <Text className={styles.statLabel}>Total Fields</Text>
@@ -348,10 +377,16 @@ function App() {
                 className={styles.dropdown}
                 placeholder="Select export format"
                 value={exportFormat}
-                onOptionSelect={(_e, data) => setExportFormat(data.optionValue as ExportFormat)}
+                onOptionSelect={(_e, data) =>
+                  setExportFormat(data.optionValue as ExportFormat)
+                }
               >
-                <Option value="excel">Excel (.xlsx)</Option>
-                <Option value="csv">CSV (.csv)</Option>
+                <Option value="Excel" text="Excel (.xlsx)">
+                  Excel (.xlsx)
+                </Option>
+                <Option value="CSV" text="CSV (.csv)">
+                  CSV (.csv)
+                </Option>
               </Dropdown>
             </div>
 
