@@ -12,8 +12,6 @@ export interface DataverseEntity {
   primaryIdAttribute: string;
   /** Primary name attribute */
   primaryNameAttribute: string;
-  /** Entity type (Standard, Activity, Virtual, etc.) */
-  entityType: string;
   /** Description */
   description?: string;
   /** Object type code */
@@ -42,12 +40,6 @@ export interface DataverseField {
   isRequired: boolean;
   /** Description of the field */
   description?: string;
-  /** Maximum length (for string fields) */
-  maxLength?: number;
-  /** Precision (for decimal/money fields) */
-  precision?: number;
-  /** Format (for specific field types) */
-  format?: string;
 }
 
 /**
@@ -67,7 +59,7 @@ export interface DataverseSolution {
 /**
  * Export format options
  */
-export type ExportFormat = 'excel' | 'csv';
+export type ExportFormat = "Excel" | "CSV";
 
 /**
  * Export data structure for entities and fields
@@ -79,8 +71,6 @@ export interface EntityFieldExportData {
   entityDisplayName: string;
   /** Entity schema name */
   entitySchemaName: string;
-  /** Entity type */
-  entityType: string;
   /** Entity description */
   entityDescription: string;
   /** Field logical name */
@@ -99,10 +89,4 @@ export interface EntityFieldExportData {
   isRequired: string;
   /** Field description */
   fieldDescription: string;
-  /** Max length */
-  maxLength: string;
-  /** Precision */
-  precision: string;
-  /** Format */
-  format: string;
 }
