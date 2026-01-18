@@ -116,6 +116,40 @@ Analyze and view Plugin Trace Logs from Microsoft Dataverse. Exclusively for PPT
 - Track related operations using correlation IDs
 - Clean up old trace logs
 
+### [@power-maverick/tool-data-migrator](./tools/data-migrator)
+
+Tool README: [here](./tools/data-migrator/README.md)
+
+Migrate data from one Dataverse environment to another with intelligent auto-mapping and smart operations. Exclusively for PPTB.
+
+**Key Features:**
+
+- **React + TypeScript**: Modern component-based architecture with Vite build system
+- **PPTB-Only Integration**: Designed exclusively for Power Platform ToolBox (uses @pptb/types v1.0.16)
+- **Modern Minimalist UI**: Clean design with no header and optimized to avoid excessive scrolling and whitespace
+- **Auto-Mapping**: Automatically map users, teams, and business units between environments
+- **Smart Migration Operations**: Choose between create, update, or upsert operations
+- **Field Selection**: Select which fields to include in the migration
+- **Lookup Handling**: Intelligent mapping of lookup fields and references
+- **Real-time Progress**: Monitor migration progress with detailed status for each record
+- **Batch Processing**: Efficient batch processing for large data sets with configurable batch size
+
+**Use Cases:**
+
+- Migrate data between environments after refresh
+- Transfer test data from development to test environments
+- Cross-tenant data migration with automatic user/team mapping
+- Partial data migration using OData filters
+- Data synchronization with upsert operations
+
+**Technical Architecture:**
+
+- **React 18** with TypeScript and functional components
+- **Fluent UI React Components** for modern Microsoft design language
+- **Vite** for fast development and optimized production builds
+- **@pptb/types v1.0.16** - Latest PPTB type definitions
+- **MigrationEngine** - Core migration logic with auto-mapping capabilities
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
