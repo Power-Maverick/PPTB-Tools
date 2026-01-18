@@ -1,0 +1,56 @@
+{
+  "name": "@power-maverick/tool-entity-field-catalog",
+  "displayName": "Entity Field Catalog",
+  "version": "0.0.1",
+  "description": "Export entity and field metadata from Dataverse solutions to Excel with custom columns - React-based tool for PowerPlatform ToolBox",
+  "contributors": [
+    {
+      "name": "Power Maverick",
+      "url": "https://github.com/Power-Maverick"
+    }
+  ],
+  "license": "GPL-2.0",
+  "configurations": {
+    "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/entity-field-catalog",
+    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/entity-field-catalog/README.md"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview",
+    "finalize-package": "npm shrinkwrap"
+  },
+  "files": [
+    "dist",
+    "npm-shrinkwrap.json"
+  ],
+  "keywords": [
+    "dataverse",
+    "entity-catalog",
+    "field-catalog",
+    "metadata",
+    "export",
+    "excel",
+    "power-platform",
+    "pptb",
+    "toolbox",
+    "custom-columns"
+  ],
+  "author": "Power Maverick",
+  "dependencies": {
+    "@fluentui/react-components": "^9.56.2",
+    "@fluentui/react-icons": "^2.0.264",
+    "exceljs": "^4.4.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@pptb/types": "^1.0.16",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.7"
+  }
+}

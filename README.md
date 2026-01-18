@@ -54,6 +54,30 @@ See [VSCODE_INTEGRATION.md](./VSCODE_INTEGRATION.md) for complete WebView integr
 - **PPTB Testing**: Install the tool in Power Platform ToolBox and test with your Dataverse environment.
 - **Local DVDT Integration**: See [LOCAL_TESTING.md](./LOCAL_TESTING.md) for step-by-step instructions on integrating with a local copy of Dataverse DevTools.
 
+### [@power-maverick/tool-entity-field-catalog](./tools/entity-field-catalog)
+
+Export comprehensive entity and field metadata from Dataverse solutions to Excel or CSV formats. **React-based tool** exclusively for PPTB.
+
+**Key Features:**
+- **Modern Fluent UI Design**: Built with Microsoft's Fluent UI React components for a professional, minimalist interface
+- **Multi-Entity Selection**: Select multiple entities from a solution with an intuitive checkbox interface
+- **Comprehensive Metadata Export**: Exports detailed information about entities and their fields including:
+  - Entity metadata: logical name, display name, schema name, type, description
+  - Field metadata: logical name, display name, schema name, type, description
+  - Field properties: isPrimaryId, isPrimaryName, isRequired
+  - Field constraints: maxLength, precision, format
+- **Multiple Export Formats**: 
+  - Excel (.xlsx) - Structured workbook with proper formatting
+  - CSV (.csv) - Simple comma-separated values for universal compatibility
+- **PPTB-Only Integration**: Exclusive integration with Power Platform ToolBox using latest @pptb/types (v1.0.13)
+- **Real-time Statistics**: View selected entity count and total field count before export
+
+**Technical Stack:**
+- **React 18** with TypeScript and functional components
+- **Fluent UI React Components** for modern Microsoft design language
+- **Vite** for fast development and optimized production builds
+- **XLSX library** for Excel export functionality
+- **@pptb/types v1.0.13** - Latest PPTB type definitions
 ### [@power-maverick/tool-view-layout-replicator](./tools/view-layout-replicator)
 
 Copy layout from one view to multiple views of the same entity in a single operation. **React-based tool** with PPTB-only integration.
@@ -143,6 +167,7 @@ npm run build
 
 Watch mode for development:
 
+**ERD Generator:**
 ```bash
 # ERD Generator
 cd tools/erd-generator
@@ -154,6 +179,12 @@ npm run dev
 
 # Dataverse Trace Analyzer
 cd tools/dataverse-trace-analyzer
+npm run dev
+```
+
+**Entity Field Catalog:**
+```bash
+cd tools/entity-field-catalog
 npm run dev
 ```
 
@@ -171,6 +202,10 @@ PPTB-Tools/
 │   │   │   └── main.tsx
 │   │   ├── package.json
 │   │   ├── tsconfig.json
+│   │   └── README.md
+│   └── entity-field-catalog/       # Entity field catalog tool
+│       ├── src/
+│       │   ├── components/
 │   │   ├── vite.config.ts
 │   │   └── README.md
 │   ├── view-layout-replicator/    # View layout copying tool
