@@ -137,11 +137,13 @@ export class ExportUtil {
 
       this.applyAlternatingRowFill(worksheet);
 
-      // Add data validation for Yes/No columns (including custom columns if they have Yes/No default values)
+      // Add data validation for Yes/No columns
       const yesNoColumns = [5, 6, 7]; // isPrimaryId, isPrimaryName, isRequired (1-indexed column numbers)
+      const fieldTypeColumn = 4; // Field Type column (1-indexed)
       
       const totalFields = entity.fields.length;
       if (totalFields > 0) {
+        // Yes/No validation for boolean columns
         yesNoColumns.forEach((colIndex) => {
           worksheet.dataValidations.add(`${this.getColumnLetter(colIndex)}2:${this.getColumnLetter(colIndex)}${totalFields + 1}`, {
             type: 'list',
@@ -152,6 +154,42 @@ export class ExportUtil {
             errorTitle: 'Invalid Value',
             error: 'Please select Yes or No from the dropdown',
           });
+        });
+
+        // Field Type validation with common Dataverse attribute types
+        const fieldTypes = [
+          'String',
+          'Memo',
+          'Integer',
+          'BigInt',
+          'Decimal',
+          'Double',
+          'Money',
+          'Boolean',
+          'DateTime',
+          'Lookup',
+          'Customer',
+          'Owner',
+          'Picklist',
+          'MultiSelectPicklist',
+          'State',
+          'Status',
+          'Uniqueidentifier',
+          'Virtual',
+          'EntityName',
+          'ManagedProperty',
+          'CalendarRules',
+          'PartyList'
+        ].sort().join(',');
+
+        worksheet.dataValidations.add(`${this.getColumnLetter(fieldTypeColumn)}2:${this.getColumnLetter(fieldTypeColumn)}${totalFields + 1}`, {
+          type: 'list',
+          allowBlank: true,
+          formulae: [`"${fieldTypes}"`],
+          showErrorMessage: true,
+          errorStyle: 'warning',
+          errorTitle: 'Unusual Field Type',
+          error: 'Please select a valid Dataverse field type from the dropdown',
         });
       }
     });

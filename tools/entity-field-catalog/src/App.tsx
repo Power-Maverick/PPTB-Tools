@@ -6,7 +6,7 @@ import {
   Option,
   Spinner,
   Text,
-  Title3,
+  Title2,
   makeStyles,
   shorthands,
   tokens,
@@ -34,96 +34,100 @@ const useStyles = makeStyles({
     flexDirection: "column",
     minHeight: "100vh",
     backgroundColor: tokens.colorNeutralBackground3,
+    ...shorthands.overflow("hidden"),
   },
   container: {
-    maxWidth: "1200px",
+    maxWidth: "1400px",
     width: "100%",
     margin: "0 auto",
-    ...shorthands.padding("24px"),
+    ...shorthands.padding("16px"),
+    ...shorthands.overflow("auto"),
+    height: "100vh",
   },
   card: {
     backgroundColor: tokens.colorNeutralBackground1,
-    ...shorthands.borderRadius(tokens.borderRadiusLarge),
-    ...shorthands.padding("24px"),
-    boxShadow: tokens.shadow8,
-    marginBottom: "24px",
+    ...shorthands.borderRadius(tokens.borderRadiusMedium),
+    ...shorthands.padding("16px"),
+    boxShadow: tokens.shadow4,
+    marginBottom: "12px",
   },
   formGroup: {
-    marginBottom: "20px",
+    marginBottom: "12px",
   },
   label: {
     display: "block",
-    marginBottom: "8px",
+    marginBottom: "6px",
     fontWeight: tokens.fontWeightSemibold,
     color: tokens.colorNeutralForeground1,
+    fontSize: tokens.fontSizeBase300,
   },
   dropdown: {
     width: "100%",
   },
   entityList: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-    gap: "12px",
-    marginTop: "12px",
-    maxHeight: "400px",
+    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+    gap: "8px",
+    marginTop: "8px",
+    maxHeight: "280px",
     overflowY: "auto",
-    ...shorthands.padding("12px"),
+    ...shorthands.padding("8px"),
     backgroundColor: tokens.colorNeutralBackground2,
-    ...shorthands.borderRadius(tokens.borderRadiusMedium),
+    ...shorthands.borderRadius(tokens.borderRadiusSmall),
   },
   entityCheckbox: {
     display: "block",
   },
   exportSection: {
     display: "flex",
-    gap: "12px",
+    gap: "8px",
     alignItems: "center",
     flexWrap: "wrap",
   },
   button: {
-    minWidth: "120px",
+    minWidth: "100px",
   },
   loading: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    ...shorthands.padding("48px"),
-    gap: "16px",
+    ...shorthands.padding("32px"),
+    gap: "12px",
   },
   error: {
     backgroundColor: tokens.colorPaletteRedBackground2,
     color: tokens.colorPaletteRedForeground1,
-    ...shorthands.padding("16px"),
-    ...shorthands.borderRadius(tokens.borderRadiusMedium),
-    marginBottom: "16px",
+    ...shorthands.padding("12px"),
+    ...shorthands.borderRadius(tokens.borderRadiusSmall),
+    marginBottom: "12px",
   },
   info: {
     backgroundColor: tokens.colorPaletteBlueBackground2,
     color: tokens.colorNeutralForeground1,
-    ...shorthands.padding("16px"),
-    ...shorthands.borderRadius(tokens.borderRadiusMedium),
-    marginBottom: "16px",
+    ...shorthands.padding("12px"),
+    ...shorthands.borderRadius(tokens.borderRadiusSmall),
+    marginBottom: "12px",
   },
   stats: {
     display: "flex",
-    gap: "24px",
-    marginTop: "16px",
-    ...shorthands.padding("16px"),
+    gap: "16px",
+    marginTop: "12px",
+    ...shorthands.padding("12px"),
     backgroundColor: tokens.colorNeutralBackground2,
-    ...shorthands.borderRadius(tokens.borderRadiusMedium),
+    ...shorthands.borderRadius(tokens.borderRadiusSmall),
   },
   statItem: {
     display: "flex",
     flexDirection: "column",
-    gap: "4px",
+    gap: "2px",
   },
   statLabel: {
     fontSize: tokens.fontSizeBase200,
     color: tokens.colorNeutralForeground3,
   },
   statValue: {
-    fontSize: tokens.fontSizeBase500,
+    fontSize: tokens.fontSizeBase400,
     fontWeight: tokens.fontWeightSemibold,
     color: tokens.colorBrandForeground1,
   },
@@ -131,19 +135,28 @@ const useStyles = makeStyles({
     display: "flex",
     gap: "8px",
     marginBottom: "8px",
-    alignItems: "flex-start",
+    alignItems: "center",
+    flexWrap: "wrap",
   },
   customColumnInput: {
     flex: "1",
+    minWidth: "150px",
   },
   columnList: {
-    marginTop: "12px",
+    marginTop: "8px",
+    maxHeight: "180px",
+    overflowY: "auto",
   },
   configRow: {
     display: "flex",
     gap: "8px",
-    marginBottom: "12px",
+    marginBottom: "8px",
     alignItems: "center",
+    flexWrap: "wrap",
+  },
+  sectionTitle: {
+    marginBottom: "12px",
+    fontSize: tokens.fontSizeBase400,
   },
 });
 
@@ -415,7 +428,7 @@ function App() {
         )}
 
         <div className={styles.card}>
-          <Title3>Select Solution</Title3>
+          <Title2 className={styles.sectionTitle}>Select Solution</Title2>
           <div className={styles.formGroup}>
             <label className={styles.label}>Solution</label>
             <Dropdown
@@ -501,7 +514,7 @@ function App() {
         {entities.length > 0 && selectedEntities.size > 0 && (
           <>
             <div className={styles.card}>
-              <Title3>Custom Columns</Title3>
+              <Title2 className={styles.sectionTitle}>Custom Columns</Title2>
               
               {/* Load saved configuration */}
               <div className={styles.formGroup}>
@@ -606,10 +619,9 @@ function App() {
             </div>
 
             <div className={styles.card}>
-              <Title3>Export</Title3>
-              <Text style={{ marginBottom: "16px", display: "block" }}>
-                Export selected entities to Excel with custom columns. Data validation
-                will be added for Yes/No fields.
+              <Title2 className={styles.sectionTitle}>Export</Title2>
+              <Text style={{ marginBottom: "8px", display: "block", fontSize: tokens.fontSizeBase200 }}>
+                Export selected entities to Excel with custom columns and field type validation.
               </Text>
               <div className={styles.exportSection}>
                 <Button
