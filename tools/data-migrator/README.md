@@ -84,18 +84,29 @@ The build output will be in the `dist` directory.
 ## Usage in PPTB
 
 1. **Install the tool** in Power Platform ToolBox
-2. **Connect to your source environment**
-3. **Open the Data Migrator tool**
-4. **Select an entity** to migrate
-5. **Choose migration operation** (create, update, or upsert)
-6. **Select fields** to include in the migration
-7. **Configure lookup mappings**:
+2. **Connect to your source environment** (primary connection)
+3. **Select a secondary connection** as the target environment
+4. **Open the Data Migrator tool**
+5. The tool will display both connections:
+   - Source (Primary): Your source environment
+   - Target (Secondary): Your target environment
+6. **Select an entity** to migrate
+7. **Choose migration operation** (create, update, or upsert)
+8. **Select fields** to include in the migration
+9. **Configure lookup mappings**:
    - Click "Auto-Map System Entities" to automatically map users, teams, and business units
    - Review the auto-mapping results
-8. **Set advanced options** (optional):
-   - Add OData filter to select specific records
-   - Adjust batch size if needed
-9. **Start Migration** and monitor progress
+10. **Set advanced options** (optional):
+    - Add OData filter to select specific records
+    - Adjust batch size if needed
+11. **Start Migration** and monitor progress
+
+## Important Notes
+
+- **Secondary Connection Required**: This tool requires both a primary (source) and secondary (target) connection to be configured in PPTB
+- **Source Environment**: Data is read from the primary connection
+- **Target Environment**: Data is written to the secondary connection
+- **Auto-Mapping**: Users, teams, and business units are mapped between source and target environments
 
 ## Use Cases
 

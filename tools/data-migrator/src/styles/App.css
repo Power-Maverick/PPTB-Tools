@@ -104,6 +104,43 @@ body {
   font-size: 13px;
 }
 
+.connection-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background-color: var(--background-light);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-bottom: 24px;
+  font-size: 13px;
+}
+
+.connection-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.connection-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.connection-url {
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.connection-arrow {
+  font-size: 20px;
+  color: var(--primary-color);
+  font-weight: bold;
+}
+
 .panel h3 {
   margin: 24px 0 12px 0;
   font-size: 16px;

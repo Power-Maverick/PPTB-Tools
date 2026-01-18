@@ -21,8 +21,8 @@ export class MigrationEngine {
   private businessUnitMappings: Map<string, string> = new Map();
 
   constructor() {
-    this.sourceClient = new DataverseClient();
-    this.targetClient = new DataverseClient();
+    this.sourceClient = new DataverseClient("primary");
+    this.targetClient = new DataverseClient("secondary");
   }
 
   /**
@@ -260,7 +260,7 @@ export class MigrationEngine {
               case "upsert":
                 const upsertedId = await this.targetClient.upsertRecord(
                   config.entityLogicalName,
-                  { [primaryIdField]: recordId },
+                  recordId,
                   targetData
                 );
                 migrationRecord.targetId = upsertedId;

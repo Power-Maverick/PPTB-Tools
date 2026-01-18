@@ -38,8 +38,10 @@ function escapeODataString(value: string): string {
  * Client for interacting with Dataverse using PPTB API
  */
 export class DataverseClient {
-  constructor() {
-    // No credentials needed - using window.dataverseAPI
+  private connectionTarget: "primary" | "secondary";
+
+  constructor(connectionTarget: "primary" | "secondary" = "primary") {
+    this.connectionTarget = connectionTarget;
   }
 
   /**
@@ -47,7 +49,10 @@ export class DataverseClient {
    */
   async fetchAllEntities(): Promise<DataverseEntity[]> {
     try {
-      const entities = await window.dataverseAPI.getAllEntitiesMetadata(false);
+      const entities = await window.dataverseAPI.getAllEntitiesMetadata(
+        false,
+        this.connectionTarget
+      );
 
       return Promise.all(
         entities.map(async (entityMetadata: any) => {
@@ -81,7 +86,8 @@ export class DataverseClient {
       const entityMetadata = await window.dataverseAPI.getEntityMetadata(
         entityLogicalName,
         true,
-        ["Attributes"]
+        ["Attributes"],
+        this.connectionTarget
       );
 
       const attributes = entityMetadata.Attributes || [];
@@ -135,7 +141,10 @@ export class DataverseClient {
         query += `&$top=${top}`;
       }
 
-      const response = await window.dataverseAPI.queryData(query);
+      const response = await window.dataverseAPI.queryData(
+        query,
+        this.connectionTarget
+      );
       return response.value || [];
     } catch (error: any) {
       console.error(`Failed to query records from ${entityLogicalName}:`, error);
@@ -153,16 +162,13 @@ export class DataverseClient {
     recordData: any
   ): Promise<string> {
     try {
-      const entitySetName = await window.dataverseAPI.getEntitySetName(
-        entityLogicalName
+      const response = await window.dataverseAPI.create(
+        entityLogicalName,
+        recordData,
+        this.connectionTarget
       );
 
-      const response = await window.dataverseAPI.createData(
-        entitySetName,
-        recordData
-      );
-
-      // Extract ID from response header or body
+      // Extract ID from response
       return response.id || response;
     } catch (error: any) {
       console.error(`Failed to create record in ${entityLogicalName}:`, error);
@@ -179,13 +185,11 @@ export class DataverseClient {
     recordData: any
   ): Promise<void> {
     try {
-      const entitySetName = await window.dataverseAPI.getEntitySetName(
-        entityLogicalName
-      );
-
-      await window.dataverseAPI.updateData(
-        `${entitySetName}(${recordId})`,
-        recordData
+      await window.dataverseAPI.update(
+        entityLogicalName,
+        recordId,
+        recordData,
+        this.connectionTarget
       );
     } catch (error: any) {
       console.error(`Failed to update record in ${entityLogicalName}:`, error);
@@ -198,40 +202,49 @@ export class DataverseClient {
    */
   async upsertRecord(
     entityLogicalName: string,
-    alternateKey: { [key: string]: any },
+    recordId: string,
     recordData: any
   ): Promise<string> {
     try {
-      const entitySetName = await window.dataverseAPI.getEntitySetName(
-        entityLogicalName
-      );
-
-      // Build alternate key string with proper escaping
-      const keyString = Object.entries(alternateKey)
-        .map(([key, value]) => {
-          const escapedValue = typeof value === 'string' ? escapeODataString(value) : value;
-          return `${key}=${escapedValue}`;
-        })
-        .join(",");
-
-      await window.dataverseAPI.updateData(
-        `${entitySetName}(${keyString})`,
-        recordData
-      );
-
-      // Query to get the ID with proper escaping
-      const records = await this.queryRecords(
-        entityLogicalName,
-        [alternateKey[Object.keys(alternateKey)[0]]],
-        Object.entries(alternateKey)
-          .map(([key, value]) => {
-            const escapedValue = typeof value === 'string' ? escapeODataString(value) : value;
-            return `${key} eq '${escapedValue}'`;
-          })
-          .join(" and ")
-      );
-
-      return records[0]?.[alternateKey[Object.keys(alternateKey)[0]]] || "";
+      // Try to retrieve the record first to see if it exists
+      try {
+        await window.dataverseAPI.retrieve(
+          entityLogicalName,
+          recordId,
+          [],
+          this.connectionTarget
+        );
+        
+        // Record exists, update it
+        await window.dataverseAPI.update(
+          entityLogicalName,
+          recordId,
+          recordData,
+          this.connectionTarget
+        );
+        
+        return recordId;
+      } catch (retrieveError: any) {
+        // Record doesn't exist, create it
+        // Add the primary ID to the record data
+        const entityMetadata = await window.dataverseAPI.getEntityMetadata(
+          entityLogicalName,
+          true,
+          ["PrimaryIdAttribute"],
+          this.connectionTarget
+        );
+        
+        const primaryIdField = entityMetadata.PrimaryIdAttribute;
+        const recordWithId = { ...recordData, [primaryIdField]: recordId };
+        
+        const response = await window.dataverseAPI.create(
+          entityLogicalName,
+          recordWithId,
+          this.connectionTarget
+        );
+        
+        return response.id || recordId;
+      }
     } catch (error: any) {
       console.error(`Failed to upsert record in ${entityLogicalName}:`, error);
       throw new Error(`Failed to upsert record: ${error.message}`);

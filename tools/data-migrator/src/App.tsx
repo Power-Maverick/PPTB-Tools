@@ -21,6 +21,7 @@ import "./styles/App.css";
 function App() {
   const [isPPTB, setIsPPTB] = useState<boolean>(false);
   const [connectionUrl, setConnectionUrl] = useState<string>("");
+  const [secondaryConnectionUrl, setSecondaryConnectionUrl] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
@@ -63,13 +64,22 @@ function App() {
         setIsPPTB(true);
 
         try {
-          // Get active connection
+          // Get active (source) connection
           const activeConnection =
             await window.toolboxAPI.connections.getActiveConnection();
           setConnectionUrl(activeConnection?.url || "");
+          
+          // Get secondary (target) connection
+          const secondaryConnection =
+            await window.toolboxAPI.connections.getSecondaryConnection();
+          setSecondaryConnectionUrl(secondaryConnection?.url || "");
+          
+          if (!secondaryConnection) {
+            setError("Please select a secondary connection as the target environment");
+          }
         } catch (error) {
-          console.error("Failed to get connection:", error);
-          setError("Failed to get connection from PPTB");
+          console.error("Failed to get connections:", error);
+          setError("Failed to get connections from PPTB");
         }
 
         setLoading(false);
@@ -85,7 +95,7 @@ function App() {
 
   // Load entities when connection is available
   useEffect(() => {
-    if (connectionUrl) {
+    if (connectionUrl && secondaryConnectionUrl) {
       loadEntities();
     }
   }, [connectionUrl]);
@@ -218,6 +228,21 @@ function App() {
           <p className="subtitle">
             Migrate data between environments with auto-mapping
           </p>
+
+          {/* Connection Information */}
+          {connectionUrl && secondaryConnectionUrl && (
+            <div className="connection-info">
+              <div className="connection-item">
+                <span className="connection-label">Source (Primary):</span>
+                <span className="connection-url">{connectionUrl}</span>
+              </div>
+              <div className="connection-arrow">→</div>
+              <div className="connection-item">
+                <span className="connection-label">Target (Secondary):</span>
+                <span className="connection-url">{secondaryConnectionUrl}</span>
+              </div>
+            </div>
+          )}
 
           {/* Entity Selection */}
           <EntitySelector
