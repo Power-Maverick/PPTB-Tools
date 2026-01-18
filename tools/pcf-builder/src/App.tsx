@@ -1,705 +1,674 @@
-import { useEffect, useState } from "react";
-import { PCFControlConfig, PCFSolutionConfig, CommandResult } from "./models/interfaces";
+import { useEffect, useRef, useState } from "react";
+import { CommandOutput } from "./components/CommandOutput";
+import { ControlAction, ControlPanel } from "./components/ControlPanel";
+import { SolutionAction, SolutionPanel } from "./components/SolutionPanel";
+import { TabDefinition, TabSwitcher } from "./components/TabSwitcher";
+import { PCFControlConfig, PCFSolutionConfig } from "./models/interfaces";
+import "./styles.css";
 
-// Import PPTB types
 /// <reference types="@pptb/types" />
 
-type ViewMode = 'home' | 'new-control' | 'edit-control' | 'solution' | 'settings';
+type AppTab = "control" | "solution";
+
+type ActionSetter<T extends string> = React.Dispatch<React.SetStateAction<T | null>>;
+
+interface ExecuteOptions {
+    command: string;
+    pendingLabel?: string;
+    successMessage: string;
+    errorMessage: string;
+    showLoader?: boolean;
+    successType?: "success" | "info";
+}
+
+type FileSystemAPI = {
+    readFile?: (path: string, encoding?: string) => Promise<unknown>;
+    readTextFile?: (path: string, encoding?: string) => Promise<unknown>;
+    read?: (path: string, encoding?: string) => Promise<unknown>;
+    exists?: (path: string) => Promise<boolean>;
+};
+
+const textDecoder = typeof TextDecoder !== "undefined" ? new TextDecoder() : undefined;
+
+const joinFsPath = (root: string, fragment: string) => {
+    if (!root) {
+        return fragment;
+    }
+    if (!fragment) {
+        return root;
+    }
+    const separator = root.includes("\\") ? "\\" : "/";
+    const trimmedRoot = root.replace(/[\\/]+$/, "");
+    const trimmedFragment = fragment.replace(/^[\\/]+/, "");
+    return `${trimmedRoot}${separator}${trimmedFragment}`;
+};
+
+const cleanString = (value: unknown): string | undefined => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return String(value);
+    }
+    if (typeof value !== "string") {
+        return undefined;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const isNonEmptyValue = (value: unknown): boolean => {
+    if (value === undefined || value === null) {
+        return false;
+    }
+
+    if (typeof value === "string") {
+        return value.trim().length > 0;
+    }
+
+    if (Array.isArray(value)) {
+        return value.length > 0;
+    }
+
+    return true;
+};
+
+function applyDefined<T extends Record<string, any>>(base: T, updates: Partial<T>): T {
+    const next = { ...base };
+
+    (Object.entries(updates) as [keyof T, T[keyof T]][]).forEach(([key, value]) => {
+        if (!isNonEmptyValue(value)) {
+            return;
+        }
+
+        if (Array.isArray(value)) {
+            next[key] = [...value] as T[keyof T];
+            return;
+        }
+
+        next[key] = value;
+    });
+
+    return next;
+}
+
+const normalizeControlType = (value?: string | null): PCFControlConfig["controlType"] => {
+    if (typeof value !== "string") {
+        return "standard";
+    }
+    return value.toLowerCase() === "virtual" ? "virtual" : "standard";
+};
+
+const normalizeTemplate = (value?: string | null): PCFControlConfig["template"] => {
+    if (typeof value !== "string") {
+        return "field";
+    }
+    return value.toLowerCase() === "dataset" ? "dataset" : "field";
+};
+
+const decodeFileResult = (input: unknown): string | null => {
+    if (typeof input === "string") {
+        return input;
+    }
+
+    if (!textDecoder) {
+        return null;
+    }
+
+    if (input instanceof ArrayBuffer) {
+        return textDecoder.decode(new Uint8Array(input));
+    }
+
+    if (ArrayBuffer.isView(input)) {
+        const view = input as ArrayBufferView;
+        const buffer = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+        return textDecoder.decode(buffer);
+    }
+
+    if (Array.isArray(input)) {
+        const buffer = Uint8Array.from(input as number[]);
+        return textDecoder.decode(buffer);
+    }
+
+    if (input && typeof input === "object" && "data" in input && (input as { data: unknown }).data !== undefined) {
+        return decodeFileResult((input as { data: unknown }).data);
+    }
+
+    return null;
+};
+
+const readTextFile = async (fsApi: FileSystemAPI, filePath: string): Promise<string | null> => {
+    if (!filePath) {
+        return null;
+    }
+
+    const readers = [
+        typeof fsApi.readFile === "function" ? fsApi.readFile.bind(fsApi) : null,
+        typeof fsApi.readTextFile === "function" ? fsApi.readTextFile.bind(fsApi) : null,
+        typeof fsApi.read === "function" ? fsApi.read.bind(fsApi) : null,
+    ].filter(Boolean) as Array<(target: string, encoding?: string) => Promise<unknown>>;
+
+    const encodings: Array<string | undefined> = ["utf-8", "utf8", undefined];
+
+    for (const reader of readers) {
+        for (const encoding of encodings) {
+            try {
+                const result = await reader(filePath, encoding);
+                const decoded = decodeFileResult(result);
+                if (decoded !== null) {
+                    return decoded;
+                }
+            } catch (
+                // Continue trying other readers/encodings
+                _err
+            ) {
+                continue;
+            }
+        }
+    }
+
+    return null;
+};
+
+const extractControlUpdates = (config: Record<string, any>): Partial<PCFControlConfig> => {
+    const updates: Partial<PCFControlConfig> = {};
+    const control = typeof config.control === "object" && config.control !== null ? config.control : {};
+
+    const namespaceValue = cleanString(control.namespace) ?? cleanString(config.namespace);
+    if (namespaceValue) {
+        updates.namespace = namespaceValue;
+    }
+
+    const nameValue = cleanString(control.name) ?? cleanString(config.controlName);
+    if (nameValue) {
+        updates.name = nameValue;
+    }
+
+    const displayNameValue = cleanString(control.displayName);
+    if (displayNameValue) {
+        updates.displayName = displayNameValue;
+    }
+
+    const descriptionValue = cleanString(control.description);
+    if (descriptionValue) {
+        updates.description = descriptionValue;
+    }
+
+    const versionValue = cleanString(control.version) ?? cleanString(config.version);
+    if (versionValue) {
+        updates.version = versionValue;
+    }
+
+    updates.controlType = normalizeControlType(cleanString(control.controlType) ?? cleanString(config.controlType));
+
+    updates.template = normalizeTemplate(cleanString(config.template) ?? cleanString(config.controlTemplate) ?? cleanString(control.template) ?? cleanString(config.pcfProject?.template));
+
+    const packagesCandidate = Array.isArray(config.additionalPackages) ? config.additionalPackages : Array.isArray(control.additionalPackages) ? control.additionalPackages : undefined;
+
+    if (packagesCandidate && packagesCandidate.length > 0) {
+        const sanitized = packagesCandidate.map((pkg) => cleanString(pkg)).filter((pkg): pkg is string => Boolean(pkg));
+        if (sanitized.length > 0) {
+            updates.additionalPackages = sanitized;
+        }
+    }
+
+    return updates;
+};
+
+const extractSolutionUpdates = (config: Record<string, any>, fallbackVersion?: string): Partial<PCFSolutionConfig> | null => {
+    const updates: Partial<PCFSolutionConfig> = {};
+    const solution = typeof config.solution === "object" && config.solution !== null ? config.solution : undefined;
+    const publisher =
+        typeof solution?.publisher === "object" && solution.publisher !== null ? solution.publisher : typeof config.publisher === "object" && config.publisher !== null ? config.publisher : undefined;
+
+    const solutionName = cleanString(solution?.solutionName) ?? cleanString(solution?.name) ?? cleanString(config.solutionName);
+    if (solutionName) {
+        updates.solutionName = solutionName;
+    }
+
+    const publisherName = cleanString(solution?.publisherName) ?? cleanString(publisher?.name) ?? cleanString(config.publisherName);
+    if (publisherName) {
+        updates.publisherName = publisherName;
+    }
+
+    const publisherPrefix = cleanString(solution?.publisherPrefix) ?? cleanString(publisher?.prefix) ?? cleanString(config.publisherPrefix);
+    if (publisherPrefix) {
+        updates.publisherPrefix = publisherPrefix;
+    }
+
+    const friendlyName = cleanString(solution?.publisherFriendlyName) ?? cleanString(publisher?.friendlyName) ?? cleanString(publisher?.displayName) ?? cleanString(config.publisherFriendlyName);
+    if (friendlyName) {
+        updates.publisherFriendlyName = friendlyName;
+    }
+
+    const versionValue = cleanString(solution?.version) ?? cleanString(config.solutionVersion) ?? fallbackVersion ?? cleanString(config.version);
+    if (versionValue) {
+        updates.version = versionValue;
+    }
+
+    return Object.keys(updates).length > 0 ? updates : null;
+};
+
+const tabs: TabDefinition[] = [
+    {
+        id: "control",
+        label: "Control",
+        description: "Create, open, build, test, and deploy PCF",
+    },
+    {
+        id: "solution",
+        label: "Solution",
+        description: "Package controls inside solutions",
+    },
+];
+
+const DEFAULT_CONTROL_CONFIG: PCFControlConfig = {
+    namespace: "",
+    name: "",
+    displayName: "",
+    description: "",
+    controlType: "standard",
+    template: "field",
+    version: "1.0.0",
+    additionalPackages: [],
+};
+
+const DEFAULT_SOLUTION_CONFIG: PCFSolutionConfig = {
+    solutionName: "",
+    publisherName: "",
+    publisherPrefix: "",
+    publisherFriendlyName: "",
+    version: "1.0.0",
+};
 
 function App() {
-    const [viewMode, setViewMode] = useState<ViewMode>('home');
-    const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string>("");
-    const [isPPTB, setIsPPTB] = useState<boolean>(false);
-    const [connectionUrl, setConnectionUrl] = useState<string>("");
-    const [projectPath, setProjectPath] = useState<string>("");
-    const [terminalId, setTerminalId] = useState<string | null>(null);
-    
-    // Control configuration state
-    const [controlConfig, setControlConfig] = useState<PCFControlConfig>({
-        namespace: '',
-        name: '',
-        displayName: '',
-        description: '',
-        controlType: 'standard',
-        template: 'field',
-        version: '1.0.0',
-        additionalPackages: []
-    });
-    
-    // Solution configuration state
-    const [solutionConfig, setSolutionConfig] = useState<PCFSolutionConfig>({
-        solutionName: '',
-        publisherName: '',
-        publisherPrefix: '',
-        publisherFriendlyName: '',
-        version: '1.0.0'
-    });
-    
-    // Output state
-    const [commandOutput, setCommandOutput] = useState<string>("");
+    const [activeTab, setActiveTab] = useState<AppTab>("control");
+    const [initializing, setInitializing] = useState(true);
+    const [error, setError] = useState("");
+    const [projectPath, setProjectPath] = useState("");
+    const [commandOutput, setCommandOutput] = useState("");
+    const [controlConfig, setControlConfig] = useState<PCFControlConfig>(DEFAULT_CONTROL_CONFIG);
+    const [solutionConfig, setSolutionConfig] = useState<PCFSolutionConfig>(DEFAULT_SOLUTION_CONFIG);
+    const [packageList, setPackageList] = useState("");
+    const [controlAction, setControlAction] = useState<ControlAction | null>(null);
+    const [solutionAction, setSolutionAction] = useState<SolutionAction | null>(null);
 
-    // Initialize PPTB environment
+    const terminalIdRef = useRef<string | null>(null);
+
     useEffect(() => {
-        const initializeEnvironment = async () => {
-            if (window.toolboxAPI) {
-                setIsPPTB(true);
-                
-                try {
-                    // Create a terminal for executing commands
-                    const terminal = await window.toolboxAPI.terminal.create({
-                        name: 'PCF Builder Terminal',
-                        visible: false
-                    });
-                    setTerminalId(terminal.id);
-                    
-                    const activeConnection = await window.toolboxAPI.connections.getActiveConnection();
-                    setConnectionUrl(activeConnection?.url || "");
-                    
-                    await window.toolboxAPI.utils.showNotification({
-                        title: "PCF Builder",
-                        body: "PCF Builder loaded successfully",
-                        type: "success"
-                    });
-                } catch (error) {
-                    console.error('Failed to initialize:', error);
-                    setError('Failed to initialize PCF Builder');
-                }
-                
-                setLoading(false);
-            } else {
-                setError('Not running in PPTB environment. This tool only works with Power Platform ToolBox.');
-                setLoading(false);
+        const initialize = async () => {
+            if (!window.toolboxAPI) {
+                setError("Power Platform ToolBox context not detected. Launch this tool inside PPTB.");
+                setInitializing(false);
+                return;
+            }
+
+            try {
+                const terminal = await window.toolboxAPI.terminal.create({
+                    name: "PCF Builder",
+                    visible: false,
+                });
+                terminalIdRef.current = terminal.id;
+            } catch (err) {
+                const message = err instanceof Error ? err.message : "Failed to initialize terminal";
+                setError(message);
+            } finally {
+                setInitializing(false);
             }
         };
 
-        initializeEnvironment();
-        
-        // Cleanup terminal on unmount
+        initialize();
+
         return () => {
+            const terminalId = terminalIdRef.current;
             if (terminalId && window.toolboxAPI) {
-                window.toolboxAPI.terminal.close(terminalId).catch(console.error);
+                window.toolboxAPI.terminal.close(terminalId).catch(() => undefined);
             }
         };
     }, []);
 
-    // Handler for creating new control
-    const handleCreateControl = async () => {
-        if (!window.toolboxAPI || !terminalId) return;
-        
-        if (!projectPath) {
-            await window.toolboxAPI.utils.showNotification({
-                title: "Error",
-                body: "Please enter a project path first",
-                type: "error"
-            });
-            return;
+    const ensureProjectPath = async () => {
+        if (projectPath) {
+            return true;
         }
-        
-        setLoading(true);
-        setCommandOutput("");
-        
-        try {
-            await window.toolboxAPI.utils.showLoading("Creating PCF control...");
-            
-            // Build pac pcf init command
-            const additionalPackages = controlConfig.additionalPackages?.join(' ') || '';
-            const command = `cd "${projectPath}" && pac pcf init --namespace ${controlConfig.namespace} --name ${controlConfig.name} --template ${controlConfig.template}${additionalPackages ? ' --npm-packages ' + additionalPackages : ''}`;
-            
-            const result = await window.toolboxAPI.terminal.execute(terminalId, command);
-            
-            await window.toolboxAPI.utils.hideLoading();
-            
-            if (result.exitCode === 0) {
-                setCommandOutput(result.output || '');
-                await window.toolboxAPI.utils.showNotification({
-                    title: "Success",
-                    body: "PCF control created successfully",
-                    type: "success"
-                });
-            } else {
-                setCommandOutput(result.error || result.output || 'Command failed');
-                await window.toolboxAPI.utils.showNotification({
-                    title: "Error",
-                    body: "Failed to create PCF control",
-                    type: "error"
-                });
-            }
-        } catch (error) {
-            await window.toolboxAPI.utils.hideLoading();
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            setError(errorMsg);
-            await window.toolboxAPI.utils.showNotification({
-                title: "Error",
-                body: errorMsg,
-                type: "error"
-            });
-        } finally {
-            setLoading(false);
-        }
+
+        await window.toolboxAPI?.utils.showNotification({
+            title: "Select a workspace",
+            body: "Choose a project folder before running this action.",
+            type: "warning",
+        });
+        return false;
     };
 
-    // Handler for building project
-    const handleBuildProject = async () => {
-        if (!window.toolboxAPI || !terminalId || !projectPath) {
+    const executeTerminalCommand = async <T extends string>(actionId: T, setAction: ActionSetter<T>, options: ExecuteOptions) => {
+        if (!window.toolboxAPI || !terminalIdRef.current) {
+            setError("ToolBox API is not available in this context.");
+            return;
+        }
+
+        setError("");
+        setCommandOutput("");
+        setAction(actionId);
+
+        const { showLoader = true } = options;
+
+        try {
+            if (showLoader) {
+                await window.toolboxAPI.utils.showLoading(options.pendingLabel ?? "Working...");
+            }
+
+            const result = await window.toolboxAPI.terminal.execute(terminalIdRef.current, options.command);
+
+            const output = result.output || result.error || "";
+            setCommandOutput(output);
+
+            if (showLoader) {
+                await window.toolboxAPI.utils.hideLoading().catch(() => undefined);
+            }
+
+            const exitCode = typeof result.exitCode === "number" ? result.exitCode : 0;
+            const isSuccess = exitCode === 0 && !result.error;
+
+            await window.toolboxAPI.utils.showNotification({
+                title: isSuccess ? "Success" : "Error",
+                body: isSuccess ? options.successMessage : options.errorMessage,
+                type: isSuccess ? (options.successType ?? "success") : "error",
+            });
+        } catch (err) {
+            if (showLoader) {
+                await window.toolboxAPI?.utils.hideLoading().catch(() => undefined);
+            }
+
+            const message = err instanceof Error ? err.message : String(err);
+            setCommandOutput(message);
+            setError(message);
             await window.toolboxAPI?.utils.showNotification({
                 title: "Error",
-                body: "Please enter a project path first",
-                type: "error"
+                body: message,
+                type: "error",
             });
-            return;
-        }
-        
-        setLoading(true);
-        setCommandOutput("");
-        
-        try {
-            await window.toolboxAPI.utils.showLoading("Building project...");
-            const command = `cd "${projectPath}" && npm run build`;
-            const result = await window.toolboxAPI.terminal.execute(terminalId, command);
-            
-            await window.toolboxAPI.utils.hideLoading();
-            
-            if (result.exitCode === 0) {
-                setCommandOutput(result.output || '');
-                await window.toolboxAPI.utils.showNotification({
-                    title: "Success",
-                    body: "Project built successfully",
-                    type: "success"
-                });
-            } else {
-                setCommandOutput(result.error || result.output || 'Build failed');
-                await window.toolboxAPI.utils.showNotification({
-                    title: "Error",
-                    body: "Build failed",
-                    type: "error"
-                });
-            }
-        } catch (error) {
-            await window.toolboxAPI.utils.hideLoading();
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            setError(errorMsg);
         } finally {
-            setLoading(false);
+            setAction(null);
         }
     };
 
-    // Handler for testing project
-    const handleTestProject = async () => {
-        if (!window.toolboxAPI || !terminalId || !projectPath) {
-            await window.toolboxAPI?.utils.showNotification({
-                title: "Error",
-                body: "Please enter a project path first",
-                type: "error"
-            });
-            return;
+    const handlePackageListChange = (value: string) => {
+        setPackageList(value);
+        const packages = value
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+        setControlConfig((prev) => ({ ...prev, additionalPackages: packages }));
+    };
+
+    const hydrateProjectFromFolder = async (workspace: string, options?: { silent?: boolean }) => {
+        if (!workspace || !window.toolboxAPI) {
+            return false;
         }
-        
-        setLoading(true);
-        setCommandOutput("");
-        
+
+        const fsApi = (window.toolboxAPI as ToolBoxAPI.API & { fileSystem?: FileSystemAPI }).fileSystem;
+
+        if (!fsApi) {
+            if (!options?.silent) {
+                await window.toolboxAPI.utils.showNotification({
+                    title: "File reader unavailable",
+                    body: "Update PPTB to a version that exposes the fileSystem API to load project metadata automatically.",
+                    type: "warning",
+                });
+            }
+            return false;
+        }
+
+        const configPath = joinFsPath(workspace, "pcfconfig.json");
+        const rawConfig = await readTextFile(fsApi, configPath);
+
+        if (!rawConfig) {
+            if (!options?.silent) {
+                await window.toolboxAPI.utils.showNotification({
+                    title: "No PCF project detected",
+                    body: "pcfconfig.json was not found in the selected folder.",
+                    type: "warning",
+                });
+            }
+            return false;
+        }
+
+        let parsedConfig: Record<string, any>;
         try {
-            const command = `cd "${projectPath}" && npm start`;
-            const result = await window.toolboxAPI.terminal.execute(terminalId, command);
-            
-            setCommandOutput(result.output || '');
+            parsedConfig = JSON.parse(rawConfig);
+        } catch (err) {
+            if (!options?.silent) {
+                await window.toolboxAPI.utils.showNotification({
+                    title: "Invalid pcfconfig.json",
+                    body: err instanceof Error ? err.message : "Unable to parse pcfconfig.json from the selected folder.",
+                    type: "error",
+                });
+            }
+            return false;
+        }
+
+        const controlUpdates = extractControlUpdates(parsedConfig);
+        const nextControl = applyDefined({ ...DEFAULT_CONTROL_CONFIG }, controlUpdates);
+        setControlConfig(nextControl);
+        setPackageList(controlUpdates.additionalPackages?.length ? controlUpdates.additionalPackages.join(", ") : "");
+
+        const solutionUpdates = extractSolutionUpdates(parsedConfig, nextControl.version);
+        const nextSolution = solutionUpdates ? applyDefined({ ...DEFAULT_SOLUTION_CONFIG }, solutionUpdates) : { ...DEFAULT_SOLUTION_CONFIG };
+        setSolutionConfig(nextSolution);
+
+        if (!options?.silent) {
             await window.toolboxAPI.utils.showNotification({
-                title: "Info",
-                body: "Test harness launched. Check the terminal output.",
-                type: "info"
-            });
-        } catch (error) {
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            setError(errorMsg);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Handler for creating solution
-    const handleCreateSolution = async () => {
-        if (!window.toolboxAPI || !terminalId || !projectPath) {
-            await window.toolboxAPI?.utils.showNotification({
-                title: "Error",
-                body: "Please enter a project path first",
-                type: "error"
-            });
-            return;
-        }
-        
-        setLoading(true);
-        setCommandOutput("");
-        
-        try {
-            await window.toolboxAPI.utils.showLoading("Creating solution...");
-            const command = `cd "${projectPath}" && pac solution init --publisher-name ${solutionConfig.publisherName} --publisher-prefix ${solutionConfig.publisherPrefix}`;
-            const result = await window.toolboxAPI.terminal.execute(terminalId, command);
-            
-            if (result.exitCode === 0) {
-                setCommandOutput(result.output || '');
-                
-                // Add PCF reference to solution
-                const addCommand = `cd "${projectPath}" && pac solution add-reference --path .`;
-                const addResult = await window.toolboxAPI.terminal.execute(terminalId, addCommand);
-                
-                setCommandOutput(prev => prev + '\n\n' + (addResult.output || ''));
-                
-                await window.toolboxAPI.utils.hideLoading();
-                await window.toolboxAPI.utils.showNotification({
-                    title: "Success",
-                    body: "Solution created successfully",
-                    type: "success"
-                });
-            } else {
-                await window.toolboxAPI.utils.hideLoading();
-                setCommandOutput(result.error || result.output || 'Solution creation failed');
-                await window.toolboxAPI.utils.showNotification({
-                    title: "Error",
-                    body: "Failed to create solution",
-                    type: "error"
-                });
-            }
-        } catch (error) {
-            await window.toolboxAPI.utils.hideLoading();
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            setError(errorMsg);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Handler for setting project path
-    const handleSetProjectPath = (path: string) => {
-        setProjectPath(path);
-        if (path) {
-            window.toolboxAPI?.utils.showNotification({
-                title: "Info",
-                body: `Project path set to: ${path}`,
-                type: "info"
+                title: "PCF project detected",
+                body: "Fields were populated from the selected folder.",
+                type: "success",
             });
         }
+
+        return true;
     };
 
-    // Handler for selecting folder using selectPath API
     const handleSelectFolder = async () => {
-        if (!window.toolboxAPI) return;
-        
+        if (!window.toolboxAPI) {
+            return;
+        }
+
         try {
-            const selectedPath = await window.toolboxAPI.utils.selectPath({
-                type: 'folder',
-                title: 'Select PCF Project Folder',
-                message: 'Choose a folder for your PCF project',
-                buttonLabel: 'Select Folder'
+            const selected = await window.toolboxAPI.utils.selectPath({
+                type: "folder",
+                title: "Select PCF workspace",
+                message: "Choose a folder that hosts your PCF solution",
+                buttonLabel: "Use folder",
             });
-            
-            if (selectedPath) {
-                setProjectPath(selectedPath);
+
+            if (selected) {
+                setProjectPath(selected);
                 await window.toolboxAPI.utils.showNotification({
-                    title: "Success",
-                    body: `Project path set to: ${selectedPath}`,
-                    type: "success"
+                    title: "Workspace updated",
+                    body: selected,
+                    type: "info",
                 });
+                await hydrateProjectFromFolder(selected);
             }
-        } catch (error) {
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            console.error('Failed to select folder:', error);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
             await window.toolboxAPI.utils.showNotification({
-                title: "Error",
-                body: `Failed to select folder: ${errorMsg}`,
-                type: "error"
+                title: "Folder selection failed",
+                body: message,
+                type: "error",
             });
         }
     };
 
-    if (loading && !isPPTB) {
-        return (
-            <div className="container">
-                <div className="content">
-                    <div className="loading">Loading...</div>
-                </div>
-            </div>
-        );
-    }
+    const handleControlAction = async (action: ControlAction) => {
+        switch (action) {
+            case "create": {
+                const canRun = await ensureProjectPath();
+                if (!canRun || !controlConfig.namespace || !controlConfig.name) {
+                    return;
+                }
 
-    if (error) {
+                const packages = controlConfig.additionalPackages ?? [];
+                const packageArg = packages.length > 0 ? ` --npm-packages ${packages.join(" ")}` : "";
+                const command = `cd "${projectPath}" && pac pcf init --namespace ${controlConfig.namespace}` + ` --name ${controlConfig.name} --template ${controlConfig.template}${packageArg}`;
+
+                return executeTerminalCommand(action, setControlAction, {
+                    command,
+                    pendingLabel: "Creating control...",
+                    successMessage: "Control scaffolded successfully.",
+                    errorMessage: "Failed to scaffold control.",
+                });
+            }
+            case "open-vscode": {
+                const canRun = await ensureProjectPath();
+                if (!canRun) {
+                    return;
+                }
+                const command = `cd "${projectPath}" && code "${projectPath}"`;
+                return executeTerminalCommand(action, setControlAction, {
+                    command,
+                    successMessage: "VS Code launched (check your desktop).",
+                    errorMessage: "Unable to open VS Code.",
+                    showLoader: false,
+                    successType: "info",
+                });
+            }
+            case "build": {
+                const canRun = await ensureProjectPath();
+                if (!canRun) {
+                    return;
+                }
+                const command = `cd "${projectPath}" && npm run build`;
+                return executeTerminalCommand(action, setControlAction, {
+                    command,
+                    pendingLabel: "Building control...",
+                    successMessage: "Build completed successfully.",
+                    errorMessage: "Build failed.",
+                });
+            }
+            case "test": {
+                const canRun = await ensureProjectPath();
+                if (!canRun) {
+                    return;
+                }
+                const command = `cd "${projectPath}" && npm start`;
+                return executeTerminalCommand(action, setControlAction, {
+                    command,
+                    successMessage: "Test harness started (see terminal pane).",
+                    errorMessage: "Failed to start test harness.",
+                    showLoader: false,
+                    successType: "info",
+                });
+            }
+            case "quick-deploy": {
+                const canRun = await ensureProjectPath();
+                if (!canRun) {
+                    return;
+                }
+                const command = `cd "${projectPath}" && npm run build && pac pcf push --publish`;
+                return executeTerminalCommand(action, setControlAction, {
+                    command,
+                    pendingLabel: "Deploying control...",
+                    successMessage: "Control pushed to the target environment.",
+                    errorMessage: "Quick deploy failed.",
+                });
+            }
+            default:
+                return;
+        }
+    };
+
+    const handleSolutionAction = async (action: SolutionAction) => {
+        switch (action) {
+            case "create": {
+                const canRun = await ensureProjectPath();
+                if (!canRun || !solutionConfig.publisherName || !solutionConfig.publisherPrefix) {
+                    return;
+                }
+
+                const nameArg = solutionConfig.solutionName ? ` --solution-name ${solutionConfig.solutionName}` : "";
+                const command = `cd "${projectPath}" && pac solution init --publisher-name ${solutionConfig.publisherName}` + ` --publisher-prefix ${solutionConfig.publisherPrefix}${nameArg}`;
+
+                return executeTerminalCommand(action, setSolutionAction, {
+                    command,
+                    pendingLabel: "Creating solution...",
+                    successMessage: "Solution initialized successfully.",
+                    errorMessage: "Solution creation failed.",
+                });
+            }
+            case "add-control": {
+                const canRun = await ensureProjectPath();
+                if (!canRun) {
+                    return;
+                }
+                const command = `cd "${projectPath}" && pac solution add-reference --path .`;
+                return executeTerminalCommand(action, setSolutionAction, {
+                    command,
+                    pendingLabel: "Adding control to solution...",
+                    successMessage: "Control referenced inside the solution.",
+                    errorMessage: "Failed to add control reference.",
+                });
+            }
+            case "deploy": {
+                const canRun = await ensureProjectPath();
+                if (!canRun || !solutionConfig.solutionName) {
+                    return;
+                }
+                const zipPath = `./bin/Debug/${solutionConfig.solutionName}.zip`;
+                const command = `cd "${projectPath}" && pac solution import --path "${zipPath}" --publish-changes --force-overwrite`;
+                return executeTerminalCommand(action, setSolutionAction, {
+                    command,
+                    pendingLabel: "Deploying solution...",
+                    successMessage: "Solution import started. Monitor the terminal for details.",
+                    errorMessage: "Solution deployment failed.",
+                });
+            }
+            default:
+                return;
+        }
+    };
+
+    if (initializing) {
         return (
-            <div className="container">
-                <div className="content">
-                    <div className="error">{error}</div>
+            <div className="app-root">
+                <div className="app-shell">
+                    <div className="loading-state">Preparing PCF Builder...</div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="container">
-            {/* Navigation Tabs */}
-            <div className="tabs">
-                <button 
-                    className={`tab ${viewMode === 'home' ? 'active' : ''}`}
-                    onClick={() => setViewMode('home')}
-                >
-                    Home
-                </button>
-                <button 
-                    className={`tab ${viewMode === 'new-control' ? 'active' : ''}`}
-                    onClick={() => setViewMode('new-control')}
-                >
-                    New Control
-                </button>
-                <button 
-                    className={`tab ${viewMode === 'edit-control' ? 'active' : ''}`}
-                    onClick={() => setViewMode('edit-control')}
-                >
-                    Edit Control
-                </button>
-                <button 
-                    className={`tab ${viewMode === 'solution' ? 'active' : ''}`}
-                    onClick={() => setViewMode('solution')}
-                >
-                    Solution
-                </button>
-            </div>
+        <div className="app-root">
+            <div className="app-shell">
+                {error && <div className="status-banner">{error}</div>}
 
-            <div className="content">
+                <TabSwitcher tabs={tabs} activeTab={activeTab} onTabChange={(tabId) => setActiveTab(tabId as AppTab)} />
 
-                {/* Home View */}
-                {viewMode === 'home' && (
-                    <div className="form-section">
-                        <h2>PCF Builder</h2>
-                        <p style={{ marginBottom: '16px', color: '#605e5c', fontSize: '0.875rem' }}>
-                            Build and manage Power Apps Component Framework (PCF) custom controls.
-                        </p>
+                <div className="panel-area">
+                    {activeTab === "control" ? (
+                        <ControlPanel
+                            projectPath={projectPath}
+                            controlConfig={controlConfig}
+                            packageList={packageList}
+                            activeAction={controlAction}
+                            onControlChange={(update) => setControlConfig((prev) => ({ ...prev, ...update }))}
+                            onProjectPathChange={setProjectPath}
+                            onPackageListChange={handlePackageListChange}
+                            onSelectFolder={handleSelectFolder}
+                            onAction={handleControlAction}
+                        />
+                    ) : (
+                        <SolutionPanel
+                            projectPath={projectPath}
+                            solutionConfig={solutionConfig}
+                            activeAction={solutionAction}
+                            onSolutionChange={(update) => setSolutionConfig((prev) => ({ ...prev, ...update }))}
+                            onProjectPathChange={setProjectPath}
+                            onSelectFolder={handleSelectFolder}
+                            onAction={handleSolutionAction}
+                        />
+                    )}
 
-                        <div className="form-group">
-                            <label htmlFor="projectPath">Project Path</label>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <input
-                                    type="text"
-                                    id="projectPath"
-                                    value={projectPath}
-                                    onChange={(e) => handleSetProjectPath(e.target.value)}
-                                    placeholder="e.g., C:\Projects\MyPCFControl"
-                                    style={{ flex: 1 }}
-                                />
-                                <button 
-                                    className="btn btn-secondary" 
-                                    onClick={handleSelectFolder}
-                                    style={{ minWidth: '80px' }}
-                                >
-                                    Browse...
-                                </button>
-                            </div>
-                            <small style={{ color: '#605e5c', marginTop: '4px', display: 'block', fontSize: '0.75rem' }}>
-                                Full path to create or manage your PCF project
-                            </small>
-                        </div>
-
-                        <div className="button-group">
-                            <button className="btn btn-primary" onClick={() => setViewMode('new-control')}>
-                                Create New Control
-                            </button>
-                            <button className="btn btn-secondary" onClick={() => setViewMode('edit-control')}>
-                                Edit Control
-                            </button>
-                            <button className="btn btn-secondary" onClick={() => setViewMode('solution')}>
-                                Create Solution
-                            </button>
-                        </div>
-                        
-                        {projectPath && (
-                            <div className="success-message">
-                                <strong>Current Project Path:</strong> {projectPath}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* New Control View */}
-                {viewMode === 'new-control' && (
-                    <div className="form-section">
-                        <h2>Create New PCF Control</h2>
-                        
-                        <div className="form-group">
-                            <label htmlFor="newProjectPath">Project Path *</label>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <input
-                                    type="text"
-                                    id="newProjectPath"
-                                    value={projectPath}
-                                    onChange={(e) => handleSetProjectPath(e.target.value)}
-                                    placeholder="e.g., C:\Projects\MyPCFControl"
-                                    style={{ flex: 1 }}
-                                />
-                                <button 
-                                    className="btn btn-secondary" 
-                                    onClick={handleSelectFolder}
-                                    style={{ minWidth: '80px' }}
-                                >
-                                    Browse...
-                                </button>
-                            </div>
-                            <small style={{ color: '#605e5c', marginTop: '4px', display: 'block', fontSize: '0.75rem' }}>
-                                Full path to create the PCF project
-                            </small>
-                        </div>
-                        
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label htmlFor="namespace">Namespace *</label>
-                                <input
-                                    type="text"
-                                    id="namespace"
-                                    value={controlConfig.namespace}
-                                    onChange={(e) => setControlConfig({ ...controlConfig, namespace: e.target.value })}
-                                    placeholder="e.g., Contoso"
-                                />
-                            </div>
-                            
-                            <div className="form-group">
-                                <label htmlFor="name">Control Name *</label>
-                                <input
-                                    type="text"
-                                    id="name"
-                                    value={controlConfig.name}
-                                    onChange={(e) => setControlConfig({ ...controlConfig, name: e.target.value })}
-                                    placeholder="e.g., MyCustomControl"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="displayName">Display Name</label>
-                            <input
-                                type="text"
-                                id="displayName"
-                                value={controlConfig.displayName}
-                                onChange={(e) => setControlConfig({ ...controlConfig, displayName: e.target.value })}
-                                placeholder="User-friendly name"
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="description">Description</label>
-                            <textarea
-                                id="description"
-                                value={controlConfig.description}
-                                onChange={(e) => setControlConfig({ ...controlConfig, description: e.target.value })}
-                                placeholder="Brief description of the control"
-                            />
-                        </div>
-
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label htmlFor="controlType">Control Type</label>
-                                <select
-                                    id="controlType"
-                                    value={controlConfig.controlType}
-                                    onChange={(e) => setControlConfig({ ...controlConfig, controlType: e.target.value as 'standard' | 'virtual' })}
-                                >
-                                    <option value="standard">Standard</option>
-                                    <option value="virtual">Virtual</option>
-                                </select>
-                            </div>
-
-                            <div className="form-group">
-                                <label htmlFor="template">Template</label>
-                                <select
-                                    id="template"
-                                    value={controlConfig.template}
-                                    onChange={(e) => setControlConfig({ ...controlConfig, template: e.target.value as 'field' | 'dataset' })}
-                                >
-                                    <option value="field">Field (Single field control)</option>
-                                    <option value="dataset">Dataset (Grid control)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="additionalPackages">Additional Packages (comma-separated)</label>
-                            <input
-                                type="text"
-                                id="additionalPackages"
-                                placeholder="e.g., @fluentui/react, react, react-dom"
-                                onChange={(e) => {
-                                    const packages = e.target.value.split(',').map(p => p.trim()).filter(p => p);
-                                    setControlConfig({ ...controlConfig, additionalPackages: packages });
-                                }}
-                            />
-                        </div>
-
-                        <div className="button-group">
-                            <button 
-                                className="btn btn-primary" 
-                                onClick={handleCreateControl}
-                                disabled={!controlConfig.namespace || !controlConfig.name || !projectPath || loading}
-                            >
-                                {loading ? 'Creating...' : 'Create Control'}
-                            </button>
-                        </div>
-
-                        {commandOutput && (
-                            <div className="output-section">
-                                <h3>Command Output</h3>
-                                <pre>{commandOutput}</pre>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Edit Control View */}
-                {viewMode === 'edit-control' && (
-                    <div className="form-section">
-                        <h2>Edit PCF Control</h2>
-                        
-                        <div className="form-group">
-                            <label htmlFor="editProjectPath">Project Path *</label>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <input
-                                    type="text"
-                                    id="editProjectPath"
-                                    value={projectPath}
-                                    onChange={(e) => handleSetProjectPath(e.target.value)}
-                                    placeholder="e.g., C:\Projects\MyPCFControl"
-                                    style={{ flex: 1 }}
-                                />
-                                <button 
-                                    className="btn btn-secondary" 
-                                    onClick={handleSelectFolder}
-                                    style={{ minWidth: '80px' }}
-                                >
-                                    Browse...
-                                </button>
-                            </div>
-                            <small style={{ color: '#605e5c', marginTop: '4px', display: 'block', fontSize: '0.75rem' }}>
-                                Full path to your existing PCF project
-                            </small>
-                        </div>
-                        
-                        {projectPath ? (
-                            <>
-                                <div className="info-box">
-                                    <strong>Project Location:</strong> {projectPath}
-                                </div>
-
-                                <div className="button-group">
-                                    <button className="btn btn-primary" onClick={handleBuildProject} disabled={loading}>
-                                        {loading ? 'Building...' : 'Build Project'}
-                                    </button>
-                                    <button className="btn btn-success" onClick={handleTestProject} disabled={loading}>
-                                        {loading ? 'Starting...' : 'Test Project'}
-                                    </button>
-                                </div>
-
-                                {commandOutput && (
-                                    <div className="output-section">
-                                        <h3>Command Output</h3>
-                                        <pre>{commandOutput}</pre>
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            <div className="info-box">
-                                <p>Please enter the path to your existing PCF control project folder.</p>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Solution View */}
-                {viewMode === 'solution' && (
-                    <div className="form-section">
-                        <h2>Create Solution Package</h2>
-                        
-                        <div className="form-group">
-                            <label htmlFor="solutionProjectPath">Project Path *</label>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <input
-                                    type="text"
-                                    id="solutionProjectPath"
-                                    value={projectPath}
-                                    onChange={(e) => handleSetProjectPath(e.target.value)}
-                                    placeholder="e.g., C:\Projects\MyPCFControl"
-                                    style={{ flex: 1 }}
-                                />
-                                <button 
-                                    className="btn btn-secondary" 
-                                    onClick={handleSelectFolder}
-                                    style={{ minWidth: '80px' }}
-                                >
-                                    Browse...
-                                </button>
-                            </div>
-                            <small style={{ color: '#605e5c', marginTop: '4px', display: 'block', fontSize: '0.75rem' }}>
-                                Full path to your PCF project
-                            </small>
-                        </div>
-                        
-                        {!projectPath ? (
-                            <div className="info-box">
-                                <p>Please enter the path to your PCF control project first.</p>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="info-box">
-                                    <strong>Project Location:</strong> {projectPath}
-                                </div>
-
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        <label htmlFor="publisherName">Publisher Name *</label>
-                                        <input
-                                            type="text"
-                                            id="publisherName"
-                                            value={solutionConfig.publisherName}
-                                            onChange={(e) => setSolutionConfig({ ...solutionConfig, publisherName: e.target.value })}
-                                            placeholder="e.g., Contoso"
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label htmlFor="publisherPrefix">Publisher Prefix *</label>
-                                        <input
-                                            type="text"
-                                            id="publisherPrefix"
-                                            value={solutionConfig.publisherPrefix}
-                                            onChange={(e) => setSolutionConfig({ ...solutionConfig, publisherPrefix: e.target.value })}
-                                            placeholder="e.g., con"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="form-group">
-                                    <label htmlFor="publisherFriendlyName">Publisher Friendly Name</label>
-                                    <input
-                                        type="text"
-                                        id="publisherFriendlyName"
-                                        value={solutionConfig.publisherFriendlyName}
-                                        onChange={(e) => setSolutionConfig({ ...solutionConfig, publisherFriendlyName: e.target.value })}
-                                        placeholder="e.g., Contoso Corporation"
-                                    />
-                                </div>
-
-                                <div className="button-group">
-                                    <button 
-                                        className="btn btn-primary" 
-                                        onClick={handleCreateSolution}
-                                        disabled={!solutionConfig.publisherName || !solutionConfig.publisherPrefix || loading}
-                                    >
-                                        {loading ? 'Creating...' : 'Create Solution'}
-                                    </button>
-                                </div>
-
-                                {commandOutput && (
-                                    <div className="output-section">
-                                        <h3>Command Output</h3>
-                                        <pre>{commandOutput}</pre>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
-                )}
+                    <CommandOutput output={commandOutput} />
+                </div>
             </div>
         </div>
     );

@@ -1,0 +1,67 @@
+.panel {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: var(--shadow-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+
+.header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.pathBadge {
+  align-self: flex-start;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--color-primary);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.helperText {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  margin-top: 6px;
+}
+
+.helperText code {
+  background: rgba(15, 23, 42, 0.06);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 720px) {
+  .panel {
+    padding: 22px;
+  }
+}
