@@ -206,9 +206,12 @@ export class DataverseClient {
         entityLogicalName
       );
 
-      // Build alternate key string
+      // Build alternate key string with proper escaping
       const keyString = Object.entries(alternateKey)
-        .map(([key, value]) => `${key}=${value}`)
+        .map(([key, value]) => {
+          const escapedValue = typeof value === 'string' ? escapeODataString(value) : value;
+          return `${key}=${escapedValue}`;
+        })
         .join(",");
 
       await window.dataverseAPI.updateData(
@@ -216,12 +219,15 @@ export class DataverseClient {
         recordData
       );
 
-      // Query to get the ID
+      // Query to get the ID with proper escaping
       const records = await this.queryRecords(
         entityLogicalName,
         [alternateKey[Object.keys(alternateKey)[0]]],
         Object.entries(alternateKey)
-          .map(([key, value]) => `${key} eq '${value}'`)
+          .map(([key, value]) => {
+            const escapedValue = typeof value === 'string' ? escapeODataString(value) : value;
+            return `${key} eq '${escapedValue}'`;
+          })
           .join(" and ")
       );
 

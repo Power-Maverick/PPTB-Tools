@@ -174,6 +174,11 @@ export class MigrationEngine {
         false,
         ["PrimaryIdAttribute"]
       );
+      
+      if (!entityMetadata || !entityMetadata.PrimaryIdAttribute) {
+        throw new Error(`Unable to get primary ID attribute for entity ${config.entityLogicalName}`);
+      }
+      
       const primaryIdField = entityMetadata.PrimaryIdAttribute;
 
       if (!selectFields.includes(primaryIdField)) {
