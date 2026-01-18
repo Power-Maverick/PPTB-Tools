@@ -1,6 +1,6 @@
 # Entity Field Catalog
 
-Export entity and field metadata from Dataverse solutions to Excel or CSV format.
+Export entity and field metadata from Dataverse solutions to Excel format.
 
 ## Overview
 
@@ -8,19 +8,19 @@ The Entity Field Catalog is a React-based tool designed exclusively for Power Pl
 
 - Select a Dataverse solution
 - Choose multiple entities from that solution
-- Export comprehensive entity and field metadata to Excel (.xlsx) or CSV (.csv) formats
+- Export comprehensive entity and field metadata to Excel (.xlsx) formats
 
 ## Features
 
 - **Modern Fluent UI Design**: Built with Microsoft's Fluent UI React components for a consistent, professional look
 - **Multi-Entity Selection**: Select one or multiple entities to export at once
 - **Comprehensive Metadata Export**: Exports entity and field information including:
-  - Entity logical name, display name, schema name, and description
-  - Field logical name, display name, schema name, type, and description
-  - Field properties: isPrimaryId, isPrimaryName, isRequired
+    - Entity logical name, display name, schema name, and description
+    - Field logical name, display name, schema name, type, and description
+    - Field properties: isPrimaryId, isPrimaryName, isRequired
 - **Multiple Export Formats**:
-  - Excel (.xlsx) - Entities tab plus one tab per entity
-  - CSV (.zip) - Entities summary CSV plus one CSV per entity, packaged together
+    - Excel (.xlsx) - Entities tab plus one tab per entity
+    - CSV (.zip) - Entities summary CSV plus one CSV per entity, packaged together
 - **PPTB Integration**: Full integration with Power Platform ToolBox API for seamless connectivity
 
 ## Technical Stack
