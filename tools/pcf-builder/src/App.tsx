@@ -96,6 +96,7 @@ function App() {
     const [controlConfig, setControlConfig] = useState<PCFControlConfig>(DEFAULT_CONTROL_CONFIG);
     const [solutionConfig, setSolutionConfig] = useState<PCFSolutionConfig>(DEFAULT_SOLUTION_CONFIG);
     const [solutionFieldsLocked, setSolutionFieldsLocked] = useState(false);
+    const [solutionProjectCreated, setSolutionProjectCreated] = useState(false);
     const [isControlInSolution, setIsControlInSolution] = useState(false);
     const [packageList, setPackageList] = useState("");
     const [controlAction, setControlAction] = useState<ControlAction | null>(null);
@@ -121,11 +122,14 @@ function App() {
         return terminal.id;
     }, []);
 
-    const requestTextInput = useCallback((options: PromptRequestOptions) => {
-        return new Promise<string | null>((resolve) => {
-            setPromptState({ ...options, resolve });
-        });
-    }, [setPromptState]);
+    const requestTextInput = useCallback(
+        (options: PromptRequestOptions) => {
+            return new Promise<string | null>((resolve) => {
+                setPromptState({ ...options, resolve });
+            });
+        },
+        [setPromptState],
+    );
 
     useEffect(() => {
         console.info("[PCF Builder] controlConfig state updated", controlConfig);
@@ -172,10 +176,10 @@ function App() {
         return false;
     };
 
-    const executeTerminalCommand = async <T extends string>(actionId: T, setAction: ActionSetter<T>, options: ExecuteOptions) => {
+    const executeTerminalCommand = async <T extends string>(actionId: T, setAction: ActionSetter<T>, options: ExecuteOptions): Promise<{ success: boolean; output: string }> => {
         if (!window.toolboxAPI || !terminalIdRef.current) {
             setError("ToolBox API is not available in this context.");
-            return false;
+            return { success: false, output: "" };
         }
 
         setError("");
@@ -184,6 +188,7 @@ function App() {
 
         const { showLoader = true } = options;
         let didSucceed = false;
+        let outputText = "";
 
         try {
             if (showLoader) {
@@ -193,6 +198,7 @@ function App() {
             const result = await window.toolboxAPI.terminal.execute(terminalIdRef.current, options.command);
 
             const output = result.output || result.error || "";
+            outputText = output;
             const wasAborted = abortedActionRef.current === actionId;
             if (!wasAborted) {
                 setCommandOutput(output);
@@ -208,7 +214,7 @@ function App() {
 
             if (wasAborted) {
                 abortedActionRef.current = null;
-                return false;
+                return { success: false, output: outputText };
             }
 
             await window.toolboxAPI.utils.showNotification({
@@ -222,6 +228,7 @@ function App() {
             }
             const wasAborted = abortedActionRef.current === actionId;
             const message = err instanceof Error ? err.message : String(err);
+            outputText = message;
 
             if (!wasAborted) {
                 setCommandOutput(message);
@@ -239,7 +246,7 @@ function App() {
             setAction(null);
         }
 
-        return didSucceed;
+        return { success: didSucceed, output: outputText };
     };
 
     const stopActiveTerminalCommand = async () => {
@@ -432,6 +439,7 @@ function App() {
         setSolutionConfig(nextSolution);
         const metadataPopulated = Boolean(solutionProjectDetails.metadata && Object.keys(solutionProjectDetails.metadata).length > 0);
         setSolutionFieldsLocked(metadataPopulated);
+        setSolutionProjectCreated(metadataPopulated);
         setIsControlInSolution(Boolean(solutionProjectDetails.controlReferenced));
 
         if (!options?.silent) {
@@ -537,13 +545,13 @@ function App() {
                 const packageArg = packages.length > 0 ? ` --npm-packages ${packages.join(" ")}` : "";
                 const command = `cd "${projectPath}" && pac pcf init --namespace ${controlConfig.namespace}` + ` --name ${controlConfig.name} --template ${controlConfig.template}${packageArg}`;
 
-                const succeeded = await executeTerminalCommand<ControlAction>(action, setControlAction, {
+                const { success } = await executeTerminalCommand<ControlAction>(action, setControlAction, {
                     command,
                     pendingLabel: "Creating control...",
                     successMessage: "Control scaffolded successfully.",
                     errorMessage: "Failed to scaffold control.",
                 });
-                if (succeeded) {
+                if (success) {
                     setHasExistingProject(true);
                     await hydrateProjectFromFolder(projectPath, { silent: true }).catch((err) => {
                         console.error("[PCF Builder] Post-create hydration failed", err);
@@ -604,14 +612,14 @@ function App() {
                 }
                 const command = `cd "${projectPath}" && npm start`;
                 setIsTestRunning(true);
-                const succeeded = await executeTerminalCommand<ControlAction>(action, setControlAction, {
+                const { success: testStarted } = await executeTerminalCommand<ControlAction>(action, setControlAction, {
                     command,
                     successMessage: "Test harness started (see terminal pane).",
                     errorMessage: "Failed to start test harness.",
                     showLoader: false,
                     successType: "info",
                 });
-                if (!succeeded) {
+                if (!testStarted) {
                     setIsTestRunning(false);
                 }
                 return;
@@ -683,15 +691,60 @@ function App() {
                     return;
                 }
 
-                const nameArg = solutionConfig.solutionName ? ` --solution-name ${solutionConfig.solutionName}` : "";
-                const command = `cd "${projectPath}" && pac solution init --publisher-name ${solutionConfig.publisherName}` + ` --publisher-prefix ${solutionConfig.publisherPrefix}${nameArg}`;
+                const controlName = controlConfig.name?.trim();
+                if (!controlName) {
+                    await window.toolboxAPI?.utils.showNotification({
+                        title: "Control name required",
+                        body: "Enter a control name before creating a solution so folders can be scaffolded correctly.",
+                        type: "warning",
+                    });
+                    return;
+                }
 
-                await executeTerminalCommand<SolutionAction>(action, setSolutionAction, {
+                const fsApi = getFileSystem();
+                if (!fsApi || typeof fsApi.createDirectory !== "function") {
+                    await window.toolboxAPI?.utils.showNotification({
+                        title: "File system unavailable",
+                        body: "Update PPTB to v1.0.17+ to scaffold solution folders automatically.",
+                        type: "error",
+                    });
+                    return;
+                }
+
+                const solutionRoot = joinFsPath(projectPath, "Solution");
+                const solutionFolderName = `${controlName}Solution`;
+                const solutionFolderPath = joinFsPath(solutionRoot, solutionFolderName);
+
+                try {
+                    await fsApi.createDirectory(solutionFolderPath);
+                } catch (err) {
+                    await window.toolboxAPI?.utils.showNotification({
+                        title: "Unable to prepare solution folder",
+                        body: err instanceof Error ? err.message : "An unexpected filesystem error occurred while creating the solution directory.",
+                        type: "error",
+                    });
+                    return;
+                }
+
+                const command = `cd "${solutionFolderPath}" && pac solution init --publisher-name "${solutionConfig.publisherName}"` + ` --publisher-prefix "${solutionConfig.publisherPrefix}"`;
+
+                const { success, output } = await executeTerminalCommand<SolutionAction>(action, setSolutionAction, {
                     command,
                     pendingLabel: "Creating solution...",
                     successMessage: "Solution initialized successfully.",
                     errorMessage: "Solution creation failed.",
                 });
+                if (success) {
+                    const outputMatch = output.match(/Dataverse solution project with name '([^']+)' created successfully/i);
+                    const detectedSolutionName = outputMatch?.[1] ?? solutionFolderName;
+                    if (outputMatch) {
+                        setSolutionProjectCreated(true);
+                    }
+                    setSolutionConfig((prev) => ({ ...prev, solutionName: detectedSolutionName }));
+                    await hydrateProjectFromFolder(projectPath, { silent: true }).catch((err) => {
+                        console.error("[PCF Builder] Post-solution hydration failed", err);
+                    });
+                }
                 return;
             }
             case "add-control": {
@@ -699,7 +752,40 @@ function App() {
                 if (!canRun) {
                     return;
                 }
-                const command = `cd "${projectPath}" && pac solution add-reference --path .`;
+                const solutionFolderName = solutionConfig.solutionName?.trim() || (controlConfig.name?.trim() ? `${controlConfig.name.trim()}Solution` : "");
+                if (!solutionFolderName) {
+                    await window.toolboxAPI?.utils.showNotification({
+                        title: "Solution folder required",
+                        body: "Create a solution first so the Add Control command knows where the .cdsproj lives.",
+                        type: "warning",
+                    });
+                    return;
+                }
+
+                const solutionFolderPath = joinFsPath(joinFsPath(projectPath, "Solution"), solutionFolderName);
+                const fsApi = getFileSystem();
+                if (fsApi && typeof fsApi.exists === "function") {
+                    try {
+                        const exists = await fsApi.exists(solutionFolderPath);
+                        if (!exists) {
+                            await window.toolboxAPI?.utils.showNotification({
+                                title: "Solution folder not found",
+                                body: `Expected ${solutionFolderPath}, but it does not exist. Create the solution before adding the control.`,
+                                type: "error",
+                            });
+                            return;
+                        }
+                    } catch (err) {
+                        await window.toolboxAPI?.utils.showNotification({
+                            title: "Unable to validate solution folder",
+                            body: err instanceof Error ? err.message : "An unexpected filesystem error occurred while verifying the solution directory.",
+                            type: "error",
+                        });
+                        return;
+                    }
+                }
+
+                const command = `cd "${solutionFolderPath}" && pac solution add-reference --path "${projectPath}"`;
                 await executeTerminalCommand<SolutionAction>(action, setSolutionAction, {
                     command,
                     pendingLabel: "Adding control to solution...",
@@ -769,6 +855,7 @@ function App() {
                                 activeAction={solutionAction}
                                 fieldsLocked={solutionFieldsLocked}
                                 isControlReferenced={isControlInSolution}
+                                solutionProjectCreated={solutionProjectCreated}
                                 onSolutionChange={(update) => setSolutionConfig((prev) => ({ ...prev, ...update }))}
                                 onAction={handleSolutionAction}
                             />

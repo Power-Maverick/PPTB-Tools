@@ -11,16 +11,7 @@ interface InputModalProps {
     onCancel: () => void;
 }
 
-export function InputModal({
-    title,
-    message,
-    initialValue,
-    placeholder,
-    confirmLabel = "OK",
-    cancelLabel = "Cancel",
-    onSubmit,
-    onCancel,
-}: InputModalProps) {
+export function InputModal({ title, message, initialValue, placeholder, confirmLabel = "OK", cancelLabel = "Cancel", onSubmit, onCancel }: InputModalProps) {
     const [value, setValue] = useState(initialValue ?? "");
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -42,13 +33,7 @@ export function InputModal({
                     {message && <p>{message}</p>}
                 </header>
                 <form onSubmit={handleSubmit} className="modal-body">
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        value={value}
-                        placeholder={placeholder}
-                        onChange={(event) => setValue(event.target.value)}
-                    />
+                    <input ref={inputRef} type="text" value={value} placeholder={placeholder} onChange={(event) => setValue(event.target.value)} />
                     <div className="modal-actions">
                         <button type="button" className="btn btn-ghost" onClick={onCancel}>
                             {cancelLabel}

@@ -9,13 +9,14 @@ interface SolutionPanelProps {
     activeAction: SolutionAction | null;
     fieldsLocked: boolean;
     isControlReferenced: boolean;
+    solutionProjectCreated: boolean;
     onSolutionChange: (update: Partial<PCFSolutionConfig>) => void;
     onAction: (action: SolutionAction) => void | Promise<void>;
 }
 
-export function SolutionPanel({ projectPath, solutionConfig, activeAction, fieldsLocked, isControlReferenced, onSolutionChange, onAction }: SolutionPanelProps) {
+export function SolutionPanel({ projectPath, solutionConfig, activeAction, fieldsLocked, isControlReferenced, solutionProjectCreated, onSolutionChange, onAction }: SolutionPanelProps) {
     const hasPath = Boolean(projectPath);
-    const canCreate = hasPath && solutionConfig.publisherFriendlyName && solutionConfig.publisherPrefix;
+    const canCreate = hasPath && solutionConfig.publisherFriendlyName && solutionConfig.publisherPrefix && !solutionProjectCreated;
     const canDeploy = hasPath && solutionConfig.solutionName;
     const canAddControl = hasPath && !isControlReferenced;
     const panelClassName = fieldsLocked ? `${styles.panel} ${styles.panelReadOnly}` : styles.panel;
@@ -52,31 +53,6 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, field
 
             <div className={styles.grid}>
                 <div>
-                    <label htmlFor="solutionName">Solution Name *</label>
-                    <input
-                        id="solutionName"
-                        type="text"
-                        value={solutionConfig.solutionName}
-                        placeholder="ContosoTimeline"
-                        readOnly={fieldsLocked}
-                        onChange={(event) => onSolutionChange({ solutionName: event.target.value })}
-                    />
-                </div>
-                <div>
-                    <label htmlFor="solutionVersion">Version</label>
-                    <input
-                        id="solutionVersion"
-                        type="text"
-                        value={solutionConfig.version}
-                        placeholder="1.0.0"
-                        readOnly={fieldsLocked}
-                        onChange={(event) => onSolutionChange({ version: event.target.value })}
-                    />
-                </div>
-            </div>
-
-            <div className={styles.grid}>
-                <div>
                     <label htmlFor="publisherFriendlyName">Publisher Friendly Name *</label>
                     <input
                         id="publisherFriendlyName"
@@ -102,6 +78,20 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, field
                         placeholder="con"
                         readOnly={fieldsLocked}
                         onChange={(event) => onSolutionChange({ publisherPrefix: event.target.value })}
+                    />
+                </div>
+            </div>
+
+            <div className={styles.grid}>
+                <div>
+                    <label htmlFor="solutionVersion">Version</label>
+                    <input
+                        id="solutionVersion"
+                        type="text"
+                        value={solutionConfig.version}
+                        placeholder="1.0.0"
+                        readOnly={fieldsLocked}
+                        onChange={(event) => onSolutionChange({ version: event.target.value })}
                     />
                 </div>
             </div>
