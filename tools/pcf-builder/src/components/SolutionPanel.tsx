@@ -84,7 +84,13 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, field
                         value={solutionConfig.publisherFriendlyName}
                         placeholder="Contoso"
                         readOnly={fieldsLocked}
-                        onChange={(event) => onSolutionChange({ publisherFriendlyName: event.target.value })}
+                        onChange={(event) => {
+                            const value = event.target.value;
+                            onSolutionChange({
+                                publisherFriendlyName: value,
+                                publisherName: value,
+                            });
+                        }}
                     />
                 </div>
                 <div>

@@ -699,31 +699,36 @@ function App() {
                 <TabSwitcher tabs={tabs} activeTab={activeTab} workspacePath={projectPath} onTabChange={(tabId) => setActiveTab(tabId as AppTab)} />
 
                 <div className="panel-area">
-                    {activeTab === "control" ? (
-                        <ControlPanel
-                            projectPath={projectPath}
-                            controlConfig={controlConfig}
-                            packageList={packageList}
-                            activeAction={controlAction}
-                            hasExistingProject={hasExistingProject}
-                            isTestRunning={isTestRunning}
-                            onControlChange={(update) => setControlConfig((prev) => ({ ...prev, ...update }))}
-                            onProjectPathChange={setProjectPath}
-                            onPackageListChange={handlePackageListChange}
-                            onSelectFolder={handleSelectFolder}
-                            onAction={handleControlAction}
-                        />
-                    ) : (
-                        <SolutionPanel
-                            projectPath={projectPath}
-                            solutionConfig={solutionConfig}
-                            activeAction={solutionAction}
-                            fieldsLocked={solutionFieldsLocked}
-                            isControlReferenced={isControlInSolution}
-                            onSolutionChange={(update) => setSolutionConfig((prev) => ({ ...prev, ...update }))}
-                            onAction={handleSolutionAction}
-                        />
-                    )}
+                    <div className={`panel-carousel panel-carousel--${activeTab}`}>
+                        <div className="panel-carousel__track">
+                            <div className="panel-slide panel-slide--control" aria-hidden={activeTab !== "control"}>
+                                <ControlPanel
+                                    projectPath={projectPath}
+                                    controlConfig={controlConfig}
+                                    packageList={packageList}
+                                    activeAction={controlAction}
+                                    hasExistingProject={hasExistingProject}
+                                    isTestRunning={isTestRunning}
+                                    onControlChange={(update) => setControlConfig((prev) => ({ ...prev, ...update }))}
+                                    onProjectPathChange={setProjectPath}
+                                    onPackageListChange={handlePackageListChange}
+                                    onSelectFolder={handleSelectFolder}
+                                    onAction={handleControlAction}
+                                />
+                            </div>
+                            <div className="panel-slide panel-slide--solution" aria-hidden={activeTab !== "solution"}>
+                                <SolutionPanel
+                                    projectPath={projectPath}
+                                    solutionConfig={solutionConfig}
+                                    activeAction={solutionAction}
+                                    fieldsLocked={solutionFieldsLocked}
+                                    isControlReferenced={isControlInSolution}
+                                    onSolutionChange={(update) => setSolutionConfig((prev) => ({ ...prev, ...update }))}
+                                    onAction={handleSolutionAction}
+                                />
+                            </div>
+                        </div>
+                    </div>
 
                     <CommandOutput output={commandOutput} />
                 </div>
