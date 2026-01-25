@@ -15,7 +15,7 @@ interface SolutionPanelProps {
 
 export function SolutionPanel({ projectPath, solutionConfig, activeAction, fieldsLocked, isControlReferenced, onSolutionChange, onAction }: SolutionPanelProps) {
     const hasPath = Boolean(projectPath);
-    const canCreate = hasPath && solutionConfig.publisherName && solutionConfig.publisherPrefix;
+    const canCreate = hasPath && solutionConfig.publisherFriendlyName && solutionConfig.publisherPrefix;
     const canDeploy = hasPath && solutionConfig.solutionName;
     const canAddControl = hasPath && !isControlReferenced;
     const panelClassName = fieldsLocked ? `${styles.panel} ${styles.panelReadOnly}` : styles.panel;
@@ -77,14 +77,14 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, field
 
             <div className={styles.grid}>
                 <div>
-                    <label htmlFor="publisherName">Publisher Name *</label>
+                    <label htmlFor="publisherFriendlyName">Publisher Friendly Name *</label>
                     <input
-                        id="publisherName"
+                        id="publisherFriendlyName"
                         type="text"
-                        value={solutionConfig.publisherName}
+                        value={solutionConfig.publisherFriendlyName}
                         placeholder="Contoso"
                         readOnly={fieldsLocked}
-                        onChange={(event) => onSolutionChange({ publisherName: event.target.value })}
+                        onChange={(event) => onSolutionChange({ publisherFriendlyName: event.target.value })}
                     />
                 </div>
                 <div>
@@ -98,18 +98,6 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, field
                         onChange={(event) => onSolutionChange({ publisherPrefix: event.target.value })}
                     />
                 </div>
-            </div>
-
-            <div>
-                <label htmlFor="publisherFriendlyName">Publisher Friendly Name</label>
-                <input
-                    id="publisherFriendlyName"
-                    type="text"
-                    value={solutionConfig.publisherFriendlyName}
-                    placeholder="Contoso Corporation"
-                    readOnly={fieldsLocked}
-                    onChange={(event) => onSolutionChange({ publisherFriendlyName: event.target.value })}
-                />
             </div>
 
             <p className={styles.helperText}>
