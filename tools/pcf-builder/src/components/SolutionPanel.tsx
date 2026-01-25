@@ -1,7 +1,7 @@
 import { PCFSolutionConfig } from "../models/interfaces";
 import styles from "./SolutionPanel.module.css";
 
-export type SolutionAction = "create" | "add-control" | "deploy";
+export type SolutionAction = "create" | "add-control" | "deploy" | "build-solution";
 
 interface SolutionPanelProps {
     projectPath: string;
@@ -19,6 +19,7 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, field
     const canCreate = hasPath && solutionConfig.publisherFriendlyName && solutionConfig.publisherPrefix && !solutionProjectCreated;
     const canDeploy = hasPath && solutionConfig.solutionName;
     const canAddControl = hasPath && !isControlReferenced;
+    const canBuildSolution = hasPath && solutionProjectCreated;
     const panelClassName = fieldsLocked ? `${styles.panel} ${styles.panelReadOnly}` : styles.panel;
     const workspaceSummary = hasPath ? "Solution commands reuse the workspace selected on the Control tab." : "Select a workspace from the Control tab to enable solution commands.";
 
@@ -34,6 +35,12 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, field
             label: activeAction === "add-control" ? "Adding..." : "Add Control",
             className: "btn btn-ghost",
             disabled: !canAddControl,
+        },
+        {
+            id: "build-solution" as SolutionAction,
+            label: activeAction === "build-solution" ? "Building..." : "Build Solution",
+            className: "btn btn-ghost",
+            disabled: !canBuildSolution,
         },
         {
             id: "deploy" as SolutionAction,

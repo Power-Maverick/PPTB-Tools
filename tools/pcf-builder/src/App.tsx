@@ -786,11 +786,65 @@ function App() {
                 }
 
                 const command = `cd "${solutionFolderPath}" && pac solution add-reference --path "${projectPath}"`;
-                await executeTerminalCommand<SolutionAction>(action, setSolutionAction, {
+                const { success, output } = await executeTerminalCommand<SolutionAction>(action, setSolutionAction, {
                     command,
                     pendingLabel: "Adding control to solution...",
                     successMessage: "Control referenced inside the solution.",
                     errorMessage: "Failed to add control reference.",
+                });
+                if (success) {
+                    if (/Project reference successfully added to Dataverse solution project/i.test(output)) {
+                        setIsControlInSolution(true);
+                    }
+                    await hydrateProjectFromFolder(projectPath, { silent: true }).catch((err) => {
+                        console.error("[PCF Builder] Post-add-control hydration failed", err);
+                    });
+                }
+                return;
+            }
+            case "build-solution": {
+                const canRun = await ensureProjectPath();
+                if (!canRun) {
+                    return;
+                }
+                const solutionFolderName = solutionConfig.solutionName?.trim() || (controlConfig.name?.trim() ? `${controlConfig.name.trim()}Solution` : "");
+                if (!solutionFolderName) {
+                    await window.toolboxAPI?.utils.showNotification({
+                        title: "Solution folder required",
+                        body: "Create a solution before running dotnet build on the .cdsproj.",
+                        type: "warning",
+                    });
+                    return;
+                }
+                const solutionFolderPath = joinFsPath(joinFsPath(projectPath, "Solution"), solutionFolderName);
+                const fsApi = getFileSystem();
+                if (fsApi && typeof fsApi.exists === "function") {
+                    try {
+                        const exists = await fsApi.exists(solutionFolderPath);
+                        if (!exists) {
+                            await window.toolboxAPI?.utils.showNotification({
+                                title: "Solution folder not found",
+                                body: `Expected ${solutionFolderPath}, but it does not exist. Create the solution before building it.`,
+                                type: "error",
+                            });
+                            return;
+                        }
+                    } catch (err) {
+                        await window.toolboxAPI?.utils.showNotification({
+                            title: "Unable to validate solution folder",
+                            body: err instanceof Error ? err.message : "An unexpected filesystem error occurred while verifying the solution directory.",
+                            type: "error",
+                        });
+                        return;
+                    }
+                }
+
+                const command = `cd "${solutionFolderPath}" && dotnet build`;
+                await executeTerminalCommand<SolutionAction>(action, setSolutionAction, {
+                    command,
+                    pendingLabel: "Building solution...",
+                    successMessage: "Solution project built successfully.",
+                    errorMessage: "Solution build failed.",
                 });
                 return;
             }
