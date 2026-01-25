@@ -35,6 +35,7 @@ export function ControlPanel({
     const canCreate = hasPath && controlConfig.namespace && controlConfig.name && !hasExistingProject;
     const canRunExistingActions = hasPath && hasExistingProject;
     const fieldsReadOnly = hasExistingProject;
+    const incrementVersionOnBuild = Boolean(controlConfig.incrementVersionOnBuild);
 
     const actionButtons: Array<{
         id: ControlAction;
@@ -85,11 +86,7 @@ export function ControlPanel({
     return (
         <section className={panelClassName}>
             <header className={styles.header}>
-                <div>
-                    <p className={styles.kicker}>Control</p>
-                    <h2>Create, test, and ship your PCF controls from a single workspace.</h2>
-                </div>
-                {projectPath && <span className={styles.pathBadge}>{projectPath}</span>}
+                <p className={styles.kicker}>Control</p>
             </header>
 
             <div className={styles.section}>
@@ -103,8 +100,8 @@ export function ControlPanel({
                 />
             </div>
 
-            <div className={styles.grid}>
-                <div>
+            <div className={styles.controlGrid}>
+                <div className={`${styles.cell} ${styles.span4}`}>
                     <label htmlFor="namespace">Namespace *</label>
                     <input
                         id="namespace"
@@ -115,7 +112,7 @@ export function ControlPanel({
                         onChange={(event) => onControlChange({ namespace: event.target.value })}
                     />
                 </div>
-                <div>
+                <div className={`${styles.cell} ${styles.span4}`}>
                     <label htmlFor="name">Control Name *</label>
                     <input
                         id="name"
@@ -126,7 +123,7 @@ export function ControlPanel({
                         onChange={(event) => onControlChange({ name: event.target.value })}
                     />
                 </div>
-                <div>
+                <div className={`${styles.cell} ${styles.span4}`}>
                     <label htmlFor="displayName">Display Name</label>
                     <input
                         id="displayName"
@@ -137,21 +134,19 @@ export function ControlPanel({
                         onChange={(event) => onControlChange({ displayName: event.target.value })}
                     />
                 </div>
-                <div>
-                    <label htmlFor="version">Version</label>
-                    <input
-                        id="version"
-                        type="text"
-                        value={controlConfig.version}
-                        placeholder="1.0.0"
+
+                <div className={`${styles.cell} ${styles.fullRow}`}>
+                    <label htmlFor="description">Description</label>
+                    <textarea
+                        id="description"
+                        value={controlConfig.description}
+                        placeholder="Explain what this control unlocks for makers."
                         readOnly={fieldsReadOnly}
-                        onChange={(event) => onControlChange({ version: event.target.value })}
+                        onChange={(event) => onControlChange({ description: event.target.value })}
                     />
                 </div>
-            </div>
 
-            <div className={styles.grid}>
-                <div>
+                <div className={`${styles.cell} ${styles.span4}`}>
                     <label htmlFor="controlType">Control Type</label>
                     <select
                         id="controlType"
@@ -167,7 +162,7 @@ export function ControlPanel({
                         <option value="virtual">Virtual</option>
                     </select>
                 </div>
-                <div>
+                <div className={`${styles.cell} ${styles.span4}`}>
                     <label htmlFor="template">Template</label>
                     <select
                         id="template"
@@ -183,32 +178,48 @@ export function ControlPanel({
                         <option value="dataset">Dataset</option>
                     </select>
                 </div>
-            </div>
+                <div className={`${styles.cell} ${styles.span4}`}>
+                    <label htmlFor="version">Version</label>
+                    <input
+                        id="version"
+                        type="text"
+                        value={controlConfig.version}
+                        placeholder="1.0.0"
+                        readOnly={fieldsReadOnly}
+                        onChange={(event) => onControlChange({ version: event.target.value })}
+                    />
+                </div>
 
-            <div>
-                <label htmlFor="description">Description</label>
-                <textarea
-                    id="description"
-                    value={controlConfig.description}
-                    placeholder="Explain what this control unlocks for makers."
-                    readOnly={fieldsReadOnly}
-                    onChange={(event) => onControlChange({ description: event.target.value })}
-                />
-            </div>
-
-            <div>
-                <label htmlFor="packages">Additional Packages (comma separated)</label>
-                <input
-                    id="packages"
-                    type="text"
-                    value={packageList}
-                    placeholder="@fluentui/react-components, dayjs"
-                    readOnly={fieldsReadOnly}
-                    onChange={(event) => onPackageListChange(event.target.value)}
-                />
-                <p className={styles.helperText}>
-                    Packages are added via <code>--npm-packages</code> during control init.
-                </p>
+                <div className={`${styles.cell} ${styles.span8}`}>
+                    <label htmlFor="packages">Additional Packages (comma separated)</label>
+                    <input
+                        id="packages"
+                        type="text"
+                        value={packageList}
+                        placeholder="@fluentui/react-components, dayjs"
+                        readOnly={fieldsReadOnly}
+                        onChange={(event) => onPackageListChange(event.target.value)}
+                    />
+                    <p className={styles.helperText}>
+                        Packages are added via <code>--npm-packages</code> during control init.
+                    </p>
+                </div>
+                <div className={`${styles.cell} ${styles.span4}`}>
+                    <label className={styles.toggleLabel} htmlFor="incrementVersion">
+                        Increment Version on Build
+                    </label>
+                    <div className={styles.toggleRow}>
+                        <input
+                            id="incrementVersion"
+                            type="checkbox"
+                            checked={incrementVersionOnBuild}
+                            disabled={fieldsReadOnly}
+                            onChange={(event) => onControlChange({ incrementVersionOnBuild: event.target.checked })}
+                            className={styles.checkbox}
+                        />
+                        <span>Auto bump package version after each build.</span>
+                    </div>
+                </div>
             </div>
 
             <div className="button-grid">

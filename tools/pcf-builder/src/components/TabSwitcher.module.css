@@ -1,3 +1,12 @@
+.tabShell {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 12px;
+    justify-content: space-between;
+}
+
 .tabStrip {
     display: flex;
     flex-wrap: wrap;
@@ -8,6 +17,7 @@
     background: rgba(255, 255, 255, 0.82);
     border: 1px solid rgba(15, 23, 42, 0.08);
     box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+    /* flex: 1 1 420px; */
 }
 
 .tabButton {
@@ -45,4 +55,44 @@
 .tabDescription {
     font-size: 0.72rem;
     color: var(--color-muted);
+}
+
+.workspaceBadge {
+    /* flex: 0 0 260px; */
+    flex: 1 1;
+    min-height: 60px;
+    border-radius: var(--radius-lg);
+    border: 1px dashed rgba(15, 23, 42, 0.14);
+    background: rgba(15, 23, 42, 0.02);
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.85rem;
+    overflow: hidden;
+}
+
+.workspaceBadge span {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+    color: var(--color-muted);
+}
+
+.workspaceBadge strong {
+    font-size: 0.85rem;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 720px) {
+    .tabStrip {
+        flex: 1 1 100%;
+    }
+
+    .workspaceBadge {
+        flex: 1 1 100%;
+    }
 }

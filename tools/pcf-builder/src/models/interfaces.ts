@@ -4,10 +4,11 @@ export interface PCFControlConfig {
     name: string;
     displayName: string;
     description: string;
-    controlType: 'standard' | 'virtual';
-    template: 'field' | 'dataset';
+    controlType: "standard" | "virtual";
+    template: "field" | "dataset";
     version: string;
     additionalPackages?: string[];
+    incrementVersionOnBuild?: boolean;
 }
 
 // PCF Solution Configuration
@@ -27,14 +28,14 @@ export interface PCFControlProperty {
     typeGroup?: string;
     defaultValue?: string;
     description?: string;
-    usage: 'bound' | 'input' | 'output';
+    usage: "bound" | "input" | "output";
     required: boolean;
 }
 
 // PCF Resource
 export interface PCFResource {
     path: string;
-    type: 'css' | 'resx' | 'img';
+    type: "css" | "resx" | "img";
 }
 
 // PCF Features

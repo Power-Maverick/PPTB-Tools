@@ -45,17 +45,10 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, field
     return (
         <section className={panelClassName}>
             <header className={styles.header}>
-                <div>
-                    <p className={styles.kicker}>Solution</p>
-                    <h2>Package and ship your controls as managed or unmanaged solutions.</h2>
-                </div>
-                {projectPath && <span className={styles.pathBadge}>{projectPath}</span>}
+                <p className={styles.kicker}>Solution</p>
             </header>
 
-            <div className={`${styles.workspaceBanner} ${hasPath ? styles.workspaceBannerReady : styles.workspaceBannerIdle}`}>
-                <strong>Workspace</strong>
-                <span>{workspaceSummary}</span>
-            </div>
+            <p className={styles.workspaceSummary}>{workspaceSummary}</p>
 
             <div className={styles.grid}>
                 <div>

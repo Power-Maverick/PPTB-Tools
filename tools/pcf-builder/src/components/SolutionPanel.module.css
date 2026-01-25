@@ -21,6 +21,18 @@
     outline: none;
 }
 
+.panelReadOnly select:disabled {
+    background: rgba(15, 23, 42, 0.04);
+    border-color: rgba(15, 23, 42, 0.12);
+    color: var(--color-muted);
+    cursor: not-allowed;
+}
+
+.panelReadOnly select:disabled:focus {
+    box-shadow: none;
+    outline: none;
+}
+
 .header {
     display: flex;
     flex-direction: column;
@@ -34,18 +46,10 @@
     color: var(--color-muted);
 }
 
-.header h2 {
-    font-size: 1.45rem;
-    font-weight: 600;
-}
-
-.pathBadge {
-    align-self: flex-start;
-    background: rgba(14, 165, 233, 0.12);
-    color: var(--color-accent);
-    border-radius: 999px;
-    padding: 6px 14px;
-    font-size: 0.82rem;
+.subtitle {
+    font-size: 1rem;
+    color: var(--color-text);
+    max-width: 52ch;
 }
 
 .grid {
@@ -71,34 +75,12 @@
     font-weight: 600;
 }
 
-.workspaceBanner {
+.workspaceSummary {
     border-radius: var(--radius-md);
-    padding: 14px 16px;
     border: 1px dashed rgba(15, 23, 42, 0.12);
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    padding: 10px 14px;
     font-size: 0.85rem;
-}
-
-.workspaceBanner strong {
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--color-muted);
-}
-
-.workspaceBanner span {
     color: var(--color-text);
-}
-
-.workspaceBannerIdle {
-    background: rgba(248, 250, 252, 0.9);
-}
-
-.workspaceBannerReady {
-    background: rgba(14, 165, 233, 0.08);
-    border-color: rgba(14, 165, 233, 0.4);
 }
 
 @media (max-width: 720px) {

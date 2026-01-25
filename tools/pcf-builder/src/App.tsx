@@ -62,6 +62,7 @@ const DEFAULT_CONTROL_CONFIG: PCFControlConfig = {
     template: "field",
     version: "1.0.0",
     additionalPackages: [],
+    incrementVersionOnBuild: false,
 };
 
 const DEFAULT_SOLUTION_CONFIG: PCFSolutionConfig = {
@@ -695,7 +696,7 @@ function App() {
             <div className="app-shell">
                 {error && <div className="status-banner">{error}</div>}
 
-                <TabSwitcher tabs={tabs} activeTab={activeTab} onTabChange={(tabId) => setActiveTab(tabId as AppTab)} />
+                <TabSwitcher tabs={tabs} activeTab={activeTab} workspacePath={projectPath} onTabChange={(tabId) => setActiveTab(tabId as AppTab)} />
 
                 <div className="panel-area">
                     {activeTab === "control" ? (

@@ -22,18 +22,10 @@
     color: var(--color-muted);
 }
 
-.header h2 {
-    font-size: 1.5rem;
-    font-weight: 600;
-}
-
-.pathBadge {
-    align-self: flex-start;
-    background: rgba(37, 99, 235, 0.08);
-    color: var(--color-primary);
-    border-radius: 999px;
-    padding: 6px 14px;
-    font-size: 0.82rem;
+.subtitle {
+    font-size: 1rem;
+    color: var(--color-text);
+    max-width: 46ch;
 }
 
 .section {
@@ -42,10 +34,26 @@
     gap: 12px;
 }
 
-.grid {
+.controlGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: 16px;
+}
+
+.cell {
+    min-width: 0;
+}
+
+.span4 {
+    grid-column: span 4;
+}
+
+.span8 {
+    grid-column: span 8;
+}
+
+.fullRow {
+    grid-column: 1 / -1;
 }
 
 .helperText {
@@ -82,8 +90,59 @@
     outline: none;
 }
 
+.toggleRow {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.85rem;
+    color: var(--color-muted);
+}
+
+.toggleRow input[type="checkbox"] {
+    margin-top: 4px;
+}
+
+.toggleLabel {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.checkbox {
+    flex: 1;
+}
+
+@media (max-width: 960px) {
+    .spanTwo {
+        grid-column: 1 / -1;
+    }
+}
+
 @media (max-width: 720px) {
     .panel {
         padding: 22px;
+    }
+}
+
+@media (max-width: 960px) {
+    .controlGrid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    .span4,
+    .span8 {
+        grid-column: span 6;
+    }
+}
+
+@media (max-width: 640px) {
+    .controlGrid {
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .span4,
+    .span8,
+    .fullRow {
+        grid-column: span 1;
     }
 }
