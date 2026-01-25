@@ -83,9 +83,25 @@ function App() {
     const [packageList, setPackageList] = useState("");
     const [controlAction, setControlAction] = useState<ControlAction | null>(null);
     const [solutionAction, setSolutionAction] = useState<SolutionAction | null>(null);
+    const [hasExistingProject, setHasExistingProject] = useState(false);
+    const [isTestRunning, setIsTestRunning] = useState(false);
 
     const terminalIdRef = useRef<string | null>(null);
     const lastHydratedPathRef = useRef<string>("");
+    const abortedActionRef = useRef<ControlAction | null>(null);
+
+    const createTerminal = useCallback(async () => {
+        if (!window.toolboxAPI) {
+            throw new Error("ToolBox API is not available in this context.");
+        }
+
+        const terminal = await window.toolboxAPI.terminal.create({
+            name: "PCF Builder",
+            visible: false,
+        });
+        terminalIdRef.current = terminal.id;
+        return terminal.id;
+    }, []);
 
     useEffect(() => {
         console.info("[PCF Builder] controlConfig state updated", controlConfig);
@@ -100,11 +116,7 @@ function App() {
             }
 
             try {
-                const terminal = await window.toolboxAPI.terminal.create({
-                    name: "PCF Builder",
-                    visible: false,
-                });
-                terminalIdRef.current = terminal.id;
+                await createTerminal();
             } catch (err) {
                 const message = err instanceof Error ? err.message : "Failed to initialize terminal";
                 setError(message);
@@ -121,7 +133,7 @@ function App() {
                 window.toolboxAPI.terminal.close(terminalId).catch(() => undefined);
             }
         };
-    }, []);
+    }, [createTerminal]);
 
     const ensureProjectPath = async () => {
         if (projectPath) {
@@ -139,7 +151,7 @@ function App() {
     const executeTerminalCommand = async <T extends string>(actionId: T, setAction: ActionSetter<T>, options: ExecuteOptions) => {
         if (!window.toolboxAPI || !terminalIdRef.current) {
             setError("ToolBox API is not available in this context.");
-            return;
+            return false;
         }
 
         setError("");
@@ -147,6 +159,7 @@ function App() {
         setAction(actionId);
 
         const { showLoader = true } = options;
+        let didSucceed = false;
 
         try {
             if (showLoader) {
@@ -156,7 +169,10 @@ function App() {
             const result = await window.toolboxAPI.terminal.execute(terminalIdRef.current, options.command);
 
             const output = result.output || result.error || "";
-            setCommandOutput(output);
+            const wasAborted = abortedActionRef.current === actionId;
+            if (!wasAborted) {
+                setCommandOutput(output);
+            }
 
             if (showLoader) {
                 await window.toolboxAPI.utils.hideLoading().catch(() => undefined);
@@ -164,6 +180,12 @@ function App() {
 
             const exitCode = typeof result.exitCode === "number" ? result.exitCode : 0;
             const isSuccess = exitCode === 0 && !result.error;
+            didSucceed = isSuccess;
+
+            if (wasAborted) {
+                abortedActionRef.current = null;
+                return false;
+            }
 
             await window.toolboxAPI.utils.showNotification({
                 title: isSuccess ? "Success" : "Error",
@@ -174,18 +196,71 @@ function App() {
             if (showLoader) {
                 await window.toolboxAPI?.utils.hideLoading().catch(() => undefined);
             }
-
+            const wasAborted = abortedActionRef.current === actionId;
             const message = err instanceof Error ? err.message : String(err);
-            setCommandOutput(message);
-            setError(message);
-            await window.toolboxAPI?.utils.showNotification({
-                title: "Error",
-                body: message,
-                type: "error",
-            });
+
+            if (!wasAborted) {
+                setCommandOutput(message);
+                setError(message);
+                await window.toolboxAPI?.utils.showNotification({
+                    title: "Error",
+                    body: message,
+                    type: "error",
+                });
+            } else {
+                abortedActionRef.current = null;
+            }
+            didSucceed = false;
         } finally {
             setAction(null);
         }
+
+        return didSucceed;
+    };
+
+    const stopActiveTerminalCommand = async () => {
+        if (!window.toolboxAPI || !terminalIdRef.current) {
+            return false;
+        }
+
+        abortedActionRef.current = "test";
+        const terminalId = terminalIdRef.current;
+
+        try {
+            await window.toolboxAPI.terminal.close(terminalId);
+            terminalIdRef.current = null;
+            setCommandOutput("Test harness stopped by user.");
+            await window.toolboxAPI.utils.showNotification({
+                title: "Test harness stopped",
+                body: "The BrowserSync session was stopped.",
+                type: "info",
+            });
+        } catch (err) {
+            abortedActionRef.current = null;
+            console.error("[PCF Builder] Failed to close terminal", err);
+            await window.toolboxAPI.utils.showNotification({
+                title: "Unable to stop command",
+                body: err instanceof Error ? err.message : "Failed to close the running terminal.",
+                type: "error",
+            });
+            return false;
+        }
+
+        try {
+            await createTerminal();
+        } catch (err) {
+            abortedActionRef.current = null;
+            const message = err instanceof Error ? err.message : "Failed to spin up a new terminal session.";
+            setError(message);
+            await window.toolboxAPI.utils.showNotification({
+                title: "Terminal unavailable",
+                body: message,
+                type: "error",
+            });
+            return false;
+        }
+
+        return true;
     };
 
     const handlePackageListChange = (value: string) => {
@@ -199,6 +274,7 @@ function App() {
 
     const hydrateProjectFromFolder = useCallback(async (workspace: string, options?: { silent?: boolean }) => {
         if (!workspace || !window.toolboxAPI) {
+            setHasExistingProject(false);
             return false;
         }
 
@@ -212,6 +288,7 @@ function App() {
                     type: "warning",
                 });
             }
+            setHasExistingProject(false);
             return false;
         }
 
@@ -219,6 +296,7 @@ function App() {
         if (typeof fsApi.exists === "function") {
             const exists = await fsApi.exists(configPath);
             if (!exists) {
+                setHasExistingProject(false);
                 if (!options?.silent) {
                     await window.toolboxAPI.utils.showNotification({
                         title: "No PCF project detected",
@@ -241,6 +319,7 @@ function App() {
                     type: "error",
                 });
             }
+            setHasExistingProject(false);
             return false;
         }
 
@@ -274,10 +353,13 @@ function App() {
                     type: "error",
                 });
             }
+            setHasExistingProject(false);
             return false;
         }
 
-        const manifestPathHints = await resolveManifestPathsFromProject(fsApi, workspace, parsedConfig);
+        const manifestResolution = await resolveManifestPathsFromProject(fsApi, workspace, parsedConfig);
+        const manifestPathHints = manifestResolution.manifestPaths;
+        setHasExistingProject(manifestResolution.projectPaths.length > 0);
 
         const [manifestUpdates, packageUpdates] = await Promise.all([
             loadManifestControlUpdates(fsApi, workspace, {
@@ -406,84 +488,125 @@ function App() {
                 if (!canRun || !controlConfig.namespace || !controlConfig.name) {
                     return;
                 }
+                if (hasExistingProject) {
+                    await window.toolboxAPI?.utils.showNotification({
+                        title: "Control already detected",
+                        body: "Create is disabled because a .pcfproj already exists in this workspace.",
+                        type: "info",
+                    });
+                    return;
+                }
 
                 const packages = controlConfig.additionalPackages ?? [];
                 const packageArg = packages.length > 0 ? ` --npm-packages ${packages.join(" ")}` : "";
                 const command = `cd "${projectPath}" && pac pcf init --namespace ${controlConfig.namespace}` + ` --name ${controlConfig.name} --template ${controlConfig.template}${packageArg}`;
 
-                return executeTerminalCommand<ControlAction>(action, setControlAction, {
+                await executeTerminalCommand<ControlAction>(action, setControlAction, {
                     command,
                     pendingLabel: "Creating control...",
                     successMessage: "Control scaffolded successfully.",
                     errorMessage: "Failed to scaffold control.",
                 });
+                return;
             }
             case "open-vscode": {
                 const canRun = await ensureProjectPath();
                 if (!canRun) {
                     return;
                 }
+                if (!hasExistingProject) {
+                    return;
+                }
                 const command = `cd "${projectPath}" && code "${projectPath}"`;
-                return executeTerminalCommand<ControlAction>(action, setControlAction, {
+                await executeTerminalCommand<ControlAction>(action, setControlAction, {
                     command,
                     successMessage: "VS Code launched (check your desktop).",
                     errorMessage: "Unable to open VS Code.",
                     showLoader: false,
                     successType: "info",
                 });
+                return;
             }
             case "build": {
                 const canRun = await ensureProjectPath();
                 if (!canRun) {
                     return;
                 }
+                if (!hasExistingProject) {
+                    return;
+                }
                 const command = `cd "${projectPath}" && npm run build`;
-                return executeTerminalCommand<ControlAction>(action, setControlAction, {
+                await executeTerminalCommand<ControlAction>(action, setControlAction, {
                     command,
                     pendingLabel: "Building control...",
                     successMessage: "Build completed successfully.",
                     errorMessage: "Build failed.",
                 });
+                return;
             }
             case "test": {
                 const canRun = await ensureProjectPath();
                 if (!canRun) {
                     return;
                 }
+                if (!hasExistingProject) {
+                    return;
+                }
+                if (isTestRunning) {
+                    const stopped = await stopActiveTerminalCommand();
+                    if (stopped) {
+                        setIsTestRunning(false);
+                        setControlAction(null);
+                    }
+                    return;
+                }
                 const command = `cd "${projectPath}" && npm start`;
-                return executeTerminalCommand<ControlAction>(action, setControlAction, {
+                setIsTestRunning(true);
+                const succeeded = await executeTerminalCommand<ControlAction>(action, setControlAction, {
                     command,
                     successMessage: "Test harness started (see terminal pane).",
                     errorMessage: "Failed to start test harness.",
                     showLoader: false,
                     successType: "info",
                 });
+                if (!succeeded) {
+                    setIsTestRunning(false);
+                }
+                return;
             }
             case "quick-deploy": {
                 const canRun = await ensureProjectPath();
                 if (!canRun) {
                     return;
                 }
+                if (!hasExistingProject) {
+                    return;
+                }
                 const command = `cd "${projectPath}" && npm run build && pac pcf push --publish`;
-                return executeTerminalCommand<ControlAction>(action, setControlAction, {
+                await executeTerminalCommand<ControlAction>(action, setControlAction, {
                     command,
                     pendingLabel: "Deploying control...",
                     successMessage: "Control pushed to the target environment.",
                     errorMessage: "Quick deploy failed.",
                 });
+                return;
             }
             case "install-deps": {
                 const canRun = await ensureProjectPath();
                 if (!canRun) {
                     return;
                 }
+                if (!hasExistingProject) {
+                    return;
+                }
                 const command = `cd "${projectPath}" && npm install`;
-                return executeTerminalCommand<ControlAction>(action, setControlAction, {
+                await executeTerminalCommand<ControlAction>(action, setControlAction, {
                     command,
                     pendingLabel: "Installing packages...",
                     successMessage: "Dependencies installed successfully.",
                     errorMessage: "npm install failed.",
                 });
+                return;
             }
             default:
                 return;
@@ -501,12 +624,13 @@ function App() {
                 const nameArg = solutionConfig.solutionName ? ` --solution-name ${solutionConfig.solutionName}` : "";
                 const command = `cd "${projectPath}" && pac solution init --publisher-name ${solutionConfig.publisherName}` + ` --publisher-prefix ${solutionConfig.publisherPrefix}${nameArg}`;
 
-                return executeTerminalCommand<SolutionAction>(action, setSolutionAction, {
+                await executeTerminalCommand<SolutionAction>(action, setSolutionAction, {
                     command,
                     pendingLabel: "Creating solution...",
                     successMessage: "Solution initialized successfully.",
                     errorMessage: "Solution creation failed.",
                 });
+                return;
             }
             case "add-control": {
                 const canRun = await ensureProjectPath();
@@ -514,12 +638,13 @@ function App() {
                     return;
                 }
                 const command = `cd "${projectPath}" && pac solution add-reference --path .`;
-                return executeTerminalCommand<SolutionAction>(action, setSolutionAction, {
+                await executeTerminalCommand<SolutionAction>(action, setSolutionAction, {
                     command,
                     pendingLabel: "Adding control to solution...",
                     successMessage: "Control referenced inside the solution.",
                     errorMessage: "Failed to add control reference.",
                 });
+                return;
             }
             case "deploy": {
                 const canRun = await ensureProjectPath();
@@ -528,12 +653,13 @@ function App() {
                 }
                 const zipPath = `./bin/Debug/${solutionConfig.solutionName}.zip`;
                 const command = `cd "${projectPath}" && pac solution import --path "${zipPath}" --publish-changes --force-overwrite`;
-                return executeTerminalCommand<SolutionAction>(action, setSolutionAction, {
+                await executeTerminalCommand<SolutionAction>(action, setSolutionAction, {
                     command,
                     pendingLabel: "Deploying solution...",
                     successMessage: "Solution import started. Monitor the terminal for details.",
                     errorMessage: "Solution deployment failed.",
                 });
+                return;
             }
             default:
                 return;
@@ -564,6 +690,8 @@ function App() {
                             controlConfig={controlConfig}
                             packageList={packageList}
                             activeAction={controlAction}
+                            hasExistingProject={hasExistingProject}
+                            isTestRunning={isTestRunning}
                             onControlChange={(update) => setControlConfig((prev) => ({ ...prev, ...update }))}
                             onProjectPathChange={setProjectPath}
                             onPackageListChange={handlePackageListChange}

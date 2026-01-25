@@ -9,6 +9,8 @@ interface ControlPanelProps {
     controlConfig: PCFControlConfig;
     packageList: string;
     activeAction: ControlAction | null;
+    hasExistingProject: boolean;
+    isTestRunning: boolean;
     onControlChange: (update: Partial<PCFControlConfig>) => void;
     onProjectPathChange: (value: string) => void;
     onPackageListChange: (value: string) => void;
@@ -16,51 +18,72 @@ interface ControlPanelProps {
     onAction: (action: ControlAction) => void | Promise<void>;
 }
 
-export function ControlPanel({ projectPath, controlConfig, packageList, activeAction, onControlChange, onProjectPathChange, onPackageListChange, onSelectFolder, onAction }: ControlPanelProps) {
+export function ControlPanel({
+    projectPath,
+    controlConfig,
+    packageList,
+    activeAction,
+    hasExistingProject,
+    isTestRunning,
+    onControlChange,
+    onProjectPathChange,
+    onPackageListChange,
+    onSelectFolder,
+    onAction,
+}: ControlPanelProps) {
     const hasPath = Boolean(projectPath);
-    const canCreate = hasPath && controlConfig.namespace && controlConfig.name;
+    const canCreate = hasPath && controlConfig.namespace && controlConfig.name && !hasExistingProject;
+    const canRunExistingActions = hasPath && hasExistingProject;
+    const fieldsReadOnly = hasExistingProject;
 
-    const actionButtons = [
+    const actionButtons: Array<{
+        id: ControlAction;
+        defaultLabel: string;
+        busyLabel?: string;
+        className: string;
+    }> = [
         {
-            id: "create" as ControlAction,
-            label: activeAction === "create" ? "Creating..." : "Create",
+            id: "create",
+            defaultLabel: "Create",
+            busyLabel: "Creating...",
             className: "btn btn-primary",
-            disabled: !canCreate,
         },
         {
-            id: "open-vscode" as ControlAction,
-            label: activeAction === "open-vscode" ? "Opening..." : "Open in VS Code",
+            id: "install-deps",
+            defaultLabel: "npm Install",
+            busyLabel: "Installing...",
             className: "btn btn-ghost",
-            disabled: !hasPath,
         },
         {
-            id: "build" as ControlAction,
-            label: activeAction === "build" ? "Building..." : "Build",
+            id: "open-vscode",
+            defaultLabel: "Open in VS Code",
+            busyLabel: "Opening...",
             className: "btn btn-ghost",
-            disabled: !hasPath,
         },
         {
-            id: "test" as ControlAction,
-            label: activeAction === "test" ? "Launching..." : "Test",
+            id: "build",
+            defaultLabel: "Build",
+            busyLabel: "Building...",
             className: "btn btn-ghost",
-            disabled: !hasPath,
         },
         {
-            id: "quick-deploy" as ControlAction,
-            label: activeAction === "quick-deploy" ? "Deploying..." : "Quick Deploy",
+            id: "test",
+            defaultLabel: "Start Test",
+            busyLabel: "Starting...",
+            className: "btn btn-ghost",
+        },
+        {
+            id: "quick-deploy",
+            defaultLabel: "Quick Deploy",
+            busyLabel: "Deploying...",
             className: "btn btn-accent",
-            disabled: !hasPath,
-        },
-        {
-            id: "install-deps" as ControlAction,
-            label: activeAction === "install-deps" ? "Installing..." : "Install deps",
-            className: "btn btn-ghost",
-            disabled: !hasPath,
         },
     ];
 
+    const panelClassName = fieldsReadOnly ? `${styles.panel} ${styles.panelReadOnly}` : styles.panel;
+
     return (
-        <section className={styles.panel}>
+        <section className={panelClassName}>
             <header className={styles.header}>
                 <div>
                     <p className={styles.kicker}>Control</p>
@@ -83,19 +106,47 @@ export function ControlPanel({ projectPath, controlConfig, packageList, activeAc
             <div className={styles.grid}>
                 <div>
                     <label htmlFor="namespace">Namespace *</label>
-                    <input id="namespace" type="text" value={controlConfig.namespace} placeholder="Contoso" onChange={(event) => onControlChange({ namespace: event.target.value })} />
+                    <input
+                        id="namespace"
+                        type="text"
+                        value={controlConfig.namespace}
+                        placeholder="Contoso"
+                        readOnly={fieldsReadOnly}
+                        onChange={(event) => onControlChange({ namespace: event.target.value })}
+                    />
                 </div>
                 <div>
                     <label htmlFor="name">Control Name *</label>
-                    <input id="name" type="text" value={controlConfig.name} placeholder="TimelineControl" onChange={(event) => onControlChange({ name: event.target.value })} />
+                    <input
+                        id="name"
+                        type="text"
+                        value={controlConfig.name}
+                        placeholder="TimelineControl"
+                        readOnly={fieldsReadOnly}
+                        onChange={(event) => onControlChange({ name: event.target.value })}
+                    />
                 </div>
                 <div>
                     <label htmlFor="displayName">Display Name</label>
-                    <input id="displayName" type="text" value={controlConfig.displayName} placeholder="Timeline (Preview)" onChange={(event) => onControlChange({ displayName: event.target.value })} />
+                    <input
+                        id="displayName"
+                        type="text"
+                        value={controlConfig.displayName}
+                        placeholder="Timeline (Preview)"
+                        readOnly={fieldsReadOnly}
+                        onChange={(event) => onControlChange({ displayName: event.target.value })}
+                    />
                 </div>
                 <div>
                     <label htmlFor="version">Version</label>
-                    <input id="version" type="text" value={controlConfig.version} placeholder="1.0.0" onChange={(event) => onControlChange({ version: event.target.value })} />
+                    <input
+                        id="version"
+                        type="text"
+                        value={controlConfig.version}
+                        placeholder="1.0.0"
+                        readOnly={fieldsReadOnly}
+                        onChange={(event) => onControlChange({ version: event.target.value })}
+                    />
                 </div>
             </div>
 
@@ -105,6 +156,7 @@ export function ControlPanel({ projectPath, controlConfig, packageList, activeAc
                     <select
                         id="controlType"
                         value={controlConfig.controlType}
+                        disabled={fieldsReadOnly}
                         onChange={(event) =>
                             onControlChange({
                                 controlType: event.target.value as PCFControlConfig["controlType"],
@@ -120,6 +172,7 @@ export function ControlPanel({ projectPath, controlConfig, packageList, activeAc
                     <select
                         id="template"
                         value={controlConfig.template}
+                        disabled={fieldsReadOnly}
                         onChange={(event) =>
                             onControlChange({
                                 template: event.target.value as PCFControlConfig["template"],
@@ -138,24 +191,60 @@ export function ControlPanel({ projectPath, controlConfig, packageList, activeAc
                     id="description"
                     value={controlConfig.description}
                     placeholder="Explain what this control unlocks for makers."
+                    readOnly={fieldsReadOnly}
                     onChange={(event) => onControlChange({ description: event.target.value })}
                 />
             </div>
 
             <div>
                 <label htmlFor="packages">Additional Packages (comma separated)</label>
-                <input id="packages" type="text" value={packageList} placeholder="@fluentui/react-components, dayjs" onChange={(event) => onPackageListChange(event.target.value)} />
+                <input
+                    id="packages"
+                    type="text"
+                    value={packageList}
+                    placeholder="@fluentui/react-components, dayjs"
+                    readOnly={fieldsReadOnly}
+                    onChange={(event) => onPackageListChange(event.target.value)}
+                />
                 <p className={styles.helperText}>
                     Packages are added via <code>--npm-packages</code> during control init.
                 </p>
             </div>
 
             <div className="button-grid">
-                {actionButtons.map((action) => (
-                    <button key={action.id} type="button" className={action.className} disabled={action.disabled || activeAction === action.id} onClick={() => onAction(action.id)}>
-                        {action.label}
-                    </button>
-                ))}
+                {actionButtons.map((action) => {
+                    const isActiveAction = activeAction === action.id;
+                    let label = action.defaultLabel;
+
+                    if (action.id === "test") {
+                        if (isTestRunning) {
+                            label = "Stop Test";
+                        } else if (isActiveAction) {
+                            label = action.busyLabel ?? action.defaultLabel;
+                        }
+                    } else if (isActiveAction) {
+                        label = action.busyLabel ?? action.defaultLabel;
+                    }
+
+                    const isDisabled = (() => {
+                        if (action.id === "create") {
+                            return !canCreate || isActiveAction;
+                        }
+                        if (action.id === "test") {
+                            if (!canRunExistingActions) {
+                                return true;
+                            }
+                            return !isTestRunning && isActiveAction;
+                        }
+                        return !canRunExistingActions || isActiveAction;
+                    })();
+
+                    return (
+                        <button key={action.id} type="button" className={action.className} disabled={isDisabled} onClick={() => onAction(action.id)}>
+                            {label}
+                        </button>
+                    );
+                })}
             </div>
         </section>
     );

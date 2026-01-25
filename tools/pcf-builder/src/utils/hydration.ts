@@ -2,6 +2,11 @@ import { PCFControlConfig, PCFSolutionConfig } from "../models/interfaces";
 
 export type FileSystemAPI = ToolBoxAPI.FileSystemAPI;
 
+export interface ManifestResolutionResult {
+    manifestPaths: string[];
+    projectPaths: string[];
+}
+
 type FileSystemDirectoryEntry = {
     name?: string;
     type?: "file" | "directory";
@@ -89,42 +94,59 @@ const resolveManifestAbsolutePath = (workspace: string, reference: string) => {
     return joinFsPath(workspace, normalized);
 };
 
-const readProjectManifestReference = async (fsApi: FileSystemAPI, workspace: string, candidatePath: string): Promise<string | null> => {
+type ProjectManifestLookup = {
+    manifestPath: string | null;
+    projectExists: boolean;
+    projectPath: string | null;
+};
+
+const readProjectManifestReference = async (fsApi: FileSystemAPI, workspace: string, candidatePath: string): Promise<ProjectManifestLookup> => {
     if (!candidatePath) {
-        return null;
+        return { manifestPath: null, projectExists: false, projectPath: null };
     }
 
     const projectPath = isAbsolutePath(candidatePath) ? candidatePath : joinFsPath(workspace, candidatePath);
 
+    let projectExists = false;
     if (typeof fsApi.exists === "function") {
-        const exists = await fsApi.exists(projectPath);
-        if (!exists) {
-            return null;
+        projectExists = await fsApi.exists(projectPath);
+        if (!projectExists) {
+            return { manifestPath: null, projectExists: false, projectPath };
         }
     }
 
     let projectContent: string;
     try {
         projectContent = await fsApi.readText(projectPath);
+        projectExists = true;
     } catch (_err) {
-        return null;
+        return { manifestPath: null, projectExists: projectExists, projectPath };
     }
 
     const elementMatch = projectContent.match(/<ControlManifestFile[^>]*>([^<]+)<\/ControlManifestFile>/i);
     if (elementMatch?.[1]) {
-        return resolveManifestAbsolutePath(workspace, elementMatch[1]);
+        return {
+            manifestPath: resolveManifestAbsolutePath(workspace, elementMatch[1]),
+            projectExists,
+            projectPath,
+        };
     }
 
     const attributeMatch = projectContent.match(/<ControlManifestFile[^>]*?Include\s*=\s*"([^"]+)"[^>]*\/>/i);
     if (attributeMatch?.[1]) {
-        return resolveManifestAbsolutePath(workspace, attributeMatch[1]);
+        return {
+            manifestPath: resolveManifestAbsolutePath(workspace, attributeMatch[1]),
+            projectExists,
+            projectPath,
+        };
     }
 
-    return null;
+    return { manifestPath: null, projectExists, projectPath };
 };
 
-export const resolveManifestPathsFromProject = async (fsApi: FileSystemAPI, workspace: string, config?: Record<string, any>): Promise<string[]> => {
+export const resolveManifestPathsFromProject = async (fsApi: FileSystemAPI, workspace: string, config?: Record<string, any>): Promise<ManifestResolutionResult> => {
     const manifestPaths = new Set<string>();
+    const projectPaths = new Set<string>();
     const projectNameCandidates = new Set<string>();
 
     const workspaceName = getBasename(workspace);
@@ -141,7 +163,10 @@ export const resolveManifestPathsFromProject = async (fsApi: FileSystemAPI, work
     }
 
     for (const projectCandidate of projectNameCandidates) {
-        const manifestPath = await readProjectManifestReference(fsApi, workspace, projectCandidate);
+        const { manifestPath, projectExists, projectPath } = await readProjectManifestReference(fsApi, workspace, projectCandidate);
+        if (projectExists && projectPath) {
+            projectPaths.add(projectPath);
+        }
         if (manifestPath) {
             manifestPaths.add(manifestPath);
         }
@@ -178,14 +203,23 @@ export const resolveManifestPathsFromProject = async (fsApi: FileSystemAPI, work
                     return;
                 }
 
-                if (entryType === "file" && entry.name.toLowerCase() === "controlmanifest.input.xml") {
-                    manifestPaths.add(entryPath);
+                if (entryType === "file") {
+                    const lowerName = entry.name.toLowerCase();
+                    if (lowerName === "controlmanifest.input.xml") {
+                        manifestPaths.add(entryPath);
+                    }
+                    if (lowerName.endsWith(".pcfproj")) {
+                        projectPaths.add(entryPath);
+                    }
                 }
             });
         }
     }
 
-    return Array.from(manifestPaths);
+    return {
+        manifestPaths: Array.from(manifestPaths),
+        projectPaths: Array.from(projectPaths),
+    };
 };
 
 export function applyDefined<T extends Record<string, any>>(base: T, updates: Partial<T>): T {
