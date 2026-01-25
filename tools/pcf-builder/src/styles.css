@@ -219,6 +219,50 @@ textarea {
     line-height: 1.45;
 }
 
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 1000;
+}
+
+.modal-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow-soft);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.modal-header h3 {
+    font-size: 1.1rem;
+    margin-bottom: 6px;
+}
+
+.modal-header p {
+    color: var(--color-muted);
+    font-size: 0.92rem;
+}
+
+.modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 18px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
 @media (max-width: 720px) {
     .app-root {
         padding: 24px 12px;

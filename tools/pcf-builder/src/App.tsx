@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { CommandOutput } from "./components/CommandOutput";
 import { ControlAction, ControlPanel } from "./components/ControlPanel";
+import { InputModal } from "./components/InputModal";
 import { SolutionAction, SolutionPanel } from "./components/SolutionPanel";
 import { TabDefinition, TabSwitcher } from "./components/TabSwitcher";
 import { PCFControlConfig, PCFSolutionConfig } from "./models/interfaces";
@@ -31,6 +32,19 @@ interface ExecuteOptions {
     showLoader?: boolean;
     successType?: "success" | "info";
 }
+
+interface PromptRequestOptions {
+    title: string;
+    message?: string;
+    placeholder?: string;
+    initialValue?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+}
+
+type PromptState = PromptRequestOptions & {
+    resolve: (value: string | null) => void;
+};
 
 const getFileSystem = (): FileSystemAPI | null => {
     if (!window.toolboxAPI) {
@@ -88,6 +102,7 @@ function App() {
     const [solutionAction, setSolutionAction] = useState<SolutionAction | null>(null);
     const [hasExistingProject, setHasExistingProject] = useState(false);
     const [isTestRunning, setIsTestRunning] = useState(false);
+    const [promptState, setPromptState] = useState<PromptState | null>(null);
 
     const terminalIdRef = useRef<string | null>(null);
     const lastHydratedPathRef = useRef<string>("");
@@ -105,6 +120,12 @@ function App() {
         terminalIdRef.current = terminal.id;
         return terminal.id;
     }, []);
+
+    const requestTextInput = useCallback((options: PromptRequestOptions) => {
+        return new Promise<string | null>((resolve) => {
+            setPromptState({ ...options, resolve });
+        });
+    }, [setPromptState]);
 
     useEffect(() => {
         console.info("[PCF Builder] controlConfig state updated", controlConfig);
@@ -603,7 +624,27 @@ function App() {
                 if (!hasExistingProject) {
                     return;
                 }
-                const command = `cd "${projectPath}" && npm run build && pac pcf push --publish`;
+                const prefixInput = await requestTextInput({
+                    title: "Publisher prefix required",
+                    message: "Enter the publisher prefix for the environment you are deploying to.",
+                    placeholder: "contoso",
+                    initialValue: solutionConfig.publisherPrefix,
+                    confirmLabel: "Deploy",
+                    cancelLabel: "Cancel",
+                });
+                const publisherPrefix = prefixInput?.trim() ?? "";
+                if (!publisherPrefix) {
+                    await window.toolboxAPI?.utils.showNotification({
+                        title: "Publisher prefix required",
+                        body: "Enter a publisher prefix to run quick deploy.",
+                        type: "warning",
+                    });
+                    return;
+                }
+                if (!solutionConfig.publisherPrefix) {
+                    setSolutionConfig((prev) => ({ ...prev, publisherPrefix }));
+                }
+                const command = `cd "${projectPath}" && npm run build && pac pcf push --publisher-prefix "${publisherPrefix}"`;
                 await executeTerminalCommand<ControlAction>(action, setControlAction, {
                     command,
                     pendingLabel: "Deploying control...",
@@ -736,6 +777,25 @@ function App() {
 
                     <CommandOutput output={commandOutput} />
                 </div>
+
+                {promptState && (
+                    <InputModal
+                        title={promptState.title}
+                        message={promptState.message}
+                        placeholder={promptState.placeholder}
+                        initialValue={promptState.initialValue}
+                        confirmLabel={promptState.confirmLabel}
+                        cancelLabel={promptState.cancelLabel}
+                        onCancel={() => {
+                            promptState.resolve(null);
+                            setPromptState(null);
+                        }}
+                        onSubmit={(value) => {
+                            promptState.resolve(value);
+                            setPromptState(null);
+                        }}
+                    />
+                )}
             </div>
         </div>
     );
