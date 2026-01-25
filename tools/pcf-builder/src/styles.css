@@ -54,39 +54,28 @@ body {
     gap: 24px;
 }
 
-.panel-carousel {
+.panel-stack {
     position: relative;
     width: 100%;
-    overflow: hidden;
+    min-height: 200px;
 }
 
-.panel-carousel__track {
-    display: flex;
-    width: 200%;
-    transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.panel-carousel--control .panel-carousel__track {
-    transform: translateX(0%);
-}
-
-.panel-carousel--solution .panel-carousel__track {
-    transform: translateX(-100%);
-}
-
-.panel-slide {
-    flex: 0 0 100%;
-    padding: 0;
-    transition: opacity 0.3s ease;
-}
-
-.panel-slide[aria-hidden="true"] {
+.panel-card {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transform: translateX(30px);
+    transition:
+        opacity 0.4s ease,
+        transform 0.4s ease;
     pointer-events: none;
-    opacity: 0.4;
 }
 
-.panel-slide[aria-hidden="false"] {
+.panel-card--active {
     opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+    position: relative;
 }
 
 .status-banner {
