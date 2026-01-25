@@ -5,10 +5,12 @@
   "description": "Build and manage Power Apps Component Framework (PCF) controls - React-based tool for PowerPlatform ToolBox",
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "npm run lint && npm run typecheck && vite build",
     "dev": "vite",
     "preview": "vite preview",
-    "finalize-package": "npm shrinkwrap"
+    "finalize-package": "npm shrinkwrap",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
+    "typecheck": "tsc --noEmit"
   },
   "files": [
     "dist",
@@ -30,10 +32,16 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@pptb/types": "^1.0.14",
+    "@eslint/js": "^9.39.2",
+    "@pptb/types": "^1.0.17",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.53.1",
+    "@typescript-eslint/parser": "^8.53.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.39.2",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^17.1.0",
     "typescript": "^5.9.3",
     "vite": "^6.0.7"
   }
