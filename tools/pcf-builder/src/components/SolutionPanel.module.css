@@ -9,6 +9,18 @@
     gap: 20px;
 }
 
+.panelReadOnly input[readonly] {
+    background: rgba(15, 23, 42, 0.04);
+    border-color: rgba(15, 23, 42, 0.12);
+    color: var(--color-muted);
+    cursor: not-allowed;
+}
+
+.panelReadOnly input[readonly]:focus {
+    box-shadow: none;
+    outline: none;
+}
+
 .header {
     display: flex;
     flex-direction: column;

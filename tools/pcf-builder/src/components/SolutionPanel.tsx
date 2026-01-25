@@ -7,14 +7,18 @@ interface SolutionPanelProps {
     projectPath: string;
     solutionConfig: PCFSolutionConfig;
     activeAction: SolutionAction | null;
+    fieldsLocked: boolean;
+    isControlReferenced: boolean;
     onSolutionChange: (update: Partial<PCFSolutionConfig>) => void;
     onAction: (action: SolutionAction) => void | Promise<void>;
 }
 
-export function SolutionPanel({ projectPath, solutionConfig, activeAction, onSolutionChange, onAction }: SolutionPanelProps) {
+export function SolutionPanel({ projectPath, solutionConfig, activeAction, fieldsLocked, isControlReferenced, onSolutionChange, onAction }: SolutionPanelProps) {
     const hasPath = Boolean(projectPath);
     const canCreate = hasPath && solutionConfig.publisherName && solutionConfig.publisherPrefix;
     const canDeploy = hasPath && solutionConfig.solutionName;
+    const canAddControl = hasPath && !isControlReferenced;
+    const panelClassName = fieldsLocked ? `${styles.panel} ${styles.panelReadOnly}` : styles.panel;
     const workspaceSummary = hasPath ? "Solution commands reuse the workspace selected on the Control tab." : "Select a workspace from the Control tab to enable solution commands.";
 
     const actionButtons = [
@@ -28,7 +32,7 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, onSol
             id: "add-control" as SolutionAction,
             label: activeAction === "add-control" ? "Adding..." : "Add Control",
             className: "btn btn-ghost",
-            disabled: !hasPath,
+            disabled: !canAddControl,
         },
         {
             id: "deploy" as SolutionAction,
@@ -39,7 +43,7 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, onSol
     ];
 
     return (
-        <section className={styles.panel}>
+        <section className={panelClassName}>
             <header className={styles.header}>
                 <div>
                     <p className={styles.kicker}>Solution</p>
@@ -61,23 +65,45 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, onSol
                         type="text"
                         value={solutionConfig.solutionName}
                         placeholder="ContosoTimeline"
+                        readOnly={fieldsLocked}
                         onChange={(event) => onSolutionChange({ solutionName: event.target.value })}
                     />
                 </div>
                 <div>
                     <label htmlFor="solutionVersion">Version</label>
-                    <input id="solutionVersion" type="text" value={solutionConfig.version} placeholder="1.0.0" onChange={(event) => onSolutionChange({ version: event.target.value })} />
+                    <input
+                        id="solutionVersion"
+                        type="text"
+                        value={solutionConfig.version}
+                        placeholder="1.0.0"
+                        readOnly={fieldsLocked}
+                        onChange={(event) => onSolutionChange({ version: event.target.value })}
+                    />
                 </div>
             </div>
 
             <div className={styles.grid}>
                 <div>
                     <label htmlFor="publisherName">Publisher Name *</label>
-                    <input id="publisherName" type="text" value={solutionConfig.publisherName} placeholder="Contoso" onChange={(event) => onSolutionChange({ publisherName: event.target.value })} />
+                    <input
+                        id="publisherName"
+                        type="text"
+                        value={solutionConfig.publisherName}
+                        placeholder="Contoso"
+                        readOnly={fieldsLocked}
+                        onChange={(event) => onSolutionChange({ publisherName: event.target.value })}
+                    />
                 </div>
                 <div>
                     <label htmlFor="publisherPrefix">Publisher Prefix *</label>
-                    <input id="publisherPrefix" type="text" value={solutionConfig.publisherPrefix} placeholder="con" onChange={(event) => onSolutionChange({ publisherPrefix: event.target.value })} />
+                    <input
+                        id="publisherPrefix"
+                        type="text"
+                        value={solutionConfig.publisherPrefix}
+                        placeholder="con"
+                        readOnly={fieldsLocked}
+                        onChange={(event) => onSolutionChange({ publisherPrefix: event.target.value })}
+                    />
                 </div>
             </div>
 
@@ -88,6 +114,7 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, onSol
                     type="text"
                     value={solutionConfig.publisherFriendlyName}
                     placeholder="Contoso Corporation"
+                    readOnly={fieldsLocked}
                     onChange={(event) => onSolutionChange({ publisherFriendlyName: event.target.value })}
                 />
             </div>
@@ -103,6 +130,8 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, onSol
                     </button>
                 ))}
             </div>
+
+            {isControlReferenced && <p className={styles.helperText}>This control is already referenced inside the solution project.</p>}
         </section>
     );
 }

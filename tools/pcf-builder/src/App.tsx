@@ -10,10 +10,10 @@ import {
     applyDefined,
     applyMissing,
     extractControlUpdates,
-    extractSolutionUpdates,
     joinFsPath,
     loadManifestControlUpdates,
     loadPackageControlUpdates,
+    loadSolutionProjectUpdates,
     resolveManifestPathsFromProject,
 } from "./utils/hydration";
 
@@ -80,6 +80,8 @@ function App() {
     const [commandOutput, setCommandOutput] = useState("");
     const [controlConfig, setControlConfig] = useState<PCFControlConfig>(DEFAULT_CONTROL_CONFIG);
     const [solutionConfig, setSolutionConfig] = useState<PCFSolutionConfig>(DEFAULT_SOLUTION_CONFIG);
+    const [solutionFieldsLocked, setSolutionFieldsLocked] = useState(false);
+    const [isControlInSolution, setIsControlInSolution] = useState(false);
     const [packageList, setPackageList] = useState("");
     const [controlAction, setControlAction] = useState<ControlAction | null>(null);
     const [solutionAction, setSolutionAction] = useState<SolutionAction | null>(null);
@@ -394,9 +396,21 @@ function App() {
         setControlConfig(nextControl);
         setPackageList(nextControl.additionalPackages?.length ? nextControl.additionalPackages.join(", ") : "");
 
-        const solutionUpdates = extractSolutionUpdates(parsedConfig, nextControl.version);
-        const nextSolution = solutionUpdates ? applyDefined({ ...DEFAULT_SOLUTION_CONFIG }, solutionUpdates) : { ...DEFAULT_SOLUTION_CONFIG };
+        const solutionProjectDetails = await loadSolutionProjectUpdates(fsApi, workspace, {
+            controlName: nextControl.name,
+        });
+
+        let nextSolution = { ...DEFAULT_SOLUTION_CONFIG };
+        if (solutionProjectDetails.metadata) {
+            nextSolution = applyDefined(nextSolution, solutionProjectDetails.metadata);
+        }
+        nextSolution = applyMissing(nextSolution, {
+            version: nextControl.version,
+        });
         setSolutionConfig(nextSolution);
+        const metadataPopulated = Boolean(solutionProjectDetails.metadata && Object.keys(solutionProjectDetails.metadata).length > 0);
+        setSolutionFieldsLocked(metadataPopulated);
+        setIsControlInSolution(Boolean(solutionProjectDetails.controlReferenced));
 
         if (!options?.silent) {
             await window.toolboxAPI.utils.showNotification({
@@ -703,6 +717,8 @@ function App() {
                             projectPath={projectPath}
                             solutionConfig={solutionConfig}
                             activeAction={solutionAction}
+                            fieldsLocked={solutionFieldsLocked}
+                            isControlReferenced={isControlInSolution}
                             onSolutionChange={(update) => setSolutionConfig((prev) => ({ ...prev, ...update }))}
                             onAction={handleSolutionAction}
                         />
