@@ -704,8 +704,6 @@ function App() {
                             solutionConfig={solutionConfig}
                             activeAction={solutionAction}
                             onSolutionChange={(update) => setSolutionConfig((prev) => ({ ...prev, ...update }))}
-                            onProjectPathChange={setProjectPath}
-                            onSelectFolder={handleSelectFolder}
                             onAction={handleSolutionAction}
                         />
                     )}
