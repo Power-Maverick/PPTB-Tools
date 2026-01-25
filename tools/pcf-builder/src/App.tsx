@@ -516,12 +516,18 @@ function App() {
                 const packageArg = packages.length > 0 ? ` --npm-packages ${packages.join(" ")}` : "";
                 const command = `cd "${projectPath}" && pac pcf init --namespace ${controlConfig.namespace}` + ` --name ${controlConfig.name} --template ${controlConfig.template}${packageArg}`;
 
-                await executeTerminalCommand<ControlAction>(action, setControlAction, {
+                const succeeded = await executeTerminalCommand<ControlAction>(action, setControlAction, {
                     command,
                     pendingLabel: "Creating control...",
                     successMessage: "Control scaffolded successfully.",
                     errorMessage: "Failed to scaffold control.",
                 });
+                if (succeeded) {
+                    setHasExistingProject(true);
+                    await hydrateProjectFromFolder(projectPath, { silent: true }).catch((err) => {
+                        console.error("[PCF Builder] Post-create hydration failed", err);
+                    });
+                }
                 return;
             }
             case "open-vscode": {
