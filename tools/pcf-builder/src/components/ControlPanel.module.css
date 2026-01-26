@@ -91,7 +91,7 @@
 }
 
 .toggleRow {
-    display: flex;
+    display: inline-flex;
     align-items: flex-start;
     gap: 10px;
     font-size: 0.85rem;

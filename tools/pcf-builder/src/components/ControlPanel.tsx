@@ -209,15 +209,8 @@ export function ControlPanel({
                         Increment Version on Build
                     </label>
                     <div className={styles.toggleRow}>
-                        <input
-                            id="incrementVersion"
-                            type="checkbox"
-                            checked={incrementVersionOnBuild}
-                            disabled={fieldsReadOnly}
-                            onChange={(event) => onControlChange({ incrementVersionOnBuild: event.target.checked })}
-                            className={styles.checkbox}
-                        />
-                        <span>Auto bump package version after each build.</span>
+                        <input id="incrementVersion" type="checkbox" checked={incrementVersionOnBuild} readOnly disabled className={styles.checkbox} />
+                        <span>Always on so ControlManifest patch versions bump before each build.</span>
                     </div>
                 </div>
             </div>

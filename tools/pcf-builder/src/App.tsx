@@ -76,7 +76,7 @@ const DEFAULT_CONTROL_CONFIG: PCFControlConfig = {
     template: "field",
     version: "1.0.0",
     additionalPackages: [],
-    incrementVersionOnBuild: false,
+    incrementVersionOnBuild: true,
 };
 
 const DEFAULT_SOLUTION_CONFIG: PCFSolutionConfig = {
@@ -121,6 +121,17 @@ const createImportJobId = () => {
     return `import-${Date.now()}-${randomSuffix}`;
 };
 
+const bumpPatchVersion = (value: string) => {
+    const segments = (value || "1.0.0").split(".").map((segment) => {
+        const parsed = Number.parseInt(segment, 10);
+        return Number.isFinite(parsed) ? parsed : 0;
+    });
+    const major = segments[0] ?? 1;
+    const minor = segments[1] ?? 0;
+    const patch = (segments[2] ?? 0) + 1;
+    return `${major}.${minor}.${patch}`;
+};
+
 function App() {
     const [activeTab, setActiveTab] = useState<AppTab>("control");
     const [initializing, setInitializing] = useState(true);
@@ -132,6 +143,7 @@ function App() {
     const [solutionFieldsLocked, setSolutionFieldsLocked] = useState(false);
     const [solutionProjectCreated, setSolutionProjectCreated] = useState(false);
     const [isControlInSolution, setIsControlInSolution] = useState(false);
+    const [manifestPaths, setManifestPaths] = useState<string[]>([]);
     const [packageList, setPackageList] = useState("");
     const [controlAction, setControlAction] = useState<ControlAction | null>(null);
     const [solutionAction, setSolutionAction] = useState<SolutionAction | null>(null);
@@ -168,6 +180,10 @@ function App() {
     useEffect(() => {
         console.info("[PCF Builder] controlConfig state updated", controlConfig);
     }, [controlConfig]);
+
+    useEffect(() => {
+        setManifestPaths((prev) => (prev.length > 0 ? [] : prev));
+    }, [projectPath]);
 
     useEffect(() => {
         const initialize = async () => {
@@ -337,9 +353,124 @@ function App() {
         setControlConfig((prev) => ({ ...prev, additionalPackages: packages }));
     };
 
+    const locateManifestPath = useCallback(
+        async (fsApi: FileSystemAPI) => {
+            const fallbackCandidates = [joinFsPath(projectPath, "ControlManifest.Input.xml"), joinFsPath(projectPath, joinFsPath("src", "ControlManifest.Input.xml"))];
+            const combined = [...manifestPaths, ...fallbackCandidates].filter((value): value is string => Boolean(value));
+            const seen = new Set<string>();
+            for (const candidate of combined) {
+                if (!candidate || seen.has(candidate)) {
+                    continue;
+                }
+                seen.add(candidate);
+                if (typeof fsApi.exists === "function") {
+                    try {
+                        const exists = await fsApi.exists(candidate);
+                        if (!exists) {
+                            continue;
+                        }
+                    } catch (
+                        // Ignore fs errors for candidates
+                        _err
+                    ) {
+                        continue;
+                    }
+                }
+                return candidate;
+            }
+            return null;
+        },
+        [manifestPaths, projectPath],
+    );
+
+    const bumpManifestVersion = useCallback(async () => {
+        if (!controlConfig.incrementVersionOnBuild) {
+            return null;
+        }
+        const fsApi = getFileSystem();
+        if (!fsApi || typeof fsApi.readText !== "function" || typeof fsApi.writeText !== "function") {
+            return null;
+        }
+        const manifestPath = await locateManifestPath(fsApi);
+        if (!manifestPath) {
+            await window.toolboxAPI?.utils.showNotification({
+                title: "Control manifest not found",
+                body: "Unable to locate ControlManifest.Input.xml to increment the version.",
+                type: "warning",
+            });
+            return null;
+        }
+
+        let manifestContent: string;
+        try {
+            manifestContent = await fsApi.readText(manifestPath);
+        } catch (err) {
+            await window.toolboxAPI?.utils.showNotification({
+                title: "Unable to read ControlManifest.Input.xml",
+                body: err instanceof Error ? err.message : "An unexpected filesystem error occurred while reading the manifest.",
+                type: "error",
+            });
+            return null;
+        }
+
+        const controlVersionRegex = /(<control\b[^>]*\bversion\s*=\s*")([^"]+)("[^>]*>)/i;
+        const controlTagRegex = /<control\b[^>]*>/i;
+        const currentVersionMatch = controlVersionRegex.exec(manifestContent);
+        const currentVersion = currentVersionMatch?.[2] ?? controlConfig.version ?? "1.0.0";
+        const nextVersion = bumpPatchVersion(currentVersion);
+
+        let updatedContent: string | null = null;
+        if (currentVersionMatch) {
+            updatedContent = manifestContent.replace(controlVersionRegex, (_match, prefix: string, _value: string, suffix: string) => `${prefix}${nextVersion}${suffix}`);
+        } else {
+            const controlTagMatch = controlTagRegex.exec(manifestContent);
+            if (controlTagMatch) {
+                const updatedTag = controlTagMatch[0].includes("version=")
+                    ? controlTagMatch[0]
+                    : controlTagMatch[0].replace("<control", `<control version="${nextVersion}"`);
+                updatedContent = manifestContent.replace(controlTagMatch[0], updatedTag);
+            }
+        }
+
+        if (!updatedContent) {
+            await window.toolboxAPI?.utils.showNotification({
+                title: "Unable to update manifest",
+                body: "ControlManifest.Input.xml is missing a <control> definition.",
+                type: "warning",
+            });
+            return null;
+        }
+
+        try {
+            await fsApi.writeText(manifestPath, updatedContent);
+        } catch (err) {
+            await window.toolboxAPI?.utils.showNotification({
+                title: "Unable to update ControlManifest.Input.xml",
+                body: err instanceof Error ? err.message : "An unexpected filesystem error occurred while writing the manifest.",
+                type: "error",
+            });
+            return null;
+        }
+
+        return nextVersion;
+    }, [controlConfig.incrementVersionOnBuild, controlConfig.version, locateManifestPath]);
+
+    const applyManifestVersionBump = useCallback(async () => {
+        const nextVersion = await bumpManifestVersion();
+        if (nextVersion) {
+            setControlConfig((prev) => ({ ...prev, version: nextVersion }));
+        }
+        return nextVersion;
+    }, [bumpManifestVersion]);
+
+    const clearHydratedArtifacts = useCallback(() => {
+        setHasExistingProject(false);
+        setManifestPaths([]);
+    }, []);
+
     const hydrateProjectFromFolder = useCallback(async (workspace: string, options?: { silent?: boolean }) => {
         if (!workspace || !window.toolboxAPI) {
-            setHasExistingProject(false);
+            clearHydratedArtifacts();
             return false;
         }
 
@@ -353,7 +484,7 @@ function App() {
                     type: "warning",
                 });
             }
-            setHasExistingProject(false);
+            clearHydratedArtifacts();
             return false;
         }
 
@@ -361,7 +492,7 @@ function App() {
         if (typeof fsApi.exists === "function") {
             const exists = await fsApi.exists(configPath);
             if (!exists) {
-                setHasExistingProject(false);
+                clearHydratedArtifacts();
                 if (!options?.silent) {
                     await window.toolboxAPI.utils.showNotification({
                         title: "No PCF project detected",
@@ -384,7 +515,7 @@ function App() {
                     type: "error",
                 });
             }
-            setHasExistingProject(false);
+            clearHydratedArtifacts();
             return false;
         }
 
@@ -400,6 +531,7 @@ function App() {
                     type: "warning",
                 });
             }
+            clearHydratedArtifacts();
             return false;
         }
 
@@ -418,12 +550,13 @@ function App() {
                     type: "error",
                 });
             }
-            setHasExistingProject(false);
+            clearHydratedArtifacts();
             return false;
         }
 
         const manifestResolution = await resolveManifestPathsFromProject(fsApi, workspace, parsedConfig);
         const manifestPathHints = manifestResolution.manifestPaths;
+        setManifestPaths(manifestPathHints);
         setHasExistingProject(manifestResolution.projectPaths.length > 0);
 
         const [manifestUpdates, packageUpdates] = await Promise.all([
@@ -449,6 +582,7 @@ function App() {
         let nextControl = applyDefined({ ...DEFAULT_CONTROL_CONFIG }, controlUpdates);
         nextControl = applyMissing(nextControl, manifestUpdates ?? undefined);
         nextControl = applyMissing(nextControl, packageUpdates ?? undefined);
+        nextControl.incrementVersionOnBuild = true;
         console.info("[PCF Builder] Hydrated control config", {
             workspace,
             controlUpdates,
@@ -487,7 +621,7 @@ function App() {
         lastHydratedPathRef.current = workspace;
 
         return true;
-    }, []);
+    }, [clearHydratedArtifacts]);
 
     useEffect(() => {
         if (!projectPath) {
@@ -619,6 +753,7 @@ function App() {
                 if (!hasExistingProject) {
                     return;
                 }
+                await applyManifestVersionBump();
                 const command = `cd "${projectPath}" && npm run build`;
                 await executeTerminalCommand<ControlAction>(action, setControlAction, {
                     command,
@@ -686,6 +821,7 @@ function App() {
                 if (!solutionConfig.publisherPrefix) {
                     setSolutionConfig((prev) => ({ ...prev, publisherPrefix }));
                 }
+                await applyManifestVersionBump();
                 const command = `cd "${projectPath}" && npm run build && pac pcf push --publisher-prefix "${publisherPrefix}"`;
                 await executeTerminalCommand<ControlAction>(action, setControlAction, {
                     command,
