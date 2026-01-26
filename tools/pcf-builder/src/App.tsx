@@ -425,9 +425,7 @@ function App() {
         } else {
             const controlTagMatch = controlTagRegex.exec(manifestContent);
             if (controlTagMatch) {
-                const updatedTag = controlTagMatch[0].includes("version=")
-                    ? controlTagMatch[0]
-                    : controlTagMatch[0].replace("<control", `<control version="${nextVersion}"`);
+                const updatedTag = controlTagMatch[0].includes("version=") ? controlTagMatch[0] : controlTagMatch[0].replace("<control", `<control version="${nextVersion}"`);
                 updatedContent = manifestContent.replace(controlTagMatch[0], updatedTag);
             }
         }
@@ -468,160 +466,163 @@ function App() {
         setManifestPaths([]);
     }, []);
 
-    const hydrateProjectFromFolder = useCallback(async (workspace: string, options?: { silent?: boolean }) => {
-        if (!workspace || !window.toolboxAPI) {
-            clearHydratedArtifacts();
-            return false;
-        }
-
-        const fsApi = getFileSystem();
-
-        if (!fsApi || typeof fsApi.readText !== "function") {
-            if (!options?.silent) {
-                await window.toolboxAPI.utils.showNotification({
-                    title: "File reader unavailable",
-                    body: "Update PPTB to v1.0.17+ to auto-load control metadata.",
-                    type: "warning",
-                });
-            }
-            clearHydratedArtifacts();
-            return false;
-        }
-
-        const configPath = joinFsPath(workspace, "pcfconfig.json");
-        if (typeof fsApi.exists === "function") {
-            const exists = await fsApi.exists(configPath);
-            if (!exists) {
+    const hydrateProjectFromFolder = useCallback(
+        async (workspace: string, options?: { silent?: boolean }) => {
+            if (!workspace || !window.toolboxAPI) {
                 clearHydratedArtifacts();
+                return false;
+            }
+
+            const fsApi = getFileSystem();
+
+            if (!fsApi || typeof fsApi.readText !== "function") {
                 if (!options?.silent) {
                     await window.toolboxAPI.utils.showNotification({
-                        title: "No PCF project detected",
-                        body: "pcfconfig.json was not found in the selected folder.",
+                        title: "File reader unavailable",
+                        body: "Update PPTB to v1.0.17+ to auto-load control metadata.",
                         type: "warning",
                     });
                 }
+                clearHydratedArtifacts();
                 return false;
             }
-        }
 
-        let rawConfig: string;
-        try {
-            rawConfig = await fsApi.readText(configPath);
-        } catch (err) {
-            if (!options?.silent) {
-                await window.toolboxAPI.utils.showNotification({
-                    title: "Unable to read pcfconfig.json",
-                    body: err instanceof Error ? err.message : "An unexpected filesystem error occurred.",
-                    type: "error",
+            const configPath = joinFsPath(workspace, "pcfconfig.json");
+            if (typeof fsApi.exists === "function") {
+                const exists = await fsApi.exists(configPath);
+                if (!exists) {
+                    clearHydratedArtifacts();
+                    if (!options?.silent) {
+                        await window.toolboxAPI.utils.showNotification({
+                            title: "No PCF project detected",
+                            body: "pcfconfig.json was not found in the selected folder.",
+                            type: "warning",
+                        });
+                    }
+                    return false;
+                }
+            }
+
+            let rawConfig: string;
+            try {
+                rawConfig = await fsApi.readText(configPath);
+            } catch (err) {
+                if (!options?.silent) {
+                    await window.toolboxAPI.utils.showNotification({
+                        title: "Unable to read pcfconfig.json",
+                        body: err instanceof Error ? err.message : "An unexpected filesystem error occurred.",
+                        type: "error",
+                    });
+                }
+                clearHydratedArtifacts();
+                return false;
+            }
+
+            const normalizedConfig = rawConfig?.trim();
+            if (!normalizedConfig) {
+                console.warn("[PCF Builder] pcfconfig.json contained no data", {
+                    workspace,
+                });
+                if (!options?.silent) {
+                    await window.toolboxAPI.utils.showNotification({
+                        title: "Empty pcfconfig.json",
+                        body: "The configuration file exists but does not contain any data.",
+                        type: "warning",
+                    });
+                }
+                clearHydratedArtifacts();
+                return false;
+            }
+
+            let parsedConfig: Record<string, any>;
+            try {
+                parsedConfig = JSON.parse(normalizedConfig);
+            } catch (err) {
+                console.error("[PCF Builder] Failed to parse pcfconfig.json", {
+                    workspace,
+                    error: err,
+                });
+                if (!options?.silent) {
+                    await window.toolboxAPI.utils.showNotification({
+                        title: "Invalid pcfconfig.json",
+                        body: err instanceof Error ? err.message : "Unable to parse pcfconfig.json from the selected folder.",
+                        type: "error",
+                    });
+                }
+                clearHydratedArtifacts();
+                return false;
+            }
+
+            const manifestResolution = await resolveManifestPathsFromProject(fsApi, workspace, parsedConfig);
+            const manifestPathHints = manifestResolution.manifestPaths;
+            setManifestPaths(manifestPathHints);
+            setHasExistingProject(manifestResolution.projectPaths.length > 0);
+
+            const [manifestUpdates, packageUpdates] = await Promise.all([
+                loadManifestControlUpdates(fsApi, workspace, {
+                    additionalManifestPaths: manifestPathHints,
+                }),
+                loadPackageControlUpdates(fsApi, workspace),
+            ]);
+            if (!manifestUpdates) {
+                console.info("[PCF Builder] No ControlManifest.Input.xml metadata detected", {
+                    workspace,
+                    manifestPathHints,
                 });
             }
-            clearHydratedArtifacts();
-            return false;
-        }
 
-        const normalizedConfig = rawConfig?.trim();
-        if (!normalizedConfig) {
-            console.warn("[PCF Builder] pcfconfig.json contained no data", {
-                workspace,
-            });
-            if (!options?.silent) {
-                await window.toolboxAPI.utils.showNotification({
-                    title: "Empty pcfconfig.json",
-                    body: "The configuration file exists but does not contain any data.",
-                    type: "warning",
+            const controlUpdates = extractControlUpdates(parsedConfig);
+            if (!controlUpdates || Object.keys(controlUpdates).length === 0) {
+                console.warn("[PCF Builder] pcfconfig.json missing control details", {
+                    workspace,
+                    parsedConfig,
                 });
             }
-            clearHydratedArtifacts();
-            return false;
-        }
-
-        let parsedConfig: Record<string, any>;
-        try {
-            parsedConfig = JSON.parse(normalizedConfig);
-        } catch (err) {
-            console.error("[PCF Builder] Failed to parse pcfconfig.json", {
+            let nextControl = applyDefined({ ...DEFAULT_CONTROL_CONFIG }, controlUpdates);
+            nextControl = applyMissing(nextControl, manifestUpdates ?? undefined);
+            nextControl = applyMissing(nextControl, packageUpdates ?? undefined);
+            nextControl.incrementVersionOnBuild = true;
+            console.info("[PCF Builder] Hydrated control config", {
                 workspace,
-                error: err,
+                controlUpdates,
+                manifestUpdates,
+                packageUpdates,
+                resultingControl: nextControl,
             });
+            setControlConfig(nextControl);
+            setPackageList(nextControl.additionalPackages?.length ? nextControl.additionalPackages.join(", ") : "");
+
+            const solutionProjectDetails = await loadSolutionProjectUpdates(fsApi, workspace, {
+                controlName: nextControl.name,
+            });
+
+            let nextSolution = { ...DEFAULT_SOLUTION_CONFIG };
+            if (solutionProjectDetails.metadata) {
+                nextSolution = applyDefined(nextSolution, solutionProjectDetails.metadata);
+            }
+            nextSolution = applyMissing(nextSolution, {
+                version: nextControl.version,
+            });
+            setSolutionConfig(nextSolution);
+            const metadataPopulated = Boolean(solutionProjectDetails.metadata && Object.keys(solutionProjectDetails.metadata).length > 0);
+            setSolutionFieldsLocked(metadataPopulated);
+            setSolutionProjectCreated(metadataPopulated);
+            setIsControlInSolution(Boolean(solutionProjectDetails.controlReferenced));
+
             if (!options?.silent) {
                 await window.toolboxAPI.utils.showNotification({
-                    title: "Invalid pcfconfig.json",
-                    body: err instanceof Error ? err.message : "Unable to parse pcfconfig.json from the selected folder.",
-                    type: "error",
+                    title: "PCF project detected",
+                    body: "Fields were populated from the selected folder.",
+                    type: "success",
                 });
             }
-            clearHydratedArtifacts();
-            return false;
-        }
 
-        const manifestResolution = await resolveManifestPathsFromProject(fsApi, workspace, parsedConfig);
-        const manifestPathHints = manifestResolution.manifestPaths;
-        setManifestPaths(manifestPathHints);
-        setHasExistingProject(manifestResolution.projectPaths.length > 0);
+            lastHydratedPathRef.current = workspace;
 
-        const [manifestUpdates, packageUpdates] = await Promise.all([
-            loadManifestControlUpdates(fsApi, workspace, {
-                additionalManifestPaths: manifestPathHints,
-            }),
-            loadPackageControlUpdates(fsApi, workspace),
-        ]);
-        if (!manifestUpdates) {
-            console.info("[PCF Builder] No ControlManifest.Input.xml metadata detected", {
-                workspace,
-                manifestPathHints,
-            });
-        }
-
-        const controlUpdates = extractControlUpdates(parsedConfig);
-        if (!controlUpdates || Object.keys(controlUpdates).length === 0) {
-            console.warn("[PCF Builder] pcfconfig.json missing control details", {
-                workspace,
-                parsedConfig,
-            });
-        }
-        let nextControl = applyDefined({ ...DEFAULT_CONTROL_CONFIG }, controlUpdates);
-        nextControl = applyMissing(nextControl, manifestUpdates ?? undefined);
-        nextControl = applyMissing(nextControl, packageUpdates ?? undefined);
-        nextControl.incrementVersionOnBuild = true;
-        console.info("[PCF Builder] Hydrated control config", {
-            workspace,
-            controlUpdates,
-            manifestUpdates,
-            packageUpdates,
-            resultingControl: nextControl,
-        });
-        setControlConfig(nextControl);
-        setPackageList(nextControl.additionalPackages?.length ? nextControl.additionalPackages.join(", ") : "");
-
-        const solutionProjectDetails = await loadSolutionProjectUpdates(fsApi, workspace, {
-            controlName: nextControl.name,
-        });
-
-        let nextSolution = { ...DEFAULT_SOLUTION_CONFIG };
-        if (solutionProjectDetails.metadata) {
-            nextSolution = applyDefined(nextSolution, solutionProjectDetails.metadata);
-        }
-        nextSolution = applyMissing(nextSolution, {
-            version: nextControl.version,
-        });
-        setSolutionConfig(nextSolution);
-        const metadataPopulated = Boolean(solutionProjectDetails.metadata && Object.keys(solutionProjectDetails.metadata).length > 0);
-        setSolutionFieldsLocked(metadataPopulated);
-        setSolutionProjectCreated(metadataPopulated);
-        setIsControlInSolution(Boolean(solutionProjectDetails.controlReferenced));
-
-        if (!options?.silent) {
-            await window.toolboxAPI.utils.showNotification({
-                title: "PCF project detected",
-                body: "Fields were populated from the selected folder.",
-                type: "success",
-            });
-        }
-
-        lastHydratedPathRef.current = workspace;
-
-        return true;
-    }, [clearHydratedArtifacts]);
+            return true;
+        },
+        [clearHydratedArtifacts],
+    );
 
     useEffect(() => {
         if (!projectPath) {
