@@ -1,0 +1,55 @@
+{
+  "name": "@power-maverick/tool-view-layout-copier",
+  "displayName": "View Layout Copier",
+  "version": "1.0.0",
+  "description": "Copy layout from one view to multiple views of the same entity in a single operation",
+  "contributors": [
+    {
+      "name": "Power Maverick",
+      "url": "https://github.com/Power-Maverick"
+    },
+    {
+      "name": "MscrmTools",
+      "url": "https://github.com/MscrmTools"
+    }
+  ],
+  "license": "GPL-2.0",
+  "configurations": {
+    "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/view-layout-copier",
+    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/view-layout-copier/README.md",
+    "iconUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/view-layout-copier/icons/layoutReplicator.svg"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview",
+    "finalize-package": "npm shrinkwrap"
+  },
+  "files": [
+    "dist",
+    "npm-shrinkwrap.json"
+  ],
+  "keywords": [
+    "dataverse",
+    "view",
+    "layout",
+    "copier",
+    "power-platform",
+    "pptb",
+    "toolbox"
+  ],
+  "author": "Power Maverick",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@pptb/types": "^1.0.13",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.7"
+  }
+}

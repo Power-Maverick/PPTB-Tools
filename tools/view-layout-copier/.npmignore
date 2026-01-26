@@ -1,0 +1,11 @@
+src/
+.vscode/
+docs/
+*.md
+!README.md
+tsconfig.json
+tsconfig.node.json
+vite.config.ts
+index.html
+node_modules/
+.DS_Store
