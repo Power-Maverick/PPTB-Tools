@@ -1,12 +1,12 @@
 {
   "name": "@power-maverick/tool-pcf-builder",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "@power-maverick/tool-pcf-builder",
-      "version": "1.0.0",
+      "version": "0.0.1",
       "license": "GPL-2.0",
       "dependencies": {
         "react": "^18.3.1",
@@ -14,7 +14,7 @@
       },
       "devDependencies": {
         "@eslint/js": "^9.39.2",
-        "@pptb/types": "^1.0.17",
+        "@pptb/types": "^1.0.19-beta.2",
         "@types/react": "^18.3.1",
         "@types/react-dom": "^18.3.0",
         "@typescript-eslint/eslint-plugin": "^8.53.1",
@@ -1056,9 +1056,9 @@
       }
     },
     "node_modules/@pptb/types": {
-      "version": "1.0.17",
-      "resolved": "https://registry.npmjs.org/@pptb/types/-/types-1.0.17.tgz",
-      "integrity": "sha512-QKXhPijdftsVb8NGD7Ce46toqfqes4Sw63P07xEK/PzhEAAuTMrjZjcBDqnLlqIYggPzJUOv/fFnBZ/bEkNoRQ==",
+      "version": "1.0.19-beta.2",
+      "resolved": "https://registry.npmjs.org/@pptb/types/-/types-1.0.19-beta.2.tgz",
+      "integrity": "sha512-n5odOm564n0Ke4lS4N+Lp3PRp7MXuJMvnkRmnnfy+oTi74J8AL34TJYbnR75fUGX26bF6c3sr5Wg2dHinXxQrg==",
       "dev": true,
       "license": "GPL-3.0"
     },

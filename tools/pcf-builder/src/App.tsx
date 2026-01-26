@@ -87,6 +87,40 @@ const DEFAULT_SOLUTION_CONFIG: PCFSolutionConfig = {
     version: "1.0.0",
 };
 
+const delay = (ms: number) =>
+    new Promise<void>((resolve) => {
+        window.setTimeout(resolve, ms);
+    });
+
+const toUint8Array = (input: ArrayBuffer | Uint8Array) => {
+    if (input instanceof Uint8Array) {
+        if (input.byteOffset === 0 && input.byteLength === input.buffer.byteLength) {
+            return input;
+        }
+        return new Uint8Array(input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength));
+    }
+    return new Uint8Array(input);
+};
+
+const binaryToBase64 = (input: ArrayBuffer | Uint8Array) => {
+    const bytes = toUint8Array(input);
+    const chunkSize = 0x8000;
+    let binary = "";
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+        const chunk = bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length));
+        binary += String.fromCharCode(...chunk);
+    }
+    return btoa(binary);
+};
+
+const createImportJobId = () => {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+    }
+    const randomSuffix = Math.random().toString(16).slice(2);
+    return `import-${Date.now()}-${randomSuffix}`;
+};
+
 function App() {
     const [activeTab, setActiveTab] = useState<AppTab>("control");
     const [initializing, setInitializing] = useState(true);
@@ -853,14 +887,165 @@ function App() {
                 if (!canRun || !solutionConfig.solutionName) {
                     return;
                 }
-                const zipPath = `./bin/Debug/${solutionConfig.solutionName}.zip`;
-                const command = `cd "${projectPath}" && pac solution import --path "${zipPath}" --publish-changes --force-overwrite`;
-                await executeTerminalCommand<SolutionAction>(action, setSolutionAction, {
-                    command,
-                    pendingLabel: "Deploying solution...",
-                    successMessage: "Solution import started. Monitor the terminal for details.",
-                    errorMessage: "Solution deployment failed.",
-                });
+                const trimmedSolutionName = solutionConfig.solutionName.trim();
+                const solutionFolderName = trimmedSolutionName || (controlConfig.name?.trim() ? `${controlConfig.name.trim()}Solution` : "");
+                if (!solutionFolderName) {
+                    await window.toolboxAPI?.utils.showNotification({
+                        title: "Solution folder required",
+                        body: "Generate the solution before deploying it to Dataverse.",
+                        type: "warning",
+                    });
+                    return;
+                }
+                const solutionFolderPath = joinFsPath(joinFsPath(projectPath, "Solution"), solutionFolderName);
+
+                const fsApi = getFileSystem();
+                if (!fsApi || typeof fsApi.readBinary !== "function") {
+                    await window.toolboxAPI?.utils.showNotification({
+                        title: "File reader unavailable",
+                        body: "Update PPTB to v1.0.17+ to deploy solutions via the new API.",
+                        type: "error",
+                    });
+                    return;
+                }
+
+                const dataverseApi = window.dataverseAPI;
+                if (!dataverseApi || typeof dataverseApi.deploySolution !== "function" || typeof dataverseApi.getImportJobStatus !== "function") {
+                    await window.toolboxAPI?.utils.showNotification({
+                        title: "Deploy API unavailable",
+                        body: "Update PPTB to a version that supports solution deployment tracking.",
+                        type: "error",
+                    });
+                    return;
+                }
+
+                const zipFileName = trimmedSolutionName || solutionFolderName;
+                const zipPath = joinFsPath(solutionFolderPath, `bin/Debug/${zipFileName}.zip`);
+                if (typeof fsApi.exists === "function") {
+                    try {
+                        const exists = await fsApi.exists(zipPath);
+                        if (!exists) {
+                            await window.toolboxAPI?.utils.showNotification({
+                                title: "Solution package missing",
+                                body: `Expected ${zipPath}, but it was not found. Run a build to generate the ZIP before deploying.`,
+                                type: "warning",
+                            });
+                            return;
+                        }
+                    } catch (err) {
+                        await window.toolboxAPI?.utils.showNotification({
+                            title: "Unable to verify solution package",
+                            body: err instanceof Error ? err.message : "An unexpected filesystem error occurred while checking the ZIP file.",
+                            type: "error",
+                        });
+                        return;
+                    }
+                }
+
+                let binaryContent: ArrayBuffer | Uint8Array;
+                try {
+                    binaryContent = await fsApi.readBinary(zipPath);
+                } catch (err) {
+                    await window.toolboxAPI?.utils.showNotification({
+                        title: "Unable to read solution package",
+                        body: err instanceof Error ? err.message : "An unexpected filesystem error occurred while reading the ZIP file.",
+                        type: "error",
+                    });
+                    return;
+                }
+
+                setCommandOutput("");
+                const appendDeployLog = (line: string) => {
+                    setCommandOutput((prev) => {
+                        const nextLine = `[Deploy] ${line}`;
+                        return prev ? `${prev}\n${nextLine}` : nextLine;
+                    });
+                };
+
+                const base64Payload = binaryToBase64(binaryContent);
+                const importJobId = createImportJobId();
+                setSolutionAction("deploy");
+                appendDeployLog(`Uploading ${solutionConfig.solutionName}.zip...`);
+
+                await window.toolboxAPI?.utils.showLoading("Deploying solution...").catch(() => undefined);
+
+                const trackImportJob = async (jobId: string) => {
+                    const pollDelay = 2000;
+                    const maxAttempts = 600; // ~20 minutes
+                    let attempt = 0;
+                    let finalStatus: Record<string, any> | null = null;
+
+                    while (attempt < maxAttempts) {
+                        attempt += 1;
+                        try {
+                            const status = await dataverseApi.getImportJobStatus(jobId);
+                            finalStatus = status ?? null;
+                            const progress = typeof status?.progress === "number" ? status.progress : undefined;
+                            const stage = status?.status ?? status?.state ?? status?.statecode;
+                            const message = status?.message ?? status?.statusdescription ?? status?.description;
+                            const summaryParts = [] as string[];
+                            if (typeof progress === "number") {
+                                summaryParts.push(`progress ${progress}%`);
+                            }
+                            if (stage) {
+                                summaryParts.push(String(stage));
+                            }
+                            if (message) {
+                                summaryParts.push(String(message));
+                            }
+                            appendDeployLog(summaryParts.length > 0 ? summaryParts.join(" | ") : "Awaiting import status...");
+
+                            if (status?.completedon || status?.completedOn || progress === 100) {
+                                return finalStatus;
+                            }
+                        } catch (err) {
+                            appendDeployLog(`Status check failed: ${err instanceof Error ? err.message : String(err)}. Retrying...`);
+                        }
+
+                        await delay(pollDelay);
+                    }
+
+                    return finalStatus;
+                };
+
+                try {
+                    const deployResult = await dataverseApi.deploySolution(base64Payload, {
+                        importJobId,
+                        publishWorkflows: true,
+                        overwriteUnmanagedCustomizations: true,
+                    });
+                    const trackedJobId = deployResult?.ImportJobId ?? importJobId;
+                    appendDeployLog(`Import job ${trackedJobId} created. Monitoring progress...`);
+                    const finalStatus = await trackImportJob(trackedJobId);
+                    const hasErrors =
+                        Boolean(finalStatus?.errorcode) || Boolean(finalStatus?.hasErrors) || Boolean((finalStatus?.data as { Errors?: Array<{ Description?: string }> } | undefined)?.Errors?.length);
+                    if (hasErrors) {
+                        const errors = (finalStatus?.data as { Errors?: Array<{ Description?: string }> } | undefined)?.Errors ?? [];
+                        const description =
+                            errors
+                                .map((err) => err?.Description)
+                                .filter(Boolean)
+                                .join(" | ") || "Import job reported errors.";
+                        throw new Error(description);
+                    }
+                    appendDeployLog(`Import job ${trackedJobId} completed.`);
+                    await window.toolboxAPI?.utils.showNotification({
+                        title: "Solution deployed",
+                        body: "The solution import completed successfully.",
+                        type: "success",
+                    });
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : String(err);
+                    appendDeployLog(`Deployment failed: ${message}`);
+                    await window.toolboxAPI?.utils.showNotification({
+                        title: "Solution deployment failed",
+                        body: message,
+                        type: "error",
+                    });
+                } finally {
+                    setSolutionAction(null);
+                    await window.toolboxAPI?.utils.hideLoading().catch(() => undefined);
+                }
                 return;
             }
             default:

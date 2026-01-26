@@ -1,8 +1,19 @@
 {
   "name": "@power-maverick/tool-pcf-builder",
   "displayName": "PCF Builder",
-  "version": "1.0.0",
-  "description": "Build and manage Power Apps Component Framework (PCF) controls - React-based tool for PowerPlatform ToolBox",
+  "version": "0.0.1",
+  "description": "Build, manage and deploy Power Apps Component Framework (PCF) controls",
+  "contributors": [
+    {
+      "name": "Power Maverick",
+      "url": "https://github.com/Power-Maverick"
+    }
+  ],
+  "license": "GPL-2.0",
+  "configurations": {
+    "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/pcf-builder",
+    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/pcf-builder/README.md"
+  },
   "type": "module",
   "scripts": {
     "build": "npm run lint && npm run typecheck && vite build",
@@ -26,14 +37,13 @@
     "toolbox"
   ],
   "author": "Power Maverick",
-  "license": "GPL-2.0",
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "@pptb/types": "^1.0.17",
+    "@pptb/types": "^1.0.19-beta.2",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^8.53.1",
