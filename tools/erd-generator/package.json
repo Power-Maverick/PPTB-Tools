@@ -1,7 +1,7 @@
 {
   "name": "@power-maverick/tool-erd-generator",
   "displayName": "ERD Generator",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Generate Entity Relationship Diagrams (ERD) for Dataverse solutions",
   "contributors": [
     {
@@ -13,7 +13,7 @@
   "configurations": {
     "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/erd-generator",
     "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/erd-generator/README.md",
-    "iconUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/erd-generator/icons/erdGenerator-light-theme.svg"
+    "iconUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/erd-generator/icons/erdGenerator.png"
   },
   "cspExceptions": {
     "connect-src": [

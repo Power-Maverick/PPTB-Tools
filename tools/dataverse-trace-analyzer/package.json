@@ -1,7 +1,7 @@
 {
   "name": "@power-maverick/tool-dataverse-trace-analyzer",
   "displayName": "Dataverse Trace Analyzer",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Analyze and view Plugin Trace Logs from Dataverse",
   "contributors": [
     {
@@ -17,7 +17,7 @@
   "configurations": {
     "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/dataverse-trace-analyzer",
     "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/dataverse-trace-analyzer/README.md",
-    "iconUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/dataverse-trace-analyzer/icons/traceAnalyzer-light-theme.svg"
+    "iconUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/dataverse-trace-analyzer/icons/traceAnalyzer.png"
   },
   "type": "module",
   "scripts": {
