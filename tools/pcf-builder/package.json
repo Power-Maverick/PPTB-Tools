@@ -1,0 +1,59 @@
+{
+  "name": "@power-maverick/tool-pcf-builder",
+  "displayName": "PCF Builder",
+  "version": "0.0.1",
+  "description": "Build, manage and deploy Power Apps Component Framework (PCF) controls",
+  "contributors": [
+    {
+      "name": "Power Maverick",
+      "url": "https://github.com/Power-Maverick"
+    }
+  ],
+  "license": "GPL-2.0",
+  "configurations": {
+    "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/pcf-builder",
+    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/pcf-builder/README.md",
+    "iconUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/pcf-builder/icons/pcfBuilder-light-theme.svg"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "npm run lint && npm run typecheck && vite build",
+    "dev": "vite",
+    "preview": "vite preview",
+    "finalize-package": "npm shrinkwrap",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
+    "typecheck": "tsc --noEmit"
+  },
+  "files": [
+    "dist",
+    "npm-shrinkwrap.json"
+  ],
+  "keywords": [
+    "pcf",
+    "power-apps",
+    "component-framework",
+    "custom-control",
+    "power-platform",
+    "pptb",
+    "toolbox"
+  ],
+  "author": "Power Maverick",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@pptb/types": "^1.0.19-beta.2",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.53.1",
+    "@typescript-eslint/parser": "^8.53.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.39.2",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^17.1.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.7"
+  }
+}

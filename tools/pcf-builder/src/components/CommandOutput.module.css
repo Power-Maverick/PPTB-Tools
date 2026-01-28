@@ -1,0 +1,26 @@
+.console {
+  background: #050914;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 20px;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.6);
+}
+
+.header {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 12px;
+}
+
+.body {
+  max-height: 260px;
+  overflow: auto;
+  line-height: 1.45;
+  color: #e2e8f0;
+  font-family: "JetBrains Mono", "Consolas", monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  margin: 0;
+}

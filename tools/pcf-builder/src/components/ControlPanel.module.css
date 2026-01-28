@@ -1,0 +1,148 @@
+.panel {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: var(--shadow-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.header {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.kicker {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.78rem;
+    color: var(--color-muted);
+}
+
+.subtitle {
+    font-size: 1rem;
+    color: var(--color-text);
+    max-width: 46ch;
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.controlGrid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.cell {
+    min-width: 0;
+}
+
+.span4 {
+    grid-column: span 4;
+}
+
+.span8 {
+    grid-column: span 8;
+}
+
+.fullRow {
+    grid-column: 1 / -1;
+}
+
+.helperText {
+    font-size: 0.78rem;
+    color: var(--color-muted);
+    margin-top: 6px;
+}
+
+.helperText code {
+    background: rgba(15, 23, 42, 0.06);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+}
+
+.panelReadOnly input[readonly],
+.panelReadOnly textarea[readonly] {
+    background: rgba(15, 23, 42, 0.04);
+    border-color: rgba(15, 23, 42, 0.12);
+    color: var(--color-muted);
+    cursor: not-allowed;
+}
+
+.panelReadOnly select:disabled {
+    background: rgba(15, 23, 42, 0.04);
+    border-color: rgba(15, 23, 42, 0.12);
+    color: var(--color-muted);
+    cursor: not-allowed;
+}
+
+.panelReadOnly input[readonly]:focus,
+.panelReadOnly textarea[readonly]:focus,
+.panelReadOnly select:disabled:focus {
+    box-shadow: none;
+    outline: none;
+}
+
+.toggleRow {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.85rem;
+    color: var(--color-muted);
+}
+
+.toggleRow input[type="checkbox"] {
+    margin-top: 4px;
+}
+
+.toggleLabel {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.checkbox {
+    flex: 1;
+}
+
+@media (max-width: 960px) {
+    .spanTwo {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 720px) {
+    .panel {
+        padding: 22px;
+    }
+}
+
+@media (max-width: 960px) {
+    .controlGrid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    .span4,
+    .span8 {
+        grid-column: span 6;
+    }
+}
+
+@media (max-width: 640px) {
+    .controlGrid {
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .span4,
+    .span8,
+    .fullRow {
+        grid-column: span 1;
+    }
+}

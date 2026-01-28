@@ -1,0 +1,36 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.74rem;
+  color: var(--color-muted);
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+}
+
+.input {
+  flex: 1;
+}
+
+.helper {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+@media (max-width: 640px) {
+  .row {
+    flex-direction: column;
+  }
+
+  .input {
+    width: 100%;
+  }
+}

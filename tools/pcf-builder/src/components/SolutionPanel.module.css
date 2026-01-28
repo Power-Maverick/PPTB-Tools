@@ -1,0 +1,90 @@
+.panel {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: var(--shadow-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.panelReadOnly input[readonly] {
+    background: rgba(15, 23, 42, 0.04);
+    border-color: rgba(15, 23, 42, 0.12);
+    color: var(--color-muted);
+    cursor: not-allowed;
+}
+
+.panelReadOnly input[readonly]:focus {
+    box-shadow: none;
+    outline: none;
+}
+
+.panelReadOnly select:disabled {
+    background: rgba(15, 23, 42, 0.04);
+    border-color: rgba(15, 23, 42, 0.12);
+    color: var(--color-muted);
+    cursor: not-allowed;
+}
+
+.panelReadOnly select:disabled:focus {
+    box-shadow: none;
+    outline: none;
+}
+
+.header {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.kicker {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.78rem;
+    color: var(--color-muted);
+}
+
+.subtitle {
+    font-size: 1rem;
+    color: var(--color-text);
+    max-width: 52ch;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+}
+
+.helperText {
+    font-size: 0.8rem;
+    color: var(--color-muted);
+}
+
+.helperText code {
+    background: rgba(15, 23, 42, 0.06);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+}
+
+.helperText em {
+    font-style: normal;
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+.workspaceSummary {
+    border-radius: var(--radius-md);
+    border: 1px dashed rgba(15, 23, 42, 0.12);
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    color: var(--color-text);
+}
+
+@media (max-width: 720px) {
+    .panel {
+        padding: 22px;
+    }
+}
