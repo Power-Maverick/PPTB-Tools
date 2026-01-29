@@ -49,10 +49,26 @@ Choose the operation that fits your scenario:
   - **Auto-Map**: Automatically map system entities (users, teams, business units)
   - **Skip**: Exclude the lookup field from migration
 
+### Flexible Filtering
+
+- **OData Filters**: Use OData syntax for simple filtering
+  - Example: `statecode eq 0 and createdon gt 2024-01-01`
+- **FetchXML Queries**: Use complete FetchXML for complex queries
+  - Supports advanced filtering, joins, and aggregations
+- Toggle between filter types with a modern selector
+
 ### Advanced Options
 
-- **Filter Query**: Apply OData filters to select specific records
+- **Filter Query**: Apply OData or FetchXML filters to select specific records
 - **Batch Size**: Control batch size for optimal performance (1-100 records per batch)
+
+### Modern, Fluid UI
+
+- **Step-based workflow**: Clear progression through configuration steps
+- **Collapsible sections**: Minimize scrolling with expandable step cards
+- **Modern design**: Gradient headers, card-based layout, smooth transitions
+- **Responsive**: Works well on different screen sizes
+- **Visual feedback**: Color-coded badges, progress indicators, and status displays
 
 ### Progress Tracking
 

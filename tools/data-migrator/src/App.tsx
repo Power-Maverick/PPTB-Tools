@@ -37,6 +37,7 @@ function App() {
   const [operation, setOperation] = useState<MigrationOperation>("create");
   const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
   const [lookupMappings, setLookupMappings] = useState<LookupMapping[]>([]);
+  const [filterType, setFilterType] = useState<"odata" | "fetchxml">("odata");
   const [filterQuery, setFilterQuery] = useState<string>("");
   const [batchSize, setBatchSize] = useState<number>(50);
 
@@ -54,6 +55,9 @@ function App() {
   const [userMappings, setUserMappings] = useState<AutoMappingResult[]>([]);
   const [teamMappings, setTeamMappings] = useState<AutoMappingResult[]>([]);
   const [businessUnitMappings, setBusinessUnitMappings] = useState<AutoMappingResult[]>([]);
+
+  // Step management for better UX
+  const [currentStep, setCurrentStep] = useState<number>(1);
 
   const [migrationEngine] = useState<MigrationEngine>(() => new MigrationEngine());
 
@@ -117,12 +121,13 @@ function App() {
     setSelectedEntity(entity);
     setLoadingFields(true);
     setError("");
+    setCurrentStep(2);
 
     try {
       // Load fields for the selected entity
       const client = new DataverseClient("primary");
       const fields = await client.fetchEntityFields(entity.logicalName);
-      
+
       const updatedEntity = { ...entity, fields };
       setSelectedEntity(updatedEntity);
 
@@ -187,9 +192,7 @@ function App() {
 
     try {
       const client = new DataverseClient("primary");
-      const selectFields = fieldMappings
-        .filter((m) => m.isEnabled)
-        .map((m) => m.sourceField);
+      const selectFields = fieldMappings.filter((m) => m.isEnabled).map((m) => m.sourceField);
 
       // Add primary ID and primary name fields
       if (!selectFields.includes(selectedEntity.primaryIdAttribute)) {
@@ -199,13 +202,21 @@ function App() {
         selectFields.push(selectedEntity.primaryNameAttribute);
       }
 
-      const sourceRecords = await client.queryRecords(
-        selectedEntity.logicalName,
-        selectFields,
-        filterQuery || undefined,
-        undefined,
-        100 // Limit preview to 100 records
-      );
+      let sourceRecords: any[];
+
+      if (filterType === "fetchxml" && filterQuery) {
+        // Use FetchXML query
+        sourceRecords = await client.queryRecordsWithFetchXml(filterQuery);
+      } else {
+        // Use OData query
+        sourceRecords = await client.queryRecords(
+          selectedEntity.logicalName,
+          selectFields,
+          filterQuery || undefined,
+          undefined,
+          100 // Limit preview to 100 records
+        );
+      }
 
       const preview: PreviewRecord[] = sourceRecords.map((record) => ({
         action: operation.toUpperCase() as "CREATE" | "UPDATE" | "DELETE",
@@ -240,6 +251,7 @@ function App() {
       fieldMappings,
       lookupMappings,
       filterQuery: filterQuery || undefined,
+      filterType,
       batchSize,
     };
 
@@ -281,107 +293,180 @@ function App() {
         </div>
       )}
 
-      <div className="content">
-        <div className="panel">
-          <h2>Data Migrator</h2>
-          <p className="subtitle">Migrate data between environments with auto-mapping</p>
-
-          {/* Connection Information */}
-          {connectionUrl && secondaryConnectionUrl && (
-            <div className="connection-info">
-              <div className="connection-item">
-                <span className="connection-label">Source (Primary):</span>
-                <span className="connection-url">{connectionUrl}</span>
+      <div className="content-fluid">
+        {/* Header with connections */}
+        <div className="header-card">
+          <div className="header-content">
+            <h1 className="app-title">Data Migrator</h1>
+            {connectionUrl && secondaryConnectionUrl && (
+              <div className="connection-flow">
+                <div className="connection-badge source">
+                  <span className="connection-label">Source</span>
+                  <span className="connection-url">{new URL(connectionUrl).hostname}</span>
+                </div>
+                <div className="flow-arrow">→</div>
+                <div className="connection-badge target">
+                  <span className="connection-label">Target</span>
+                  <span className="connection-url">{new URL(secondaryConnectionUrl).hostname}</span>
+                </div>
               </div>
-              <div className="connection-arrow">→</div>
-              <div className="connection-item">
-                <span className="connection-label">Target (Secondary):</span>
-                <span className="connection-url">{secondaryConnectionUrl}</span>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
+        </div>
 
+        {/* Main content with steps */}
+        <div className="steps-container">
           {/* Step 1: Entity Selection */}
-          <EntitySelector
-            entities={entities}
-            selectedEntity={selectedEntity}
-            onEntitySelect={handleEntitySelect}
-            loading={loadingEntities}
-          />
+          <div className={`step-card ${currentStep >= 1 ? "active" : ""}`}>
+            <div className="step-header">
+              <div className="step-number">1</div>
+              <h2 className="step-title">Select Entity</h2>
+            </div>
+            <div className="step-content">
+              <EntitySelector
+                entities={entities}
+                selectedEntity={selectedEntity}
+                onEntitySelect={handleEntitySelect}
+                loading={loadingEntities}
+              />
+            </div>
+          </div>
 
-          {/* Show loading while fields are being fetched */}
+          {/* Loading indicator */}
           {loadingFields && (
-            <div style={{ padding: "20px", textAlign: "center" }}>
-              <div className="loading-spinner" style={{ margin: "0 auto 12px" }}></div>
+            <div className="loading-card">
+              <div className="loading-spinner"></div>
               <p>Loading fields...</p>
             </div>
           )}
 
-          {/* Steps 2-7: Field selection and configuration */}
+          {/* Steps 2-7: Configuration */}
           {selectedEntity && selectedEntity.fields.length > 0 && !loadingFields && (
             <>
               {/* Step 2: Field Selection */}
-              <FieldSelector
-                fields={selectedEntity.fields}
-                fieldMappings={fieldMappings}
-                onFieldMappingsChange={setFieldMappings}
-              />
+              <div className={`step-card ${currentStep >= 2 ? "active" : ""}`}>
+                <div className="step-header" onClick={() => setCurrentStep(2)}>
+                  <div className="step-number">2</div>
+                  <h2 className="step-title">Select Fields</h2>
+                  <span className="step-count">{fieldMappings.filter((m) => m.isEnabled).length} selected</span>
+                </div>
+                <div className="step-content">
+                  <FieldSelector
+                    fields={selectedEntity.fields}
+                    fieldMappings={fieldMappings}
+                    onFieldMappingsChange={setFieldMappings}
+                  />
+                </div>
+              </div>
 
               {/* Step 3: Filter Configuration */}
-              <div className="config-section">
-                <h3>Filter Data (Optional)</h3>
-                <div className="form-group">
-                  <label>Filter Query (OData)</label>
-                  <input
-                    type="text"
-                    value={filterQuery}
-                    onChange={(e) => setFilterQuery(e.target.value)}
-                    placeholder="e.g., statecode eq 0"
-                  />
-                  <p style={{ fontSize: "12px", color: "#605e5c", margin: "8px 0 0 0" }}>
-                    Filter records to migrate. Leave empty to migrate all records.
-                  </p>
+              <div className={`step-card ${currentStep >= 2 ? "active" : ""}`}>
+                <div className="step-header" onClick={() => setCurrentStep(3)}>
+                  <div className="step-number">3</div>
+                  <h2 className="step-title">Filter Data</h2>
+                  <span className="step-badge">Optional</span>
+                </div>
+                <div className="step-content">
+                  <div className="filter-type-selector">
+                    <button
+                      className={`filter-type-btn ${filterType === "odata" ? "active" : ""}`}
+                      onClick={() => setFilterType("odata")}
+                    >
+                      OData
+                    </button>
+                    <button
+                      className={`filter-type-btn ${filterType === "fetchxml" ? "active" : ""}`}
+                      onClick={() => setFilterType("fetchxml")}
+                    >
+                      FetchXML
+                    </button>
+                  </div>
+
+                  <div className="form-group">
+                    {filterType === "odata" ? (
+                      <>
+                        <label>OData Filter</label>
+                        <input
+                          type="text"
+                          value={filterQuery}
+                          onChange={(e) => setFilterQuery(e.target.value)}
+                          placeholder="e.g., statecode eq 0"
+                          className="modern-input"
+                        />
+                        <p className="field-hint">Example: statecode eq 0 and createdon gt 2024-01-01</p>
+                      </>
+                    ) : (
+                      <>
+                        <label>FetchXML Query</label>
+                        <textarea
+                          value={filterQuery}
+                          onChange={(e) => setFilterQuery(e.target.value)}
+                          placeholder="<fetch><entity name='account'>...</entity></fetch>"
+                          className="modern-textarea"
+                          rows={6}
+                        />
+                        <p className="field-hint">Complete FetchXML query including entity and attributes</p>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Step 4: Operation Selection */}
-              <div className="config-section">
-                <h3>Settings</h3>
-                <OperationSelector operation={operation} onOperationChange={setOperation} />
-
-                {/* Step 5: Batch Size */}
-                <div className="form-group">
-                  <label>Batch Size (Max 100)</label>
-                  <input
-                    type="number"
-                    value={batchSize}
-                    onChange={(e) => setBatchSize(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
-                    min="1"
-                    max="100"
-                  />
-                  <p style={{ fontSize: "12px", color: "#605e5c", margin: "8px 0 0 0" }}>
-                    Number of records to process per batch.
-                  </p>
+              {/* Step 4: Settings */}
+              <div className={`step-card ${currentStep >= 2 ? "active" : ""}`}>
+                <div className="step-header" onClick={() => setCurrentStep(4)}>
+                  <div className="step-number">4</div>
+                  <h2 className="step-title">Settings</h2>
+                </div>
+                <div className="step-content">
+                  <div className="settings-grid">
+                    <div className="setting-item">
+                      <OperationSelector operation={operation} onOperationChange={setOperation} />
+                    </div>
+                    <div className="setting-item">
+                      <label>Batch Size (Max 100)</label>
+                      <input
+                        type="number"
+                        value={batchSize}
+                        onChange={(e) =>
+                          setBatchSize(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))
+                        }
+                        min="1"
+                        max="100"
+                        className="modern-input"
+                      />
+                      <p className="field-hint">Records per batch</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Step 6: Lookup Mapping */}
+              {/* Step 5: Lookup Mapping */}
               {lookupMappings.length > 0 && (
-                <LookupMapper
-                  lookupMappings={lookupMappings}
-                  onLookupMappingsChange={setLookupMappings}
-                  onAutoMapping={handleAutoMapping}
-                />
+                <div className={`step-card ${currentStep >= 2 ? "active" : ""}`}>
+                  <div className="step-header" onClick={() => setCurrentStep(5)}>
+                    <div className="step-number">5</div>
+                    <h2 className="step-title">Lookup Mappings</h2>
+                    <span className="step-badge">Optional</span>
+                  </div>
+                  <div className="step-content">
+                    <LookupMapper
+                      lookupMappings={lookupMappings}
+                      onLookupMappingsChange={setLookupMappings}
+                      onAutoMapping={handleAutoMapping}
+                    />
+                  </div>
+                </div>
               )}
 
-              {/* Step 7: Preview Button */}
-              <div className="migration-controls">
+              {/* Action Button */}
+              <div className="action-bar">
                 <button
-                  className="btn-primary"
+                  className="btn-preview"
                   onClick={handlePreview}
                   disabled={loadingPreview || isMigrating}
                 >
-                  {loadingPreview ? "Loading Preview..." : "Preview Data"}
+                  {loadingPreview ? "Loading..." : "Preview Data"}
                 </button>
               </div>
             </>
@@ -389,9 +474,13 @@ function App() {
         </div>
 
         {/* Migration Progress */}
-        {migrationProgress && <MigrationProgressComponent progress={migrationProgress} />}
+        {migrationProgress && (
+          <div className="progress-card">
+            <MigrationProgressComponent progress={migrationProgress} />
+          </div>
+        )}
 
-        {/* Step 8: Preview Modal */}
+        {/* Preview Modal */}
         {showPreview && selectedEntity && (
           <PreviewData
             previewRecords={previewRecords}

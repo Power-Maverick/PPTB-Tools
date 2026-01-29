@@ -119,6 +119,19 @@ export class DataverseClient {
     }
 
     /**
+     * Query records using FetchXML
+     */
+    async queryRecordsWithFetchXml(fetchXml: string): Promise<any[]> {
+        try {
+            const response = await window.dataverseAPI.fetchXmlQuery(fetchXml, this.connectionTarget);
+            return response.value || [];
+        } catch (error: any) {
+            console.error("Failed to query records with FetchXML:", error);
+            throw new Error(`Failed to query records with FetchXML: ${error.message}`);
+        }
+    }
+
+    /**
      * Create a record
      */
     async createRecord(entityLogicalName: string, recordData: any): Promise<string> {

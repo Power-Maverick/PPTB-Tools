@@ -134,6 +134,8 @@ export interface MigrationConfig {
   lookupMappings: LookupMapping[];
   /** Filter query for source records */
   filterQuery?: string;
+  /** Filter type */
+  filterType?: "odata" | "fetchxml";
   /** Batch size for migration */
   batchSize: number;
 }
