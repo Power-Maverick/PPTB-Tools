@@ -350,6 +350,17 @@ body {
   /* Inherits form-group styles */
 }
 
+/* Operation Checkboxes */
+.operation-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--background-light);
+  border-radius: 8px;
+  border: 2px solid var(--border-color);
+}
+
 /* Action Bar */
 .action-bar {
   display: flex;

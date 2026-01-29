@@ -34,7 +34,7 @@ function App() {
   const [loadingFields, setLoadingFields] = useState<boolean>(false);
 
   // Migration configuration
-  const [operation, setOperation] = useState<MigrationOperation>("create");
+  const [operations, setOperations] = useState<MigrationOperation[]>(["create"]);
   const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
   const [lookupMappings, setLookupMappings] = useState<LookupMapping[]>([]);
   const [filterType, setFilterType] = useState<"odata" | "fetchxml">("odata");
@@ -219,7 +219,7 @@ function App() {
       }
 
       const preview: PreviewRecord[] = sourceRecords.map((record) => ({
-        action: operation.toUpperCase() as "CREATE" | "UPDATE" | "DELETE",
+        action: (operations[0] || "create").toUpperCase() as "CREATE" | "UPDATE" | "DELETE",
         data: record,
         primaryId: record[selectedEntity.primaryIdAttribute] || "",
         primaryName: record[selectedEntity.primaryNameAttribute] || "",
@@ -247,7 +247,7 @@ function App() {
     const config: MigrationConfig = {
       entityLogicalName: selectedEntity.logicalName,
       entityDisplayName: selectedEntity.displayName,
-      operation,
+      operations,
       fieldMappings,
       lookupMappings,
       filterQuery: filterQuery || undefined,
@@ -421,7 +421,7 @@ function App() {
                 <div className="step-content">
                   <div className="settings-grid">
                     <div className="setting-item">
-                      <OperationSelector operation={operation} onOperationChange={setOperation} />
+                      <OperationSelector operations={operations} onOperationsChange={setOperations} />
                     </div>
                     <div className="setting-item">
                       <label>Batch Size (Max 100)</label>

@@ -126,8 +126,8 @@ export interface MigrationConfig {
   entityLogicalName: string;
   /** Entity display name */
   entityDisplayName: string;
-  /** Migration operation */
-  operation: MigrationOperation;
+  /** Migration operations (can be multiple) */
+  operations: MigrationOperation[];
   /** Field mappings */
   fieldMappings: FieldMapping[];
   /** Lookup mappings */

@@ -171,8 +171,9 @@ export class MigrationEngine {
       // Add primary ID field
       const entityMetadata = await window.dataverseAPI.getEntityMetadata(
         config.entityLogicalName,
-        false,
-        ["PrimaryIdAttribute"]
+        true,  // searchByLogicalName should be true
+        ["PrimaryIdAttribute"],
+        "primary"  // Use primary connection for source
       );
       
       if (!entityMetadata || !entityMetadata.PrimaryIdAttribute) {
@@ -234,39 +235,38 @@ export class MigrationEngine {
             // Transform record with mappings
             const targetData = this.transformRecord(sourceRecord, config);
 
-            // Perform operation
-            switch (config.operation) {
-              case "create":
-                const createdId = await this.targetClient.createRecord(
-                  config.entityLogicalName,
-                  targetData
-                );
-                migrationRecord.targetId = createdId;
-                migrationRecord.status = "success";
-                progress.successful++;
-                break;
+            // Perform all selected operations on each record
+            for (const operation of config.operations) {
+              switch (operation) {
+                case "create":
+                  const createdId = await this.targetClient.createRecord(
+                    config.entityLogicalName,
+                    targetData
+                  );
+                  migrationRecord.targetId = createdId;
+                  break;
 
-              case "update":
-                await this.targetClient.updateRecord(
-                  config.entityLogicalName,
-                  recordId,
-                  targetData
-                );
-                migrationRecord.targetId = recordId;
-                migrationRecord.status = "success";
-                progress.successful++;
-                break;
+                case "update":
+                  await this.targetClient.updateRecord(
+                    config.entityLogicalName,
+                    recordId,
+                    targetData
+                  );
+                  migrationRecord.targetId = recordId;
+                  break;
 
-              case "delete":
-                await this.targetClient.deleteRecord(
-                  config.entityLogicalName,
-                  recordId
-                );
-                migrationRecord.targetId = recordId;
-                migrationRecord.status = "success";
-                progress.successful++;
-                break;
+                case "delete":
+                  await this.targetClient.deleteRecord(
+                    config.entityLogicalName,
+                    recordId
+                  );
+                  migrationRecord.targetId = recordId;
+                  break;
+              }
             }
+            
+            migrationRecord.status = "success";
+            progress.successful++;
           } catch (error: any) {
             migrationRecord.status = "error";
             migrationRecord.errorMessage = error.message;
