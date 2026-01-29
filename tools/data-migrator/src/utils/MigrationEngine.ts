@@ -257,13 +257,12 @@ export class MigrationEngine {
                 progress.successful++;
                 break;
 
-              case "upsert":
-                const upsertedId = await this.targetClient.upsertRecord(
+              case "delete":
+                await this.targetClient.deleteRecord(
                   config.entityLogicalName,
-                  recordId,
-                  targetData
+                  recordId
                 );
-                migrationRecord.targetId = upsertedId;
+                migrationRecord.targetId = recordId;
                 migrationRecord.status = "success";
                 progress.successful++;
                 break;

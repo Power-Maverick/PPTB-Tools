@@ -5,266 +5,415 @@ import { FieldSelector } from "./components/FieldSelector";
 import { LookupMapper } from "./components/LookupMapper";
 import { MigrationProgress as MigrationProgressComponent } from "./components/MigrationProgress";
 import { OperationSelector } from "./components/OperationSelector";
-import { AutoMappingResult, DataverseEntity, FieldMapping, LookupMapping, MigrationConfig, MigrationOperation, MigrationProgress } from "./models/interfaces";
+import { PreviewData } from "./components/PreviewData";
+import {
+  AutoMappingResult,
+  DataverseEntity,
+  FieldMapping,
+  LookupMapping,
+  MigrationConfig,
+  MigrationOperation,
+  MigrationProgress,
+  PreviewRecord,
+} from "./models/interfaces";
 import "./styles/App.css";
 import { DataverseClient } from "./utils/DataverseClient";
 import { MigrationEngine } from "./utils/MigrationEngine";
 
 function App() {
-    const [isPPTB, setIsPPTB] = useState<boolean>(false);
-    const [connectionUrl, setConnectionUrl] = useState<string>("");
-    const [secondaryConnectionUrl, setSecondaryConnectionUrl] = useState<string>("");
-    const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string>("");
+  const [isPPTB, setIsPPTB] = useState<boolean>(false);
+  const [connectionUrl, setConnectionUrl] = useState<string>("");
+  const [secondaryConnectionUrl, setSecondaryConnectionUrl] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>("");
 
-    // Entities
-    const [entities, setEntities] = useState<DataverseEntity[]>([]);
-    const [loadingEntities, setLoadingEntities] = useState<boolean>(false);
-    const [selectedEntity, setSelectedEntity] = useState<DataverseEntity | null>(null);
+  // Entities
+  const [entities, setEntities] = useState<DataverseEntity[]>([]);
+  const [loadingEntities, setLoadingEntities] = useState<boolean>(false);
+  const [selectedEntity, setSelectedEntity] = useState<DataverseEntity | null>(null);
+  const [loadingFields, setLoadingFields] = useState<boolean>(false);
 
-    // Migration configuration
-    const [operation, setOperation] = useState<MigrationOperation>("create");
-    const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
-    const [lookupMappings, setLookupMappings] = useState<LookupMapping[]>([]);
-    const [filterQuery, setFilterQuery] = useState<string>("");
-    const [batchSize, setBatchSize] = useState<number>(50);
+  // Migration configuration
+  const [operation, setOperation] = useState<MigrationOperation>("create");
+  const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
+  const [lookupMappings, setLookupMappings] = useState<LookupMapping[]>([]);
+  const [filterQuery, setFilterQuery] = useState<string>("");
+  const [batchSize, setBatchSize] = useState<number>(50);
 
-    // Migration progress
-    const [migrationProgress, setMigrationProgress] = useState<MigrationProgress | null>(null);
-    const [isMigrating, setIsMigrating] = useState<boolean>(false);
+  // Preview
+  const [showPreview, setShowPreview] = useState<boolean>(false);
+  const [previewRecords, setPreviewRecords] = useState<PreviewRecord[]>([]);
+  const [loadingPreview, setLoadingPreview] = useState<boolean>(false);
 
-    // Auto-mapping
-    const [showAutoMapping, setShowAutoMapping] = useState<boolean>(false);
-    const [userMappings, setUserMappings] = useState<AutoMappingResult[]>([]);
-    const [teamMappings, setTeamMappings] = useState<AutoMappingResult[]>([]);
-    const [businessUnitMappings, setBusinessUnitMappings] = useState<AutoMappingResult[]>([]);
+  // Migration progress
+  const [migrationProgress, setMigrationProgress] = useState<MigrationProgress | null>(null);
+  const [isMigrating, setIsMigrating] = useState<boolean>(false);
 
-    const [migrationEngine] = useState<MigrationEngine>(() => new MigrationEngine());
+  // Auto-mapping
+  const [showAutoMapping, setShowAutoMapping] = useState<boolean>(false);
+  const [userMappings, setUserMappings] = useState<AutoMappingResult[]>([]);
+  const [teamMappings, setTeamMappings] = useState<AutoMappingResult[]>([]);
+  const [businessUnitMappings, setBusinessUnitMappings] = useState<AutoMappingResult[]>([]);
 
-    // Detect environment and initialize
-    useEffect(() => {
-        const initializeEnvironment = async () => {
-            console.log("initializing Env");
+  const [migrationEngine] = useState<MigrationEngine>(() => new MigrationEngine());
 
-            // Check if we're in PPTB
-            if (window.toolboxAPI) {
-                setIsPPTB(true);
-
-                console.log("toolboxAPI identified");
-
-                try {
-                    // Get active (source) connection
-                    const activeConnection = await window.toolboxAPI.connections.getActiveConnection();
-                    setConnectionUrl(activeConnection?.url || "");
-
-                    // Get secondary (target) connection
-                    const secondaryConnection = await window.toolboxAPI.connections.getSecondaryConnection();
-                    setSecondaryConnectionUrl(secondaryConnection?.url || "");
-
-                    if (!secondaryConnection) {
-                        setError("Please select a secondary connection as the target environment");
-                    }
-
-                    // Load entities when connection is available
-                    loadEntities();
-                } catch (error) {
-                    console.error("Failed to get connections:", error);
-                    setError("Failed to get connections from PPTB");
-                }
-
-                setLoading(false);
-            } else {
-                // Not in supported environment
-                setError("This tool only works in Power Platform ToolBox (PPTB)");
-                setLoading(false);
-            }
-        };
-
-        initializeEnvironment();
-    }, []);
-
-    const loadEntities = async () => {
-        setLoadingEntities(true);
-        setError("");
+  // Detect environment and initialize
+  useEffect(() => {
+    const initializeEnvironment = async () => {
+      if (window.toolboxAPI) {
+        setIsPPTB(true);
 
         try {
-            const client = new DataverseClient();
-            const entityList = await client.fetchAllEntities();
-            setEntities(entityList.sort((a, b) => a.displayName.localeCompare(b.displayName)));
-        } catch (error: any) {
-            setError(`Failed to load entities: ${error.message}`);
-        } finally {
-            setLoadingEntities(false);
-        }
-    };
+          // Get active (source) connection
+          const activeConnection = await window.toolboxAPI.connections.getActiveConnection();
+          setConnectionUrl(activeConnection?.url || "");
 
-    const handleEntitySelect = (entity: DataverseEntity) => {
-        setSelectedEntity(entity);
+          // Get secondary (target) connection
+          const secondaryConnection = await window.toolboxAPI.connections.getSecondaryConnection();
+          setSecondaryConnectionUrl(secondaryConnection?.url || "");
 
-        // Initialize field mappings
-        const mappings: FieldMapping[] = entity.fields.map((field) => ({
-            sourceField: field.logicalName,
-            targetField: field.logicalName,
-            isEnabled: !field.isPrimaryId, // Exclude primary ID by default
-            fieldType: field.type,
-        }));
-        setFieldMappings(mappings);
-
-        // Initialize lookup mappings for reference fields
-        const lookupFields = entity.fields.filter((f) => f.type.includes("Lookup") || f.type.includes("Owner") || f.type.includes("Customer"));
-
-        const lookups: LookupMapping[] = lookupFields.map((field) => ({
-            fieldName: field.logicalName,
-            fieldDisplayName: field.displayName,
-            targetEntity: field.targets?.[0] || "",
-            strategy: "auto",
-        }));
-        setLookupMappings(lookups);
-
-        // Reset migration progress
-        setMigrationProgress(null);
-    };
-
-    const handleAutoMapping = async () => {
-        setShowAutoMapping(true);
-        setError("");
-
-        try {
-            // Auto-map users, teams, and business units
-            const users = await migrationEngine.autoMapUsers();
-            const teams = await migrationEngine.autoMapTeams();
-            const businessUnits = await migrationEngine.autoMapBusinessUnits();
-
-            setUserMappings(users);
-            setTeamMappings(teams);
-            setBusinessUnitMappings(businessUnits);
-        } catch (error: any) {
-            setError(`Failed to auto-map: ${error.message}`);
-        }
-    };
-
-    const handleStartMigration = async () => {
-        if (!selectedEntity) {
-            setError("Please select an entity first");
-            return;
+          if (!secondaryConnection) {
+            setError("Please select a secondary connection as the target environment");
+          }
+        } catch (error) {
+          console.error("Failed to get connections:", error);
+          setError("Failed to get connections from PPTB");
         }
 
-        setIsMigrating(true);
-        setError("");
-
-        const config: MigrationConfig = {
-            entityLogicalName: selectedEntity.logicalName,
-            entityDisplayName: selectedEntity.displayName,
-            operation,
-            fieldMappings,
-            lookupMappings,
-            filterQuery: filterQuery || undefined,
-            batchSize,
-        };
-
-        try {
-            await migrationEngine.migrateRecords(config, (progress) => {
-                setMigrationProgress(progress);
-            });
-        } catch (error: any) {
-            setError(`Migration failed: ${error.message}`);
-        } finally {
-            setIsMigrating(false);
-        }
+        setLoading(false);
+      } else {
+        // Not in supported environment
+        setError("This tool only works in Power Platform ToolBox (PPTB)");
+        setLoading(false);
+      }
     };
 
-    if (loading) {
-        return (
-            <div className="loading-container">
-                <div className="loading-spinner"></div>
-                <p>Initializing...</p>
-            </div>
-        );
+    initializeEnvironment();
+  }, []);
+
+  // Load entities when connections are available
+  useEffect(() => {
+    if (connectionUrl && secondaryConnectionUrl) {
+      loadEntities();
+    }
+  }, [connectionUrl, secondaryConnectionUrl]);
+
+  const loadEntities = async () => {
+    setLoadingEntities(true);
+    setError("");
+
+    try {
+      const client = new DataverseClient("primary");
+      const entityList = await client.fetchAllEntities();
+      setEntities(entityList.sort((a, b) => a.displayName.localeCompare(b.displayName)));
+    } catch (error: any) {
+      setError(`Failed to load entities: ${error.message}`);
+    } finally {
+      setLoadingEntities(false);
+    }
+  };
+
+  const handleEntitySelect = async (entity: DataverseEntity) => {
+    setSelectedEntity(entity);
+    setLoadingFields(true);
+    setError("");
+
+    try {
+      // Load fields for the selected entity
+      const client = new DataverseClient("primary");
+      const fields = await client.fetchEntityFields(entity.logicalName);
+      
+      const updatedEntity = { ...entity, fields };
+      setSelectedEntity(updatedEntity);
+
+      // Initialize field mappings
+      const mappings: FieldMapping[] = fields.map((field) => ({
+        sourceField: field.logicalName,
+        targetField: field.logicalName,
+        isEnabled: !field.isPrimaryId, // Exclude primary ID by default
+        fieldType: field.type,
+      }));
+      setFieldMappings(mappings);
+
+      // Initialize lookup mappings for reference fields
+      const lookupFields = fields.filter(
+        (f) => f.type.includes("Lookup") || f.type.includes("Owner") || f.type.includes("Customer")
+      );
+
+      const lookups: LookupMapping[] = lookupFields.map((field) => ({
+        fieldName: field.logicalName,
+        fieldDisplayName: field.displayName,
+        targetEntity: field.targets?.[0] || "",
+        strategy: "auto",
+      }));
+      setLookupMappings(lookups);
+
+      // Reset preview and migration progress
+      setPreviewRecords([]);
+      setMigrationProgress(null);
+    } catch (error: any) {
+      setError(`Failed to load fields: ${error.message}`);
+    } finally {
+      setLoadingFields(false);
+    }
+  };
+
+  const handleAutoMapping = async () => {
+    setShowAutoMapping(true);
+    setError("");
+
+    try {
+      // Auto-map users, teams, and business units
+      const users = await migrationEngine.autoMapUsers();
+      const teams = await migrationEngine.autoMapTeams();
+      const businessUnits = await migrationEngine.autoMapBusinessUnits();
+
+      setUserMappings(users);
+      setTeamMappings(teams);
+      setBusinessUnitMappings(businessUnits);
+    } catch (error: any) {
+      setError(`Failed to auto-map: ${error.message}`);
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!selectedEntity) {
+      setError("Please select an entity first");
+      return;
     }
 
-    if (!isPPTB) {
-        return (
-            <div className="error-container">
-                <h2>Unsupported Environment</h2>
-                <p>{error}</p>
-            </div>
-        );
+    setLoadingPreview(true);
+    setError("");
+
+    try {
+      const client = new DataverseClient("primary");
+      const selectFields = fieldMappings
+        .filter((m) => m.isEnabled)
+        .map((m) => m.sourceField);
+
+      // Add primary ID and primary name fields
+      if (!selectFields.includes(selectedEntity.primaryIdAttribute)) {
+        selectFields.push(selectedEntity.primaryIdAttribute);
+      }
+      if (!selectFields.includes(selectedEntity.primaryNameAttribute)) {
+        selectFields.push(selectedEntity.primaryNameAttribute);
+      }
+
+      const sourceRecords = await client.queryRecords(
+        selectedEntity.logicalName,
+        selectFields,
+        filterQuery || undefined,
+        undefined,
+        100 // Limit preview to 100 records
+      );
+
+      const preview: PreviewRecord[] = sourceRecords.map((record) => ({
+        action: operation.toUpperCase() as "CREATE" | "UPDATE" | "DELETE",
+        data: record,
+        primaryId: record[selectedEntity.primaryIdAttribute] || "",
+        primaryName: record[selectedEntity.primaryNameAttribute] || "",
+      }));
+
+      setPreviewRecords(preview);
+      setShowPreview(true);
+    } catch (error: any) {
+      setError(`Failed to load preview: ${error.message}`);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const handleStartMigration = async () => {
+    if (!selectedEntity) {
+      setError("Please select an entity first");
+      return;
     }
 
+    setShowPreview(false);
+    setIsMigrating(true);
+    setError("");
+
+    const config: MigrationConfig = {
+      entityLogicalName: selectedEntity.logicalName,
+      entityDisplayName: selectedEntity.displayName,
+      operation,
+      fieldMappings,
+      lookupMappings,
+      filterQuery: filterQuery || undefined,
+      batchSize,
+    };
+
+    try {
+      await migrationEngine.migrateRecords(config, (progress) => {
+        setMigrationProgress(progress);
+      });
+    } catch (error: any) {
+      setError(`Migration failed: ${error.message}`);
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
+  if (loading) {
     return (
-        <div className="app-container">
-            {error && (
-                <div className="error-banner">
-                    <span>{error}</span>
-                    <button onClick={() => setError("")}>×</button>
-                </div>
-            )}
-
-            <div className="content">
-                <div className="panel">
-                    <h2>Data Migrator</h2>
-                    <p className="subtitle">Migrate data between environments with auto-mapping</p>
-
-                    {/* Connection Information */}
-                    {connectionUrl && secondaryConnectionUrl && (
-                        <div className="connection-info">
-                            <div className="connection-item">
-                                <span className="connection-label">Source (Primary):</span>
-                                <span className="connection-url">{connectionUrl}</span>
-                            </div>
-                            <div className="connection-arrow">→</div>
-                            <div className="connection-item">
-                                <span className="connection-label">Target (Secondary):</span>
-                                <span className="connection-url">{secondaryConnectionUrl}</span>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Entity Selection */}
-                    <EntitySelector entities={entities} selectedEntity={selectedEntity} onEntitySelect={handleEntitySelect} loading={loadingEntities} />
-
-                    {selectedEntity && (
-                        <>
-                            {/* Operation Selection */}
-                            <OperationSelector operation={operation} onOperationChange={setOperation} />
-
-                            {/* Field Selection */}
-                            <FieldSelector fields={selectedEntity.fields} fieldMappings={fieldMappings} onFieldMappingsChange={setFieldMappings} />
-
-                            {/* Lookup Mapping */}
-                            {lookupMappings.length > 0 && <LookupMapper lookupMappings={lookupMappings} onLookupMappingsChange={setLookupMappings} onAutoMapping={handleAutoMapping} />}
-
-                            {/* Filter and Batch Size */}
-                            <div className="config-section">
-                                <h3>Advanced Options</h3>
-                                <div className="form-group">
-                                    <label>Filter Query (OData)</label>
-                                    <input type="text" value={filterQuery} onChange={(e) => setFilterQuery(e.target.value)} placeholder="e.g., statecode eq 0" />
-                                </div>
-                                <div className="form-group">
-                                    <label>Batch Size</label>
-                                    <input type="number" value={batchSize} onChange={(e) => setBatchSize(parseInt(e.target.value))} min="1" max="1000" />
-                                </div>
-                            </div>
-
-                            {/* Migration Controls */}
-                            <div className="migration-controls">
-                                <button className="btn-primary" onClick={handleStartMigration} disabled={isMigrating}>
-                                    {isMigrating ? "Migrating..." : "Start Migration"}
-                                </button>
-                            </div>
-                        </>
-                    )}
-                </div>
-
-                {/* Migration Progress */}
-                {migrationProgress && <MigrationProgressComponent progress={migrationProgress} />}
-
-                {/* Auto-Mapping Panel */}
-                {showAutoMapping && <AutoMappingPanel userMappings={userMappings} teamMappings={teamMappings} businessUnitMappings={businessUnitMappings} onClose={() => setShowAutoMapping(false)} />}
-            </div>
-        </div>
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Initializing...</p>
+      </div>
     );
+  }
+
+  if (!isPPTB) {
+    return (
+      <div className="error-container">
+        <h2>Unsupported Environment</h2>
+        <p>{error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app-container">
+      {error && (
+        <div className="error-banner">
+          <span>{error}</span>
+          <button onClick={() => setError("")}>×</button>
+        </div>
+      )}
+
+      <div className="content">
+        <div className="panel">
+          <h2>Data Migrator</h2>
+          <p className="subtitle">Migrate data between environments with auto-mapping</p>
+
+          {/* Connection Information */}
+          {connectionUrl && secondaryConnectionUrl && (
+            <div className="connection-info">
+              <div className="connection-item">
+                <span className="connection-label">Source (Primary):</span>
+                <span className="connection-url">{connectionUrl}</span>
+              </div>
+              <div className="connection-arrow">→</div>
+              <div className="connection-item">
+                <span className="connection-label">Target (Secondary):</span>
+                <span className="connection-url">{secondaryConnectionUrl}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Step 1: Entity Selection */}
+          <EntitySelector
+            entities={entities}
+            selectedEntity={selectedEntity}
+            onEntitySelect={handleEntitySelect}
+            loading={loadingEntities}
+          />
+
+          {/* Show loading while fields are being fetched */}
+          {loadingFields && (
+            <div style={{ padding: "20px", textAlign: "center" }}>
+              <div className="loading-spinner" style={{ margin: "0 auto 12px" }}></div>
+              <p>Loading fields...</p>
+            </div>
+          )}
+
+          {/* Steps 2-7: Field selection and configuration */}
+          {selectedEntity && selectedEntity.fields.length > 0 && !loadingFields && (
+            <>
+              {/* Step 2: Field Selection */}
+              <FieldSelector
+                fields={selectedEntity.fields}
+                fieldMappings={fieldMappings}
+                onFieldMappingsChange={setFieldMappings}
+              />
+
+              {/* Step 3: Filter Configuration */}
+              <div className="config-section">
+                <h3>Filter Data (Optional)</h3>
+                <div className="form-group">
+                  <label>Filter Query (OData)</label>
+                  <input
+                    type="text"
+                    value={filterQuery}
+                    onChange={(e) => setFilterQuery(e.target.value)}
+                    placeholder="e.g., statecode eq 0"
+                  />
+                  <p style={{ fontSize: "12px", color: "#605e5c", margin: "8px 0 0 0" }}>
+                    Filter records to migrate. Leave empty to migrate all records.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 4: Operation Selection */}
+              <div className="config-section">
+                <h3>Settings</h3>
+                <OperationSelector operation={operation} onOperationChange={setOperation} />
+
+                {/* Step 5: Batch Size */}
+                <div className="form-group">
+                  <label>Batch Size (Max 100)</label>
+                  <input
+                    type="number"
+                    value={batchSize}
+                    onChange={(e) => setBatchSize(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
+                    min="1"
+                    max="100"
+                  />
+                  <p style={{ fontSize: "12px", color: "#605e5c", margin: "8px 0 0 0" }}>
+                    Number of records to process per batch.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 6: Lookup Mapping */}
+              {lookupMappings.length > 0 && (
+                <LookupMapper
+                  lookupMappings={lookupMappings}
+                  onLookupMappingsChange={setLookupMappings}
+                  onAutoMapping={handleAutoMapping}
+                />
+              )}
+
+              {/* Step 7: Preview Button */}
+              <div className="migration-controls">
+                <button
+                  className="btn-primary"
+                  onClick={handlePreview}
+                  disabled={loadingPreview || isMigrating}
+                >
+                  {loadingPreview ? "Loading Preview..." : "Preview Data"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Migration Progress */}
+        {migrationProgress && <MigrationProgressComponent progress={migrationProgress} />}
+
+        {/* Step 8: Preview Modal */}
+        {showPreview && selectedEntity && (
+          <PreviewData
+            previewRecords={previewRecords}
+            selectedFields={fieldMappings.filter((m) => m.isEnabled).map((m) => m.sourceField)}
+            fields={selectedEntity.fields}
+            onClose={() => setShowPreview(false)}
+            onConfirm={handleStartMigration}
+          />
+        )}
+
+        {/* Auto-Mapping Panel */}
+        {showAutoMapping && (
+          <AutoMappingPanel
+            userMappings={userMappings}
+            teamMappings={teamMappings}
+            businessUnitMappings={businessUnitMappings}
+            onClose={() => setShowAutoMapping(false)}
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default App;

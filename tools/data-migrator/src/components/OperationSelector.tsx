@@ -23,8 +23,8 @@ export function OperationSelector({
         <option value="update">
           Update - Update existing records by primary key
         </option>
-        <option value="upsert">
-          Upsert - Create if not exists, update if exists
+        <option value="delete">
+          Delete - Delete records from target environment
         </option>
       </select>
       <p style={{ fontSize: "12px", color: "#605e5c", margin: "8px 0 0 0" }}>
@@ -32,8 +32,8 @@ export function OperationSelector({
           "Creates new records in the target environment. Will fail if record already exists."}
         {operation === "update" &&
           "Updates existing records by matching primary key. Requires records to exist in target."}
-        {operation === "upsert" &&
-          "Smart operation: creates new records or updates existing ones based on primary key."}
+        {operation === "delete" &&
+          "Deletes records from the target environment by matching primary key."}
       </p>
     </div>
   );

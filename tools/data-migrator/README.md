@@ -31,11 +31,20 @@ Choose the operation that fits your scenario:
 
 - **Create**: Insert new records only (fails if record exists)
 - **Update**: Update existing records by primary key (requires records to exist)
-- **Upsert**: Smart operation that creates new records or updates existing ones
+- **Delete**: Delete records from target environment by matching primary key
+
+### Preview Before Migration
+
+- Preview data before migration to verify the operation
+- Shows action column (CREATE, UPDATE, DELETE)
+- Displays primary ID, primary name, and selected fields
+- Limited to first 100 records for quick review
+- Confirm before starting the actual migration
 
 ### Field and Lookup Management
 
 - Select which fields to include in the migration
+- Fields are loaded on-demand after entity selection for better performance
 - Configure lookup field mapping strategies:
   - **Auto-Map**: Automatically map system entities (users, teams, business units)
   - **Skip**: Exclude the lookup field from migration
@@ -43,7 +52,7 @@ Choose the operation that fits your scenario:
 ### Advanced Options
 
 - **Filter Query**: Apply OData filters to select specific records
-- **Batch Size**: Control batch size for optimal performance (1-1000 records per batch)
+- **Batch Size**: Control batch size for optimal performance (1-100 records per batch)
 
 ### Progress Tracking
 
@@ -83,6 +92,8 @@ The build output will be in the `dist` directory.
 
 ## Usage in PPTB
 
+The tool follows a step-by-step workflow:
+
 1. **Install the tool** in Power Platform ToolBox
 2. **Connect to your source environment** (primary connection)
 3. **Select a secondary connection** as the target environment
@@ -90,16 +101,28 @@ The build output will be in the `dist` directory.
 5. The tool will display both connections:
    - Source (Primary): Your source environment
    - Target (Secondary): Your target environment
+
+### Migration Workflow
+
 6. **Select an entity** to migrate
-7. **Choose migration operation** (create, update, or upsert)
+   - Entity data (without fields) loads initially for faster performance
+7. **Wait for fields to load** automatically after entity selection
 8. **Select fields** to include in the migration
-9. **Configure lookup mappings**:
-   - Click "Auto-Map System Entities" to automatically map users, teams, and business units
-   - Review the auto-mapping results
-10. **Set advanced options** (optional):
-    - Add OData filter to select specific records
-    - Adjust batch size if needed
-11. **Start Migration** and monitor progress
+9. **Add filter** (optional) to select a subset of records using OData syntax
+10. **Choose migration operation** from settings:
+    - **Create**: Insert new records only
+    - **Update**: Update existing records by primary key
+    - **Delete**: Delete records from target environment
+11. **Set batch size** (max 100 records per batch)
+12. **Auto-map system entities** (optional):
+    - Click "Auto-Map System Entities" to map users, teams, and business units
+    - Review the auto-mapping results
+13. **Preview the data** to be migrated:
+    - Shows Action column (CREATE, UPDATE, DELETE)
+    - Displays primary ID and primary name
+    - Shows selected fields
+    - Limited to first 100 records for preview
+14. **Start Migration** from the preview and monitor progress
 
 ## Important Notes
 
@@ -107,6 +130,8 @@ The build output will be in the `dist` directory.
 - **Source Environment**: Data is read from the primary connection
 - **Target Environment**: Data is written to the secondary connection
 - **Auto-Mapping**: Users, teams, and business units are mapped between source and target environments
+- **Preview First**: Always preview data before starting migration to verify the operation and data
+- **Batch Limit**: Maximum batch size is 100 records for optimal performance
 
 ## Use Cases
 
@@ -114,7 +139,7 @@ The build output will be in the `dist` directory.
 - **Dev to Test Migration**: Move test data from development to test environments
 - **Cross-Tenant Migration**: Transfer data between different tenants with user/team mapping
 - **Partial Data Migration**: Use filters to migrate specific records
-- **Data Synchronization**: Keep data in sync between environments with upsert operations
+- **Data Deletion**: Remove specific records from target environment based on source data
 
 ## Architecture
 

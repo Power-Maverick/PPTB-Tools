@@ -33,7 +33,7 @@ export class DataverseClient {
     }
 
     /**
-     * Fetch all entities from the environment
+     * Fetch all entities from the environment (without fields)
      */
     async fetchAllEntities(): Promise<DataverseEntity[]> {
         try {
@@ -42,22 +42,16 @@ export class DataverseClient {
                 this.connectionTarget,
             );
 
-            return Promise.all(
-                entities.value.map(async (entityMetadata: any) => {
-                    const fields = await this.fetchEntityFields(entityMetadata.LogicalName);
-
-                    return {
-                        logicalName: entityMetadata.LogicalName,
-                        displayName: extractLabel(entityMetadata.DisplayName) || entityMetadata.LogicalName,
-                        schemaName: entityMetadata.SchemaName || entityMetadata.LogicalName,
-                        primaryIdAttribute: entityMetadata.PrimaryIdAttribute || "",
-                        primaryNameAttribute: entityMetadata.PrimaryNameAttribute || "",
-                        description: extractLabel(entityMetadata.Description),
-                        objectTypeCode: entityMetadata.ObjectTypeCode,
-                        fields: fields,
-                    };
-                }),
-            );
+            return entities.value.map((entityMetadata: any) => ({
+                logicalName: entityMetadata.LogicalName,
+                displayName: extractLabel(entityMetadata.DisplayName) || entityMetadata.LogicalName,
+                schemaName: entityMetadata.SchemaName || entityMetadata.LogicalName,
+                primaryIdAttribute: entityMetadata.PrimaryIdAttribute || "",
+                primaryNameAttribute: entityMetadata.PrimaryNameAttribute || "",
+                description: extractLabel(entityMetadata.Description),
+                objectTypeCode: entityMetadata.ObjectTypeCode,
+                fields: [], // Fields will be loaded on demand
+            }));
         } catch (error: any) {
             console.error("Failed to fetch entities:", error);
             throw new Error(`Failed to fetch entities: ${error.message}`);
@@ -179,6 +173,25 @@ export class DataverseClient {
         } catch (error: any) {
             console.error(`Failed to upsert record in ${entityLogicalName}:`, error);
             throw new Error(`Failed to upsert record: ${error.message}`);
+        }
+    }
+
+    /**
+     * Delete a record
+     */
+    async deleteRecord(
+        entityLogicalName: string,
+        recordId: string,
+    ): Promise<void> {
+        try {
+            await window.dataverseAPI.delete(
+                entityLogicalName,
+                recordId,
+                this.connectionTarget,
+            );
+        } catch (error: any) {
+            console.error(`Failed to delete record in ${entityLogicalName}:`, error);
+            throw new Error(`Failed to delete record: ${error.message}`);
         }
     }
 

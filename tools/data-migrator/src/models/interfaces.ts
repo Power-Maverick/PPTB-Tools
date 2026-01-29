@@ -49,7 +49,7 @@ export interface DataverseField {
 /**
  * Migration operation type
  */
-export type MigrationOperation = "create" | "update" | "upsert";
+export type MigrationOperation = "create" | "update" | "delete";
 
 /**
  * Migration status for a record
@@ -196,4 +196,18 @@ export interface BusinessUnitRecord {
   businessunitid: string;
   /** Name */
   name: string;
+}
+
+/**
+ * Preview record for migration
+ */
+export interface PreviewRecord {
+  /** Action to be performed */
+  action: "CREATE" | "UPDATE" | "DELETE";
+  /** Source record data */
+  data: Record<string, any>;
+  /** Primary ID value */
+  primaryId: string;
+  /** Primary name value */
+  primaryName: string;
 }
