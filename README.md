@@ -2,13 +2,51 @@
 
 Tools for Power Platform ToolBox (PPTB) - a comprehensive toolkit for working with Microsoft Dataverse and Power Platform.
 
+- [Power Platform ToolBox (PPTB) Tools](#power-platform-toolbox-pptb-tools)
+    - [Overview](#overview)
+    - [Tools](#tools)
+        - [PCF Builder](#pcf-builder)
+        - [ERD Generator](#erd-generator)
+        - [Entity Field Catalog](#entity-field-catalog)
+        - [View Layout Replicator](#view-layout-replicator)
+        - [Dataverse Trace Analyzer](#dataverse-trace-analyzer)
+    - [Contributing](#contributing)
+    - [License](#license)
+
 ## Overview
 
 This is a monorepo containing various tools designed primarily for Power Platform ToolBox (PPTB), with additional support for Dataverse DevTools (DVDT) VS Code extension.
 
 ## Tools
 
-### [@power-maverick/tool-erd-generator](./tools/erd-generator)
+### [PCF Builder](./tools/pcf-builder)
+
+Tool README: [here](./tools/pcf-builder/README.md)
+
+Build and manage Power Apps Component Framework (PCF) custom controls. **React-based tool** exclusively for:
+
+- **PPTB (Power Platform Toolbox)**: Full integration with PPTB - Electron desktop app
+
+**Key Features:**
+
+- **React + TypeScript**: Modern component-based architecture with Vite build system
+- **PPTB-Only Integration**: Designed exclusively for PowerPlatform ToolBox
+- **Visual PCF Control Creation**: Create new PCF controls with intuitive UI
+- **Project Management**: Build, test, and manage PCF projects
+- **Solution Packaging**: Create solution packages for deployment
+- **Template Support**: Field (single field) and Dataset (grid) templates
+- **Additional Packages**: Support for Fluent UI, React, and other npm packages
+- **Command Execution**: Execute Power Apps CLI commands through PPTB terminal API
+- **File System Integration**: Select folders and files through PPTB file system API
+
+**Use Cases:**
+
+- Rapidly create new PCF controls with predefined templates
+- Manage PCF projects within PPTB
+- Build and test PCF controls using integrated commands
+- Package PCF controls into solutions for deployment
+
+### [ERD Generator](./tools/erd-generator)
 
 Tool README: [here](./tools/erd-generator/README.md)
 
@@ -29,20 +67,16 @@ Generate Entity Relationship Diagrams (ERD) from Dataverse solutions. Dual integ
 - Download diagrams as source code or copy to clipboard
 - User-configurable options (include attributes, relationships, max attributes)
 
-**Technical Architecture:**
+**Use Cases:**
 
-- **React 18** with functional components and hooks
-- **Vite** for fast development and optimized production builds
-- **TypeScript** for type safety
-- **Browser-only bundle**: No Node.js-specific artifacts in webview output
-- **Separate builds**: Extension code (Node.js) and webview (browser) are built independently
+- Visualize Dataverse entity relationships for better understanding
+- Generate diagrams for documentation or analysis
+- Use in both PPTB and DVDT environments seamlessly
+- Export diagrams in various formats for different use cases
+- Customize diagram content based on user preferences
+- Facilitate communication with stakeholders using visual representations
 
-**Testing:**
-
-- **PPTB Testing**: Install the tool in Power Platform ToolBox and test with your Dataverse environment.
-- **Local DVDT Integration**: See [LOCAL_TESTING.md](./LOCAL_TESTING.md) for step-by-step instructions on integrating with a local copy of Dataverse DevTools.
-
-### [@power-maverick/tool-entity-field-catalog](./tools/entity-field-catalog)
+### [Entity Field Catalog](./tools/entity-field-catalog)
 
 Tool README: [here](./tools/entity-field-catalog/README.md)
 
@@ -63,15 +97,16 @@ Export comprehensive entity and field metadata from Dataverse solutions to Excel
 - **PPTB-Only Integration**: Exclusive integration with Power Platform ToolBox using latest @pptb/types (v1.0.13)
 - **Real-time Statistics**: View selected entity count and total field count before export
 
-**Technical Architecture:**
+**Use Cases:**
 
-- **React 18** with TypeScript and functional components
-- **Fluent UI React Components** for modern Microsoft design language
-- **Vite** for fast development and optimized production builds
-- **XLSX library** for Excel export functionality
-- **@pptb/types v1.0.13** - Latest PPTB type definitions
+- Document entity and field structures for analysis or auditing
+- Share metadata information with team members or stakeholders
+- Facilitate data modeling and schema design discussions
+- Quickly generate reports on Dataverse solution structures
+- Maintain up-to-date records of entity and field configurations
+- Support migration or integration projects with detailed metadata exports
 
-### [@power-maverick/tool-view-layout-replicator](./tools/view-layout-replicator)
+### [View Layout Replicator](./tools/view-layout-replicator)
 
 Tool README: [here](./tools/view-layout-replicator/README.md)
 
@@ -92,7 +127,7 @@ Copy layout from one view to multiple views of the same entity in a single opera
 - Quickly copy column configurations
 - Maintain consistency in view designs across your Dataverse environment
 
-### [@power-maverick/tool-dataverse-trace-analyzer](./tools/dataverse-trace-analyzer)
+### [Dataverse Trace Analyzer](./tools/dataverse-trace-analyzer)
 
 Tool README: [here](./tools/dataverse-trace-analyzer/README.md)
 
