@@ -56,8 +56,8 @@ function App() {
   const [teamMappings, setTeamMappings] = useState<AutoMappingResult[]>([]);
   const [businessUnitMappings, setBusinessUnitMappings] = useState<AutoMappingResult[]>([]);
 
-  // Step management for better UX
-  const [currentStep, setCurrentStep] = useState<number>(1);
+  // Step management for better UX - track which steps are expanded
+  const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set([1]));
 
   const [migrationEngine] = useState<MigrationEngine>(() => new MigrationEngine());
 
@@ -117,11 +117,31 @@ function App() {
     }
   };
 
+  // Helper functions for step management
+  const toggleStep = (stepNumber: number) => {
+    const newExpanded = new Set(expandedSteps);
+    if (newExpanded.has(stepNumber)) {
+      newExpanded.delete(stepNumber);
+    } else {
+      newExpanded.add(stepNumber);
+    }
+    setExpandedSteps(newExpanded);
+  };
+
+  const autoCollapseAndExpand = (currentStepNum: number, nextStepNum: number) => {
+    const newExpanded = new Set<number>();
+    // Collapse current step, expand next step
+    newExpanded.add(nextStepNum);
+    setExpandedSteps(newExpanded);
+  };
+
   const handleEntitySelect = async (entity: DataverseEntity) => {
     setSelectedEntity(entity);
     setLoadingFields(true);
     setError("");
-    setCurrentStep(2);
+    
+    // Collapse step 1, expand step 2
+    autoCollapseAndExpand(1, 2);
 
     try {
       // Load fields for the selected entity
@@ -317,19 +337,25 @@ function App() {
         {/* Main content with steps */}
         <div className="steps-container">
           {/* Step 1: Entity Selection */}
-          <div className={`step-card ${currentStep >= 1 ? "active" : ""}`}>
-            <div className="step-header">
+          <div className={`step-card ${expandedSteps.has(1) ? "active" : "collapsed"}`}>
+            <div className="step-header" onClick={() => toggleStep(1)}>
               <div className="step-number">1</div>
               <h2 className="step-title">Select Entity</h2>
+              {selectedEntity && (
+                <span className="step-count">{selectedEntity.displayName}</span>
+              )}
+              <span className="step-toggle">{expandedSteps.has(1) ? "−" : "+"}</span>
             </div>
-            <div className="step-content">
-              <EntitySelector
-                entities={entities}
-                selectedEntity={selectedEntity}
-                onEntitySelect={handleEntitySelect}
-                loading={loadingEntities}
-              />
-            </div>
+            {expandedSteps.has(1) && (
+              <div className="step-content">
+                <EntitySelector
+                  entities={entities}
+                  selectedEntity={selectedEntity}
+                  onEntitySelect={handleEntitySelect}
+                  loading={loadingEntities}
+                />
+              </div>
+            )}
           </div>
 
           {/* Loading indicator */}
@@ -344,118 +370,130 @@ function App() {
           {selectedEntity && selectedEntity.fields.length > 0 && !loadingFields && (
             <>
               {/* Step 2: Field Selection */}
-              <div className={`step-card ${currentStep >= 2 ? "active" : ""}`}>
-                <div className="step-header" onClick={() => setCurrentStep(2)}>
+              <div className={`step-card ${expandedSteps.has(2) ? "active" : "collapsed"}`}>
+                <div className="step-header" onClick={() => toggleStep(2)}>
                   <div className="step-number">2</div>
                   <h2 className="step-title">Select Fields</h2>
                   <span className="step-count">{fieldMappings.filter((m) => m.isEnabled).length} selected</span>
+                  <span className="step-toggle">{expandedSteps.has(2) ? "−" : "+"}</span>
                 </div>
-                <div className="step-content">
-                  <FieldSelector
-                    fields={selectedEntity.fields}
-                    fieldMappings={fieldMappings}
-                    onFieldMappingsChange={setFieldMappings}
-                  />
-                </div>
+                {expandedSteps.has(2) && (
+                  <div className="step-content">
+                    <FieldSelector
+                      fields={selectedEntity.fields}
+                      fieldMappings={fieldMappings}
+                      onFieldMappingsChange={setFieldMappings}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Step 3: Filter Configuration */}
-              <div className={`step-card ${currentStep >= 2 ? "active" : ""}`}>
-                <div className="step-header" onClick={() => setCurrentStep(3)}>
+              <div className={`step-card ${expandedSteps.has(3) ? "active" : "collapsed"}`}>
+                <div className="step-header" onClick={() => toggleStep(3)}>
                   <div className="step-number">3</div>
                   <h2 className="step-title">Filter Data</h2>
                   <span className="step-badge">Optional</span>
+                  <span className="step-toggle">{expandedSteps.has(3) ? "−" : "+"}</span>
                 </div>
-                <div className="step-content">
-                  <div className="filter-type-selector">
-                    <button
-                      className={`filter-type-btn ${filterType === "odata" ? "active" : ""}`}
-                      onClick={() => setFilterType("odata")}
-                    >
-                      OData
-                    </button>
-                    <button
-                      className={`filter-type-btn ${filterType === "fetchxml" ? "active" : ""}`}
-                      onClick={() => setFilterType("fetchxml")}
-                    >
-                      FetchXML
-                    </button>
-                  </div>
+                {expandedSteps.has(3) && (
+                  <div className="step-content">
+                    <div className="filter-type-selector">
+                      <button
+                        className={`filter-type-btn ${filterType === "odata" ? "active" : ""}`}
+                        onClick={() => setFilterType("odata")}
+                      >
+                        OData
+                      </button>
+                      <button
+                        className={`filter-type-btn ${filterType === "fetchxml" ? "active" : ""}`}
+                        onClick={() => setFilterType("fetchxml")}
+                      >
+                        FetchXML
+                      </button>
+                    </div>
 
-                  <div className="form-group">
-                    {filterType === "odata" ? (
-                      <>
-                        <label>OData Filter</label>
-                        <input
-                          type="text"
-                          value={filterQuery}
-                          onChange={(e) => setFilterQuery(e.target.value)}
-                          placeholder="e.g., statecode eq 0"
-                          className="modern-input"
-                        />
-                        <p className="field-hint">Example: statecode eq 0 and createdon gt 2024-01-01</p>
-                      </>
-                    ) : (
-                      <>
-                        <label>FetchXML Query</label>
-                        <textarea
-                          value={filterQuery}
-                          onChange={(e) => setFilterQuery(e.target.value)}
-                          placeholder="<fetch><entity name='account'>...</entity></fetch>"
-                          className="modern-textarea"
-                          rows={6}
-                        />
-                        <p className="field-hint">Complete FetchXML query including entity and attributes</p>
-                      </>
-                    )}
+                    <div className="form-group">
+                      {filterType === "odata" ? (
+                        <>
+                          <label>OData Filter</label>
+                          <input
+                            type="text"
+                            value={filterQuery}
+                            onChange={(e) => setFilterQuery(e.target.value)}
+                            placeholder="e.g., statecode eq 0"
+                            className="modern-input"
+                          />
+                          <p className="field-hint">Example: statecode eq 0 and createdon gt 2024-01-01</p>
+                        </>
+                      ) : (
+                        <>
+                          <label>FetchXML Query</label>
+                          <textarea
+                            value={filterQuery}
+                            onChange={(e) => setFilterQuery(e.target.value)}
+                            placeholder="<fetch><entity name='account'>...</entity></fetch>"
+                            className="modern-textarea"
+                            rows={6}
+                          />
+                          <p className="field-hint">Complete FetchXML query including entity and attributes</p>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Step 4: Settings */}
-              <div className={`step-card ${currentStep >= 2 ? "active" : ""}`}>
-                <div className="step-header" onClick={() => setCurrentStep(4)}>
+              <div className={`step-card ${expandedSteps.has(4) ? "active" : "collapsed"}`}>
+                <div className="step-header" onClick={() => toggleStep(4)}>
                   <div className="step-number">4</div>
                   <h2 className="step-title">Settings</h2>
+                  <span className="step-toggle">{expandedSteps.has(4) ? "−" : "+"}</span>
                 </div>
-                <div className="step-content">
-                  <div className="settings-grid">
-                    <div className="setting-item">
-                      <OperationSelector operations={operations} onOperationsChange={setOperations} />
-                    </div>
-                    <div className="setting-item">
-                      <label>Batch Size (Max 100)</label>
-                      <input
-                        type="number"
-                        value={batchSize}
-                        onChange={(e) =>
-                          setBatchSize(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))
-                        }
-                        min="1"
-                        max="100"
-                        className="modern-input"
-                      />
-                      <p className="field-hint">Records per batch</p>
+                {expandedSteps.has(4) && (
+                  <div className="step-content">
+                    <div className="settings-grid">
+                      <div className="setting-item">
+                        <OperationSelector operations={operations} onOperationsChange={setOperations} />
+                      </div>
+                      <div className="setting-item">
+                        <label>Batch Size (Max 100)</label>
+                        <input
+                          type="number"
+                          value={batchSize}
+                          onChange={(e) =>
+                            setBatchSize(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))
+                          }
+                          min="1"
+                          max="100"
+                          className="modern-input"
+                        />
+                        <p className="field-hint">Records per batch</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Step 5: Lookup Mapping */}
               {lookupMappings.length > 0 && (
-                <div className={`step-card ${currentStep >= 2 ? "active" : ""}`}>
-                  <div className="step-header" onClick={() => setCurrentStep(5)}>
+                <div className={`step-card ${expandedSteps.has(5) ? "active" : "collapsed"}`}>
+                  <div className="step-header" onClick={() => toggleStep(5)}>
                     <div className="step-number">5</div>
                     <h2 className="step-title">Lookup Mappings</h2>
                     <span className="step-badge">Optional</span>
+                    <span className="step-toggle">{expandedSteps.has(5) ? "−" : "+"}</span>
                   </div>
-                  <div className="step-content">
-                    <LookupMapper
-                      lookupMappings={lookupMappings}
-                      onLookupMappingsChange={setLookupMappings}
-                      onAutoMapping={handleAutoMapping}
-                    />
-                  </div>
+                  {expandedSteps.has(5) && (
+                    <div className="step-content">
+                      <LookupMapper
+                        lookupMappings={lookupMappings}
+                        onLookupMappingsChange={setLookupMappings}
+                        onAutoMapping={handleAutoMapping}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 

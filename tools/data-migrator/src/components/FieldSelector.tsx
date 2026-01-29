@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { DataverseField, FieldMapping } from "../models/interfaces";
 
 interface FieldSelectorProps {
@@ -11,6 +12,8 @@ export function FieldSelector({
   fieldMappings,
   onFieldMappingsChange,
 }: FieldSelectorProps) {
+  const [searchTerm, setSearchTerm] = useState<string>("");
+
   const handleToggleField = (fieldName: string) => {
     const updatedMappings = fieldMappings.map((mapping) =>
       mapping.sourceField === fieldName
@@ -36,11 +39,24 @@ export function FieldSelector({
     onFieldMappingsChange(updatedMappings);
   };
 
+  // Filter fields based on search term
+  const filteredMappings = fieldMappings.filter((mapping) => {
+    if (!searchTerm) return true;
+    const field = fields.find((f) => f.logicalName === mapping.sourceField);
+    if (!field) return false;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      field.logicalName.toLowerCase().includes(searchLower) ||
+      field.displayName.toLowerCase().includes(searchLower)
+    );
+  });
+
   const selectedCount = fieldMappings.filter((m) => m.isEnabled).length;
 
   return (
     <div className="config-section">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
         <h3>Select Fields ({selectedCount} of {fieldMappings.length})</h3>
         <div style={{ display: "flex", gap: "8px" }}>
           <button className="btn-secondary" onClick={handleSelectAll}>
@@ -51,8 +67,21 @@ export function FieldSelector({
           </button>
         </div>
       </div>
+
+      {/* Search box */}
+      <div className="form-group" style={{ marginBottom: "12px" }}>
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search fields by name..."
+          className="modern-input"
+          style={{ marginBottom: "0" }}
+        />
+      </div>
+
       <div className="field-list">
-        {fieldMappings.map((mapping) => {
+        {filteredMappings.map((mapping) => {
           const field = fields.find((f) => f.logicalName === mapping.sourceField);
           return (
             <div key={mapping.sourceField} className="checkbox-group">
@@ -63,12 +92,19 @@ export function FieldSelector({
                 onChange={() => handleToggleField(mapping.sourceField)}
               />
               <label htmlFor={`field-${mapping.sourceField}`}>
-                {field?.displayName || mapping.sourceField} (
-                {field?.type || "Unknown"})
+                <strong>{field?.displayName || mapping.sourceField}</strong>
+                <span style={{ color: "#605e5c", fontSize: "12px", marginLeft: "8px" }}>
+                  ({field?.logicalName})
+                </span>
               </label>
             </div>
           );
         })}
+        {filteredMappings.length === 0 && (
+          <p style={{ textAlign: "center", padding: "20px", color: "#605e5c" }}>
+            No fields match your search
+          </p>
+        )}
       </div>
     </div>
   );

@@ -66,23 +66,32 @@ export class DataverseClient {
             const entityMetadata = await window.dataverseAPI.getEntityRelatedMetadata(
                 entityLogicalName,
                 "Attributes",
-                ["LogicalName", "DisplayName", "SchemaName", "AttributeTypeName", "AttributeType", "IsPrimaryId", "IsPrimaryName", "RequiredLevel", "Description"],
+                ["LogicalName", "DisplayName", "SchemaName", "AttributeTypeName", "AttributeType", "IsPrimaryId", "IsPrimaryName", "RequiredLevel", "Description", "IsValidForRead", "AttributeOf"],
                 this.connectionTarget,
             );
 
             const attributes = entityMetadata.value || [];
 
-            return attributes.map((attr: any) => ({
-                logicalName: attr.LogicalName,
-                displayName: extractLabel(attr.DisplayName) || attr.LogicalName,
-                schemaName: attr.SchemaName || attr.LogicalName,
-                type: attr.AttributeTypeName?.Value || attr.AttributeType || "Unknown",
-                attributeType: attr.AttributeType,
-                isPrimaryId: attr.IsPrimaryId || false,
-                isPrimaryName: attr.IsPrimaryName || false,
-                requiredLevel: attr.RequiredLevel?.Value,
-                description: extractLabel(attr.Description),
-            }));
+            // Filter out virtual attributes (IsValidForRead = false or has AttributeOf)
+            return attributes
+                .filter((attr: any) => {
+                    // Exclude if not valid for read
+                    if (attr.IsValidForRead === false) return false;
+                    // Exclude if it's a virtual attribute (has AttributeOf property)
+                    if (attr.AttributeOf) return false;
+                    return true;
+                })
+                .map((attr: any) => ({
+                    logicalName: attr.LogicalName,
+                    displayName: extractLabel(attr.DisplayName) || attr.LogicalName,
+                    schemaName: attr.SchemaName || attr.LogicalName,
+                    type: attr.AttributeTypeName?.Value || attr.AttributeType || "Unknown",
+                    attributeType: attr.AttributeType,
+                    isPrimaryId: attr.IsPrimaryId || false,
+                    isPrimaryName: attr.IsPrimaryName || false,
+                    requiredLevel: attr.RequiredLevel?.Value,
+                    description: extractLabel(attr.Description),
+                }));
         } catch (error: any) {
             console.error(`Failed to fetch fields for ${entityLogicalName}:`, error);
             throw new Error(`Failed to fetch fields for ${entityLogicalName}: ${error.message}`);

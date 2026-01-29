@@ -21,6 +21,7 @@ export function EntitySelector({
       ) : (
         <select
           id="entity-select"
+          className="modern-input"
           value={selectedEntity?.logicalName || ""}
           onChange={(e) => {
             const entity = entities.find(
