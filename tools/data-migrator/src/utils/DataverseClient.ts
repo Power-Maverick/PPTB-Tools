@@ -66,7 +66,7 @@ export class DataverseClient {
             const entityMetadata = await window.dataverseAPI.getEntityRelatedMetadata(
                 entityLogicalName,
                 "Attributes",
-                ["LogicalName", "DisplayName", "SchemaName", "AttributeTypeName", "AttributeType", "IsPrimaryId", "IsPrimaryName", "RequiredLevel", "Description", "IsValidForRead", "AttributeOf"],
+                ["LogicalName", "DisplayName", "SchemaName", "AttributeTypeName", "AttributeType", "IsPrimaryId", "IsPrimaryName", "RequiredLevel", "Description", "IsValidForRead", "AttributeOf", "Targets"],
                 this.connectionTarget,
             );
 
@@ -91,6 +91,7 @@ export class DataverseClient {
                     isPrimaryName: attr.IsPrimaryName || false,
                     requiredLevel: attr.RequiredLevel?.Value,
                     description: extractLabel(attr.Description),
+                    targets: attr.Targets || [],
                 }));
         } catch (error: any) {
             console.error(`Failed to fetch fields for ${entityLogicalName}:`, error);
