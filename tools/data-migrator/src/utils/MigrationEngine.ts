@@ -254,7 +254,7 @@ export class MigrationEngine {
 
           try {
             // Transform record with mappings
-            const targetData = this.transformRecord(sourceRecord, config);
+            const targetData = await this.transformRecord(sourceRecord, config);
 
             // Perform all selected operations on each record
             for (const operation of config.operations) {
@@ -310,7 +310,7 @@ export class MigrationEngine {
   /**
    * Transform source record to target record with field mappings
    */
-  private transformRecord(sourceRecord: any, config: MigrationConfig): any {
+  private async transformRecord(sourceRecord: any, config: MigrationConfig): Promise<any> {
     const targetRecord: any = {};
 
     for (const mapping of config.fieldMappings) {
@@ -374,10 +374,18 @@ export class MigrationEngine {
         }
 
         // Format as OData lookup reference
-        // Use proper entity set name (pluralized)
-        const entitySetName = this.pluralizeEntityName(lookupMapping.targetEntity);
-        targetRecord[`${mapping.targetField}@odata.bind`] = 
-          `/${entitySetName}(${mappedGuid})`;
+        // Use proper entity set name from dataverse API
+        try {
+          const entitySetName = await window.dataverseAPI.getEntitySetName(lookupMapping.targetEntity);
+          targetRecord[`${mapping.targetField}@odata.bind`] = 
+            `/${entitySetName}(${mappedGuid})`;
+        } catch (error) {
+          console.error(`Failed to get entity set name for ${lookupMapping.targetEntity}, using fallback`);
+          // Fallback to pluralization if API fails
+          const entitySetName = this.pluralizeEntityName(lookupMapping.targetEntity);
+          targetRecord[`${mapping.targetField}@odata.bind`] = 
+            `/${entitySetName}(${mappedGuid})`;
+        }
       } else {
         // Regular field (not a lookup)
         const sourceValue = sourceRecord[mapping.sourceField];
