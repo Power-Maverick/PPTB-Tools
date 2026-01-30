@@ -318,12 +318,6 @@ export class MigrationEngine {
         continue;
       }
 
-      let sourceValue = sourceRecord[mapping.sourceField];
-
-      if (sourceValue === null || sourceValue === undefined) {
-        continue;
-      }
-
       // Check if this is a lookup field that needs mapping
       const lookupMapping = config.lookupMappings.find(
         (l) => l.fieldName === mapping.sourceField
@@ -334,51 +328,97 @@ export class MigrationEngine {
           continue;
         }
 
-        // Extract GUID from lookup value (handle both string and object formats)
-        let lookupGuid: string;
-        if (typeof sourceValue === "string") {
-          lookupGuid = sourceValue;
-        } else if (sourceValue._value) {
-          lookupGuid = sourceValue._value;
-        } else if (sourceValue.id) {
-          lookupGuid = sourceValue.id;
-        } else {
-          // Try to get the value from formatted lookup field name
-          const lookupValueField = `_${mapping.sourceField}_value`;
-          lookupGuid = sourceRecord[lookupValueField] || sourceValue;
+        // Extract GUID from lookup value
+        // Lookup values are stored in _fieldname_value format in query results
+        const lookupValueField = `_${mapping.sourceField}_value`;
+        let lookupGuid = sourceRecord[lookupValueField];
+
+        // Fallback: try direct field access or object formats
+        if (!lookupGuid) {
+          const sourceValue = sourceRecord[mapping.sourceField];
+          if (typeof sourceValue === "string") {
+            lookupGuid = sourceValue;
+          } else if (sourceValue && sourceValue._value) {
+            lookupGuid = sourceValue._value;
+          } else if (sourceValue && sourceValue.id) {
+            lookupGuid = sourceValue.id;
+          }
+        }
+
+        // Skip if no lookup value found
+        if (!lookupGuid) {
+          continue;
         }
 
         // Remove curly braces if present
-        lookupGuid = lookupGuid.replace(/[{}]/g, "");
+        lookupGuid = lookupGuid.toString().replace(/[{}]/g, "");
 
-        // Apply auto-mapping based on entity type
+        // Apply mapping based on strategy
         let mappedGuid = lookupGuid;
 
-        if (lookupMapping.targetEntity === "systemuser") {
-          mappedGuid = this.userMappings.get(lookupGuid) || lookupGuid;
-        } else if (lookupMapping.targetEntity === "team") {
-          mappedGuid = this.teamMappings.get(lookupGuid) || lookupGuid;
-        } else if (lookupMapping.targetEntity === "businessunit") {
-          mappedGuid =
-            this.businessUnitMappings.get(lookupGuid) || lookupGuid;
+        if (lookupMapping.strategy === "auto") {
+          // Apply auto-mapping based on entity type
+          if (lookupMapping.targetEntity === "systemuser") {
+            mappedGuid = this.userMappings.get(lookupGuid) || lookupGuid;
+          } else if (lookupMapping.targetEntity === "team") {
+            mappedGuid = this.teamMappings.get(lookupGuid) || lookupGuid;
+          } else if (lookupMapping.targetEntity === "businessunit") {
+            mappedGuid = this.businessUnitMappings.get(lookupGuid) || lookupGuid;
+          }
         } else if (
           lookupMapping.strategy === "manual" &&
           lookupMapping.manualMappings
         ) {
-          mappedGuid =
-            lookupMapping.manualMappings.get(lookupGuid) || lookupGuid;
+          // Apply manual mapping
+          mappedGuid = lookupMapping.manualMappings.get(lookupGuid) || lookupGuid;
         }
 
         // Format as OData lookup reference
-        // For single-valued navigation properties, use @odata.bind format
+        // Use proper entity set name (pluralized)
+        const entitySetName = this.pluralizeEntityName(lookupMapping.targetEntity);
         targetRecord[`${mapping.targetField}@odata.bind`] = 
-          `/${lookupMapping.targetEntity}s(${mappedGuid})`;
+          `/${entitySetName}(${mappedGuid})`;
       } else {
-        targetRecord[mapping.targetField] = sourceValue;
+        // Regular field (not a lookup)
+        const sourceValue = sourceRecord[mapping.sourceField];
+        
+        if (sourceValue !== null && sourceValue !== undefined) {
+          targetRecord[mapping.targetField] = sourceValue;
+        }
       }
     }
 
     return targetRecord;
+  }
+
+  /**
+   * Pluralize entity name for OData entity set names
+   */
+  private pluralizeEntityName(entityName: string): string {
+    // Handle common Dataverse entity pluralizations
+    const knownPluralizations: { [key: string]: string } = {
+      systemuser: "systemusers",
+      team: "teams",
+      businessunit: "businessunits",
+      account: "accounts",
+      contact: "contacts",
+      lead: "leads",
+      opportunity: "opportunities",
+      quote: "quotes",
+      order: "orders",
+      invoice: "invoices",
+      product: "products",
+      pricelevel: "pricelevels",
+      // Add more as needed
+    };
+
+    // Check if we have a known pluralization
+    if (knownPluralizations[entityName.toLowerCase()]) {
+      return knownPluralizations[entityName.toLowerCase()];
+    }
+
+    // Default: add 's' at the end
+    return entityName + "s";
   }
 
   /**
