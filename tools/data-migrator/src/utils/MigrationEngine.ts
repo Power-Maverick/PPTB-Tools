@@ -186,11 +186,20 @@ export class MigrationEngine {
         selectFields.push(primaryIdField);
       }
 
-      const sourceRecords = await this.sourceClient.queryRecords(
-        config.entityLogicalName,
-        selectFields,
-        config.filterQuery
-      );
+      let sourceRecords: any[];
+
+      // Use appropriate query method based on filter type
+      if (config.filterType === "fetchxml" && config.filterQuery) {
+        // Use FetchXML query
+        sourceRecords = await this.sourceClient.queryRecordsWithFetchXml(config.filterQuery);
+      } else {
+        // Use OData query
+        sourceRecords = await this.sourceClient.queryRecords(
+          config.entityLogicalName,
+          selectFields,
+          config.filterQuery
+        );
+      }
 
       const totalRecords = sourceRecords.length;
       const totalBatches = Math.ceil(totalRecords / config.batchSize);
