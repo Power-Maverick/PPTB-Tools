@@ -375,17 +375,36 @@ export class MigrationEngine {
 
         // Format as OData lookup reference
         // Use proper entity set name from dataverse API
-        try {
-          const entitySetName = await window.dataverseAPI.getEntitySetName(lookupMapping.targetEntity);
-          targetRecord[`${mapping.targetField}@odata.bind`] = 
-            `/${entitySetName}(${mappedGuid})`;
-        } catch (error) {
-          console.error(`Failed to get entity set name for ${lookupMapping.targetEntity}, using fallback`);
-          // Fallback to pluralization if API fails
-          const entitySetName = this.pluralizeEntityName(lookupMapping.targetEntity);
-          targetRecord[`${mapping.targetField}@odata.bind`] = 
-            `/${entitySetName}(${mappedGuid})`;
+        if (!lookupMapping.targetEntity) {
+          console.error(`Target entity is missing for lookup field ${mapping.sourceField}`);
+          continue;
         }
+
+        let entitySetName: string;
+        try {
+          // Get entity metadata to extract the LogicalCollectionName (entity set name)
+          const entityMetadata = await window.dataverseAPI.getEntityMetadata(
+            lookupMapping.targetEntity,
+            true,
+            ["LogicalCollectionName"],
+            "primary"
+          );
+          
+          entitySetName = entityMetadata?.LogicalCollectionName;
+          
+          // Validate we got a proper entity set name
+          if (!entitySetName || entitySetName.trim() === "") {
+            throw new Error("Empty entity set name returned from metadata");
+          }
+        } catch (error) {
+          console.error(`Failed to get entity set name for ${lookupMapping.targetEntity}:`, error);
+          // Fallback to pluralization if API fails
+          entitySetName = this.pluralizeEntityName(lookupMapping.targetEntity);
+          console.log(`Using fallback pluralization: ${entitySetName}`);
+        }
+        
+        targetRecord[`${mapping.targetField}@odata.bind`] = 
+          `/${entitySetName}(${mappedGuid})`;
       } else {
         // Regular field (not a lookup)
         const sourceValue = sourceRecord[mapping.sourceField];
@@ -403,6 +422,14 @@ export class MigrationEngine {
    * Pluralize entity name for OData entity set names
    */
   private pluralizeEntityName(entityName: string): string {
+    // Validate input
+    if (!entityName || entityName.trim() === "") {
+      console.error("pluralizeEntityName called with empty entity name");
+      return "";
+    }
+
+    const normalizedName = entityName.toLowerCase().trim();
+
     // Handle common Dataverse entity pluralizations
     const knownPluralizations: { [key: string]: string } = {
       systemuser: "systemusers",
@@ -417,16 +444,35 @@ export class MigrationEngine {
       invoice: "invoices",
       product: "products",
       pricelevel: "pricelevels",
+      incident: "incidents",
+      campaign: "campaigns",
+      list: "lists",
+      annotation: "annotations",
+      appointment: "appointments",
+      email: "emails",
+      phonecall: "phonecalls",
+      task: "tasks",
+      letter: "letters",
+      fax: "faxes",
+      activitypointer: "activitypointers",
       // Add more as needed
     };
 
     // Check if we have a known pluralization
-    if (knownPluralizations[entityName.toLowerCase()]) {
-      return knownPluralizations[entityName.toLowerCase()];
+    if (knownPluralizations[normalizedName]) {
+      return knownPluralizations[normalizedName];
+    }
+
+    // Handle words ending in 'y' -> 'ies'
+    if (normalizedName.endsWith("y") && normalizedName.length > 1) {
+      const consonants = "bcdfghjklmnpqrstvwxz";
+      if (consonants.includes(normalizedName[normalizedName.length - 2])) {
+        return normalizedName.slice(0, -1) + "ies";
+      }
     }
 
     // Default: add 's' at the end
-    return entityName + "s";
+    return normalizedName + "s";
   }
 
   /**
