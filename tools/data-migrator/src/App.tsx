@@ -305,12 +305,20 @@ function App() {
   }
 
   const handleSaveConfiguration = () => {
+    // Convert Maps to arrays for JSON serialization
+    const serializedLookupMappings = lookupMappings.map(mapping => ({
+      ...mapping,
+      manualMappings: mapping.manualMappings 
+        ? Array.from(mapping.manualMappings.entries())
+        : undefined
+    }));
+
     const config = {
       entityLogicalName: selectedEntity?.logicalName,
       entityDisplayName: selectedEntity?.displayName,
       operations,
       fieldMappings,
-      lookupMappings,
+      lookupMappings: serializedLookupMappings,
       filterType,
       filterQuery,
       batchSize,
@@ -344,7 +352,16 @@ function App() {
         setTimeout(() => {
           setOperations(config.operations || ["create"]);
           setFieldMappings(config.fieldMappings || []);
-          setLookupMappings(config.lookupMappings || []);
+          
+          // Convert arrays back to Maps for lookup mappings
+          const deserializedLookupMappings = (config.lookupMappings || []).map((mapping: any) => ({
+            ...mapping,
+            manualMappings: mapping.manualMappings 
+              ? new Map(mapping.manualMappings)
+              : undefined
+          }));
+          setLookupMappings(deserializedLookupMappings);
+          
           setFilterType(config.filterType || "odata");
           setFilterQuery(config.filterQuery || "");
           setBatchSize(config.batchSize || 50);
