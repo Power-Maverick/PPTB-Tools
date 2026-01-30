@@ -13,8 +13,8 @@ export function LookupMapper({
   onAutoMapping,
 }: LookupMapperProps) {
   const [expandedMapping, setExpandedMapping] = useState<string | null>(null);
-  const [newSourceId, setNewSourceId] = useState<string>("");
-  const [newTargetId, setNewTargetId] = useState<string>("");
+  // Use a Map to store input values per field to avoid shared state issues
+  const [inputValues, setInputValues] = useState<Map<string, { source: string; target: string }>>(new Map());
 
   const handleStrategyChange = (fieldName: string, strategy: "auto" | "manual" | "skip") => {
     const updatedMappings = lookupMappings.map((mapping) => {
@@ -31,8 +31,23 @@ export function LookupMapper({
     onLookupMappingsChange(updatedMappings);
   };
 
+  const validateGuid = (value: string): boolean => {
+    const guidPattern = /^[{]?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}[}]?$/;
+    return guidPattern.test(value.trim());
+  };
+
   const handleAddMapping = (fieldName: string) => {
-    if (!newSourceId.trim() || !newTargetId.trim()) {
+    const inputs = inputValues.get(fieldName);
+    const sourceId = inputs?.source?.trim() || "";
+    const targetId = inputs?.target?.trim() || "";
+
+    if (!sourceId || !targetId) {
+      return;
+    }
+
+    // Validate GUID format
+    if (!validateGuid(sourceId) || !validateGuid(targetId)) {
+      alert("Please enter valid GUIDs in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
       return;
     }
 
@@ -45,15 +60,28 @@ export function LookupMapper({
           // Create a new Map to ensure React detects the change
           updatedMapping.manualMappings = new Map(updatedMapping.manualMappings);
         }
-        updatedMapping.manualMappings.set(newSourceId.trim(), newTargetId.trim());
+        
+        // Check for duplicate source ID
+        if (updatedMapping.manualMappings.has(sourceId)) {
+          if (!confirm(`Source ID ${sourceId} already exists with a different target. Do you want to overwrite it?`)) {
+            return mapping;
+          }
+        }
+        
+        updatedMapping.manualMappings.set(sourceId, targetId);
         return updatedMapping;
       }
       return mapping;
     });
 
     onLookupMappingsChange(updatedMappings);
-    setNewSourceId("");
-    setNewTargetId("");
+    
+    // Clear input values for this field
+    setInputValues(prev => {
+      const newMap = new Map(prev);
+      newMap.set(fieldName, { source: "", target: "" });
+      return newMap;
+    });
   };
 
   const handleDeleteMapping = (fieldName: string, sourceId: string) => {
@@ -104,6 +132,7 @@ export function LookupMapper({
                       e.target.value as "auto" | "manual" | "skip"
                     )
                   }
+                  aria-label={`Mapping strategy for ${mapping.fieldDisplayName}`}
                 >
                   <option value="auto">Auto-Map</option>
                   <option value="manual">Manual Map</option>
@@ -116,6 +145,11 @@ export function LookupMapper({
                       setExpandedMapping(
                         expandedMapping === mapping.fieldName ? null : mapping.fieldName
                       )
+                    }
+                    aria-label={
+                      expandedMapping === mapping.fieldName
+                        ? "Collapse manual mapping panel"
+                        : "Expand manual mapping panel"
                     }
                   >
                     {expandedMapping === mapping.fieldName ? "−" : "+"}
@@ -141,6 +175,7 @@ export function LookupMapper({
                         className="btn-delete"
                         onClick={() => handleDeleteMapping(mapping.fieldName, sourceId)}
                         title="Delete mapping"
+                        aria-label={`Delete mapping for ${sourceId}`}
                       >
                         ✕
                       </button>
@@ -153,27 +188,47 @@ export function LookupMapper({
                     type="text"
                     className="modern-input"
                     placeholder="Source ID (GUID)"
-                    value={newSourceId}
-                    onChange={(e) => setNewSourceId(e.target.value)}
+                    value={inputValues.get(mapping.fieldName)?.source || ""}
+                    onChange={(e) => {
+                      setInputValues(prev => {
+                        const newMap = new Map(prev);
+                        const current = newMap.get(mapping.fieldName) || { source: "", target: "" };
+                        newMap.set(mapping.fieldName, { ...current, source: e.target.value });
+                        return newMap;
+                      });
+                    }}
+                    aria-label="Source ID"
                   />
                   <input
                     type="text"
                     className="modern-input"
                     placeholder="Target ID (GUID)"
-                    value={newTargetId}
-                    onChange={(e) => setNewTargetId(e.target.value)}
+                    value={inputValues.get(mapping.fieldName)?.target || ""}
+                    onChange={(e) => {
+                      setInputValues(prev => {
+                        const newMap = new Map(prev);
+                        const current = newMap.get(mapping.fieldName) || { source: "", target: "" };
+                        newMap.set(mapping.fieldName, { ...current, target: e.target.value });
+                        return newMap;
+                      });
+                    }}
+                    aria-label="Target ID"
                   />
                   <button
                     className="btn-add"
                     onClick={() => handleAddMapping(mapping.fieldName)}
-                    disabled={!newSourceId.trim() || !newTargetId.trim()}
+                    disabled={
+                      !(inputValues.get(mapping.fieldName)?.source?.trim()) ||
+                      !(inputValues.get(mapping.fieldName)?.target?.trim())
+                    }
+                    aria-label="Add mapping"
                   >
                     Add
                   </button>
                 </div>
                 
-                <p style={{ fontSize: "11px", color: "#605e5c", marginTop: "8px" }}>
-                  💡 Enter source record IDs and their corresponding target IDs. These mappings will be used during migration.
+                <p className="manual-mapping-hint">
+                  💡 Enter source record IDs and their corresponding target IDs. GUIDs should be in format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
                 </p>
               </div>
             )}
