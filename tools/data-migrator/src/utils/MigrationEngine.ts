@@ -223,17 +223,29 @@ export class MigrationEngine {
 
         for (const sourceRecord of batch) {
           const recordId = sourceRecord[primaryIdField];
+          
+          // Get primary name from entity metadata
+          const entityMetadataForName = await window.dataverseAPI.getEntityMetadata(
+            config.entityLogicalName,
+            true,
+            ["PrimaryNameAttribute"],
+            "primary"
+          );
+          const primaryNameField = entityMetadataForName?.PrimaryNameAttribute;
+          const primaryName = primaryNameField ? sourceRecord[primaryNameField] : "";
+          
           const displayField = config.fieldMappings.find(
             (m) => m.sourceField.includes("name")
           )?.sourceField;
           const displayName =
             displayField && sourceRecord[displayField]
               ? sourceRecord[displayField]
-              : recordId;
+              : (primaryName || recordId);
 
           const migrationRecord: MigrationRecord = {
             sourceId: recordId,
             displayName,
+            primaryName: primaryName || displayName,
             status: "processing",
           };
 
@@ -306,7 +318,7 @@ export class MigrationEngine {
         continue;
       }
 
-      const sourceValue = sourceRecord[mapping.sourceField];
+      let sourceValue = sourceRecord[mapping.sourceField];
 
       if (sourceValue === null || sourceValue === undefined) {
         continue;
@@ -322,25 +334,45 @@ export class MigrationEngine {
           continue;
         }
 
+        // Extract GUID from lookup value (handle both string and object formats)
+        let lookupGuid: string;
+        if (typeof sourceValue === "string") {
+          lookupGuid = sourceValue;
+        } else if (sourceValue._value) {
+          lookupGuid = sourceValue._value;
+        } else if (sourceValue.id) {
+          lookupGuid = sourceValue.id;
+        } else {
+          // Try to get the value from formatted lookup field name
+          const lookupValueField = `_${mapping.sourceField}_value`;
+          lookupGuid = sourceRecord[lookupValueField] || sourceValue;
+        }
+
+        // Remove curly braces if present
+        lookupGuid = lookupGuid.replace(/[{}]/g, "");
+
         // Apply auto-mapping based on entity type
-        let mappedValue = sourceValue;
+        let mappedGuid = lookupGuid;
 
         if (lookupMapping.targetEntity === "systemuser") {
-          mappedValue = this.userMappings.get(sourceValue) || sourceValue;
+          mappedGuid = this.userMappings.get(lookupGuid) || lookupGuid;
         } else if (lookupMapping.targetEntity === "team") {
-          mappedValue = this.teamMappings.get(sourceValue) || sourceValue;
+          mappedGuid = this.teamMappings.get(lookupGuid) || lookupGuid;
         } else if (lookupMapping.targetEntity === "businessunit") {
-          mappedValue =
-            this.businessUnitMappings.get(sourceValue) || sourceValue;
+          mappedGuid =
+            this.businessUnitMappings.get(lookupGuid) || lookupGuid;
         } else if (
           lookupMapping.strategy === "manual" &&
           lookupMapping.manualMappings
         ) {
-          mappedValue =
-            lookupMapping.manualMappings.get(sourceValue) || sourceValue;
+          mappedGuid =
+            lookupMapping.manualMappings.get(lookupGuid) || lookupGuid;
         }
 
-        targetRecord[mapping.targetField] = mappedValue;
+        // Format as OData lookup reference
+        // For single-valued navigation properties, use @odata.bind format
+        targetRecord[`${mapping.targetField}@odata.bind`] = 
+          `/${lookupMapping.targetEntity}s(${mappedGuid})`;
       } else {
         targetRecord[mapping.targetField] = sourceValue;
       }

@@ -60,7 +60,12 @@ export function MigrationProgress({ progress }: MigrationProgressProps) {
         {progress.records.map((record, index) => (
           <div key={index} className="record-item">
             <div>
-              <div style={{ fontWeight: 500 }}>{record.displayName}</div>
+              <div style={{ fontWeight: 500 }}>
+                {record.primaryName || record.displayName}
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px" }}>
+                ID: {record.sourceId}
+              </div>
               {record.errorMessage && (
                 <div style={{ fontSize: "12px", color: "var(--error-color)", marginTop: "4px" }}>
                   {record.errorMessage}

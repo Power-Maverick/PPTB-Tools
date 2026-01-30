@@ -66,6 +66,8 @@ export interface MigrationRecord {
   targetId?: string;
   /** Display name or identifier */
   displayName: string;
+  /** Primary name value */
+  primaryName?: string;
   /** Status of the migration */
   status: MigrationStatus;
   /** Error message if failed */

@@ -304,15 +304,64 @@ function App() {
     );
   }
 
+  const handleSaveConfiguration = () => {
+    const config = {
+      entityLogicalName: selectedEntity?.logicalName,
+      entityDisplayName: selectedEntity?.displayName,
+      operations,
+      fieldMappings,
+      lookupMappings,
+      filterType,
+      filterQuery,
+      batchSize,
+      version: "1.0"
+    };
+
+    const json = JSON.stringify(config, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `migration-config-${selectedEntity?.logicalName || "entity"}-${Date.now()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleLoadConfiguration = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const config = JSON.parse(text);
+
+      // Find and select the entity
+      const entity = entities.find((e) => e.logicalName === config.entityLogicalName);
+      if (entity) {
+        await handleEntitySelect(entity);
+        
+        // Wait for fields to load, then apply configuration
+        setTimeout(() => {
+          setOperations(config.operations || ["create"]);
+          setFieldMappings(config.fieldMappings || []);
+          setLookupMappings(config.lookupMappings || []);
+          setFilterType(config.filterType || "odata");
+          setFilterQuery(config.filterQuery || "");
+          setBatchSize(config.batchSize || 50);
+        }, 500);
+      } else {
+        setError(`Entity "${config.entityLogicalName}" not found in this environment`);
+      }
+    } catch (error: any) {
+      setError(`Failed to load configuration: ${error.message}`);
+    }
+
+    // Reset input
+    event.target.value = "";
+  };
+
   return (
     <div className="app-container">
-      {error && (
-        <div className="error-banner">
-          <span>{error}</span>
-          <button onClick={() => setError("")}>×</button>
-        </div>
-      )}
-
       <div className="content-fluid">
         {/* Header with connections */}
         <div className="header-card">
@@ -332,6 +381,27 @@ function App() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Configuration Save/Load */}
+        <div className="config-toolbar">
+          <button
+            className="btn-secondary"
+            onClick={handleSaveConfiguration}
+            disabled={!selectedEntity}
+            title="Save current configuration"
+          >
+            💾 Save Configuration
+          </button>
+          <label className="btn-secondary" style={{ cursor: "pointer" }}>
+            📂 Load Configuration
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleLoadConfiguration}
+              style={{ display: "none" }}
+            />
+          </label>
         </div>
 
         {/* Main content with steps */}
@@ -488,7 +558,9 @@ function App() {
                   {expandedSteps.has(5) && (
                     <div className="step-content">
                       <LookupMapper
-                        lookupMappings={lookupMappings}
+                        lookupMappings={lookupMappings.filter(l => 
+                          fieldMappings.find(f => f.sourceField === l.fieldName && f.isEnabled)
+                        )}
                         onLookupMappingsChange={setLookupMappings}
                         onAutoMapping={handleAutoMapping}
                       />
@@ -507,14 +579,30 @@ function App() {
                   {loadingPreview ? "Loading..." : "Preview Data"}
                 </button>
               </div>
+
+              {/* Error Message - appears below preview button */}
+              {error && !isMigrating && !migrationProgress && (
+                <div className="error-message-inline">
+                  <span>⚠️ {error}</span>
+                  <button onClick={() => setError("")}>×</button>
+                </div>
+              )}
             </>
           )}
         </div>
 
-        {/* Migration Progress */}
-        {migrationProgress && (
+        {/* Migration Progress or Error */}
+        {(migrationProgress || (error && (isMigrating || migrationProgress))) && (
           <div className="progress-card">
-            <MigrationProgressComponent progress={migrationProgress} />
+            {error && (isMigrating || migrationProgress) && (
+              <div className="error-message-progress">
+                <span>⚠️ {error}</span>
+                <button onClick={() => setError("")}>×</button>
+              </div>
+            )}
+            {migrationProgress && (
+              <MigrationProgressComponent progress={migrationProgress} />
+            )}
           </div>
         )}
 
