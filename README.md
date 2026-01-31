@@ -186,6 +186,32 @@ Migrate data from one Dataverse environment to another with intelligent auto-map
 - **@pptb/types v1.0.16** - Latest PPTB type definitions
 - **MigrationEngine** - Core migration logic with auto-mapping capabilities
 
+### [Environment Variable Manager](./tools/environment-variable-manager)
+
+Tool README: [here](./tools/environment-variable-manager/README.md)
+
+Manage environment variables default and per-environment values in Dataverse. Exclusively for PPTB.
+
+**Key Features:**
+
+- **React + TypeScript**: Modern component-based architecture with Vite build system
+- **PPTB-Only Integration**: Designed exclusively for Power Platform ToolBox (uses @pptb/types v1.0.17)
+- **Modern Minimalist UI**: Clean design with no header and optimized to avoid excessive scrolling and whitespace
+- **View & Search**: Browse all environment variables with instant search by name, schema, description, or value
+- **Create Variables**: Create new environment variable definitions with full type support (String, Number, Boolean, JSON, Data Source)
+- **Edit Values**: Update both default values (all environments) and environment-specific values (current environment only)
+- **Visual Indicators**: Clear badges showing which variables have environment-specific overrides
+- **Type Support**: Full support for all Dataverse environment variable types
+- **Delete Variables**: Remove environment variables when no longer needed
+
+**Use Cases:**
+
+- Manage different API endpoints, URLs, or settings across Dev, Test, and Prod environments
+- Control feature availability using Boolean variables as feature flags
+- Store API keys, connection strings, or other integration configuration
+- Centralize application configuration that may differ per environment
+- Store complex configuration objects using JSON type variables
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
