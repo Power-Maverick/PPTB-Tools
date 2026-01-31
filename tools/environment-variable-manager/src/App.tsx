@@ -49,7 +49,7 @@ function App() {
         if (connectionUrl) {
             loadVariables();
         }
-    }, [connectionUrl]);
+    }, [connectionUrl, loadVariables]);
 
     // Filter variables based on search query
     useEffect(() => {
