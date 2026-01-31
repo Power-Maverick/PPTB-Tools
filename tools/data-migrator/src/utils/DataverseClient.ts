@@ -194,6 +194,19 @@ export class DataverseClient {
     }
 
     /**
+     * Retrieve a record by ID
+     */
+    async retrieveRecord(entityLogicalName: string, recordId: string, selectFields: string[]): Promise<any> {
+        try {
+            const record = await window.dataverseAPI.retrieve(entityLogicalName, recordId, selectFields, this.connectionTarget);
+            return record;
+        } catch (error: any) {
+            console.error(`Failed to retrieve record from ${entityLogicalName}:`, error);
+            throw new Error(`Failed to retrieve record: ${error.message}`);
+        }
+    }
+
+    /**
      * Upsert a record (update if exists, create if not)
      */
     async upsertRecord(entityLogicalName: string, recordId: string, recordData: any): Promise<string> {
