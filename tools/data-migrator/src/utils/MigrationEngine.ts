@@ -284,9 +284,6 @@ export class MigrationEngine {
 
               switch (operation) {
                 case "create":
-                  if (recordExistsInTarget) {
-                    throw new Error(`Record ${recordId} already exists in target. Use Update operation instead.`);
-                  }
                   const createdId = await this.targetClient.createRecord(
                     config.entityLogicalName,
                     targetData
@@ -295,9 +292,6 @@ export class MigrationEngine {
                   break;
 
                 case "update":
-                  if (!recordExistsInTarget) {
-                    throw new Error(`Record ${recordId} does not exist in target. Use Create operation instead.`);
-                  }
                   await this.targetClient.updateRecord(
                     config.entityLogicalName,
                     recordId,
