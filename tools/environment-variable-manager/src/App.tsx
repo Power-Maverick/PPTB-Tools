@@ -44,30 +44,6 @@ function App() {
         initializeEnvironment();
     }, []);
 
-    // Load environment variables when connection is available
-    useEffect(() => {
-        if (connectionUrl) {
-            loadVariables();
-        }
-    }, [connectionUrl, loadVariables]);
-
-    // Filter variables based on search query
-    useEffect(() => {
-        if (searchQuery.trim() === "") {
-            setFilteredVariables(variables);
-        } else {
-            const query = searchQuery.toLowerCase();
-            const filtered = variables.filter(
-                (v) =>
-                    v.definition.displayname?.toLowerCase().includes(query) ||
-                    v.definition.schemaname?.toLowerCase().includes(query) ||
-                    v.definition.description?.toLowerCase().includes(query) ||
-                    v.currentValue?.toLowerCase().includes(query)
-            );
-            setFilteredVariables(filtered);
-        }
-    }, [searchQuery, variables]);
-
     const loadVariables = useCallback(async () => {
         setLoadingVariables(true);
         setError("");
@@ -97,6 +73,30 @@ function App() {
             setLoadingVariables(false);
         }
     }, []);
+
+    // Load environment variables when connection is available
+    useEffect(() => {
+        if (connectionUrl) {
+            loadVariables();
+        }
+    }, [connectionUrl, loadVariables]);
+
+    // Filter variables based on search query
+    useEffect(() => {
+        if (searchQuery.trim() === "") {
+            setFilteredVariables(variables);
+        } else {
+            const query = searchQuery.toLowerCase();
+            const filtered = variables.filter(
+                (v) =>
+                    v.definition.displayname?.toLowerCase().includes(query) ||
+                    v.definition.schemaname?.toLowerCase().includes(query) ||
+                    v.definition.description?.toLowerCase().includes(query) ||
+                    v.currentValue?.toLowerCase().includes(query)
+            );
+            setFilteredVariables(filtered);
+        }
+    }, [searchQuery, variables]);
 
     const handleRefresh = useCallback(() => {
         loadVariables();
