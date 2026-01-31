@@ -257,9 +257,36 @@ export class MigrationEngine {
             const targetData = await this.transformRecord(sourceRecord, config);
 
             // Perform all selected operations on each record
+            // First check if record exists in target for smart operation selection
+            let recordExistsInTarget = false;
+            try {
+              const existingRecord = await this.targetClient.retrieveRecord(
+                config.entityLogicalName,
+                recordId,
+                [primaryIdField]
+              );
+              recordExistsInTarget = !!existingRecord;
+            } catch (error) {
+              // Record doesn't exist
+              recordExistsInTarget = false;
+            }
+
             for (const operation of config.operations) {
+              // Skip create if record already exists and both create and update are selected
+              if (operation === "create" && recordExistsInTarget && config.operations.includes("update")) {
+                continue; // Skip create, will be handled by update
+              }
+              
+              // Skip update if record doesn't exist and both create and update are selected
+              if (operation === "update" && !recordExistsInTarget && config.operations.includes("create")) {
+                continue; // Skip update, will be handled by create
+              }
+
               switch (operation) {
                 case "create":
+                  if (recordExistsInTarget) {
+                    throw new Error(`Record ${recordId} already exists in target. Use Update operation instead.`);
+                  }
                   const createdId = await this.targetClient.createRecord(
                     config.entityLogicalName,
                     targetData
@@ -268,6 +295,9 @@ export class MigrationEngine {
                   break;
 
                 case "update":
+                  if (!recordExistsInTarget) {
+                    throw new Error(`Record ${recordId} does not exist in target. Use Create operation instead.`);
+                  }
                   await this.targetClient.updateRecord(
                     config.entityLogicalName,
                     recordId,

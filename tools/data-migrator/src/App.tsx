@@ -148,11 +148,16 @@ function App() {
       const client = new DataverseClient("primary");
       const fields = await client.fetchEntityFields(entity.logicalName);
 
-      const updatedEntity = { ...entity, fields };
+      // Sort fields by display name
+      const sortedFields = [...fields].sort((a, b) => 
+        a.displayName.localeCompare(b.displayName)
+      );
+
+      const updatedEntity = { ...entity, fields: sortedFields };
       setSelectedEntity(updatedEntity);
 
-      // Initialize field mappings
-      const mappings: FieldMapping[] = fields.map((field) => ({
+      // Initialize field mappings with sorted fields
+      const mappings: FieldMapping[] = sortedFields.map((field) => ({
         sourceField: field.logicalName,
         targetField: field.logicalName,
         isEnabled: !field.isPrimaryId, // Exclude primary ID by default
@@ -377,6 +382,25 @@ function App() {
     event.target.value = "";
   };
 
+  const handleResetConfiguration = () => {
+    // Reset all configuration to initial state
+    setSelectedEntity(null);
+    setFieldMappings([]);
+    setLookupMappings([]);
+    setOperations(["create"]);
+    setFilterType("odata");
+    setFilterQuery("");
+    setBatchSize(50);
+    setPreviewRecords([]);
+    setMigrationProgress(null);
+    setShowPreview(false);
+    setError("");
+    setExpandedSteps(new Set([1]));
+    setUserMappings([]);
+    setTeamMappings([]);
+    setBusinessUnitMappings([]);
+  };
+
   return (
     <div className="app-container">
       <div className="content-fluid">
@@ -419,6 +443,13 @@ function App() {
               style={{ display: "none" }}
             />
           </label>
+          <button
+            className="btn-secondary btn-reset"
+            onClick={handleResetConfiguration}
+            title="Reset all configuration"
+          >
+            🔄 Reset
+          </button>
         </div>
 
         {/* Main content with steps */}
@@ -608,8 +639,8 @@ function App() {
           )}
         </div>
 
-        {/* Migration Progress or Error */}
-        {(migrationProgress || (error && (isMigrating || migrationProgress))) && (
+        {/* Migration Progress - Always show section when entity is selected */}
+        {selectedEntity && (
           <div className="progress-card">
             {error && (isMigrating || migrationProgress) && (
               <div className="error-message-progress">
@@ -617,8 +648,13 @@ function App() {
                 <button onClick={() => setError("")}>×</button>
               </div>
             )}
-            {migrationProgress && (
+            {migrationProgress ? (
               <MigrationProgressComponent progress={migrationProgress} />
+            ) : (
+              <div className="progress-placeholder">
+                <h3>Migration Status</h3>
+                <p>Select settings and preview data to begin migration</p>
+              </div>
             )}
           </div>
         )}
