@@ -66,11 +66,32 @@ export class DataverseClient {
             const entityMetadata = await window.dataverseAPI.getEntityRelatedMetadata(
                 entityLogicalName,
                 "Attributes",
-                ["LogicalName", "DisplayName", "SchemaName", "AttributeTypeName", "AttributeType", "IsPrimaryId", "IsPrimaryName", "RequiredLevel", "Description", "IsValidForRead", "AttributeOf", "Targets"],
+                ["LogicalName", "DisplayName", "SchemaName", "AttributeTypeName", "AttributeType", "IsPrimaryId", "IsPrimaryName", "RequiredLevel", "Description", "IsValidForRead", "AttributeOf"],
                 this.connectionTarget,
             );
 
             const attributes = entityMetadata.value || [];
+
+            // Get relationship metadata to find target entities for lookup fields
+            let relationshipsMap: Map<string, string> = new Map();
+            try {
+                const relationships = await window.dataverseAPI.getEntityRelatedMetadata(
+                    entityLogicalName,
+                    "ManyToOneRelationships",
+                    ["ReferencingAttribute", "ReferencedEntity"],
+                    this.connectionTarget,
+                );
+                
+                if (relationships.value) {
+                    relationships.value.forEach((rel: any) => {
+                        if (rel.ReferencingAttribute && rel.ReferencedEntity) {
+                            relationshipsMap.set(rel.ReferencingAttribute, rel.ReferencedEntity);
+                        }
+                    });
+                }
+            } catch (relError) {
+                console.warn("Could not fetch relationships for lookup targets:", relError);
+            }
 
             // Filter out virtual attributes (IsValidForRead = false or has AttributeOf)
             return attributes
@@ -81,18 +102,29 @@ export class DataverseClient {
                     if (attr.AttributeOf) return false;
                     return true;
                 })
-                .map((attr: any) => ({
-                    logicalName: attr.LogicalName,
-                    displayName: extractLabel(attr.DisplayName) || attr.LogicalName,
-                    schemaName: attr.SchemaName || attr.LogicalName,
-                    type: attr.AttributeTypeName?.Value || attr.AttributeType || "Unknown",
-                    attributeType: attr.AttributeType,
-                    isPrimaryId: attr.IsPrimaryId || false,
-                    isPrimaryName: attr.IsPrimaryName || false,
-                    requiredLevel: attr.RequiredLevel?.Value,
-                    description: extractLabel(attr.Description),
-                    targets: attr.Targets || [],
-                }));
+                .map((attr: any) => {
+                    const field: DataverseField = {
+                        logicalName: attr.LogicalName,
+                        displayName: extractLabel(attr.DisplayName) || attr.LogicalName,
+                        schemaName: attr.SchemaName || attr.LogicalName,
+                        type: attr.AttributeTypeName?.Value || attr.AttributeType || "Unknown",
+                        attributeType: attr.AttributeType,
+                        isPrimaryId: attr.IsPrimaryId || false,
+                        isPrimaryName: attr.IsPrimaryName || false,
+                        requiredLevel: attr.RequiredLevel?.Value,
+                        description: extractLabel(attr.Description),
+                    };
+                    
+                    // Add targets array for lookup fields
+                    if (attr.AttributeType === "Lookup" || attr.AttributeType === "Customer" || attr.AttributeType === "Owner") {
+                        const targetEntity = relationshipsMap.get(attr.LogicalName);
+                        if (targetEntity) {
+                            field.targets = [targetEntity];
+                        }
+                    }
+                    
+                    return field;
+                });
         } catch (error: any) {
             console.error(`Failed to fetch fields for ${entityLogicalName}:`, error);
             throw new Error(`Failed to fetch fields for ${entityLogicalName}: ${error.message}`);
