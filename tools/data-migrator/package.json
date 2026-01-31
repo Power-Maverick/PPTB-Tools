@@ -19,7 +19,8 @@
   },
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "npm run typecheck && vite build",
+    "typecheck": "tsc --noEmit",
     "dev": "vite",
     "preview": "vite preview",
     "finalize-package": "npm shrinkwrap"

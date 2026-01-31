@@ -16,13 +16,6 @@ function extractLabel(value: any): string | undefined {
 }
 
 /**
- * Escape OData string literals to prevent injection
- */
-function escapeODataString(value: string): string {
-    return value.replace(/'/g, "''");
-}
-
-/**
  * Client for interacting with Dataverse using PPTB API
  */
 export class DataverseClient {
@@ -81,7 +74,7 @@ export class DataverseClient {
                     ["ReferencingAttribute", "ReferencedEntity"],
                     this.connectionTarget,
                 );
-                
+
                 if (relationships.value) {
                     relationships.value.forEach((rel: any) => {
                         if (rel.ReferencingAttribute && rel.ReferencedEntity) {
@@ -114,7 +107,7 @@ export class DataverseClient {
                         requiredLevel: attr.RequiredLevel?.Value,
                         description: extractLabel(attr.Description),
                     };
-                    
+
                     // Add targets array for lookup fields
                     if (attr.AttributeType === "Lookup" || attr.AttributeType === "Customer" || attr.AttributeType === "Owner") {
                         const targetEntity = relationshipsMap.get(attr.LogicalName);
@@ -122,7 +115,7 @@ export class DataverseClient {
                             field.targets = [targetEntity];
                         }
                     }
-                    
+
                     return field;
                 });
         } catch (error: any) {
@@ -234,16 +227,9 @@ export class DataverseClient {
     /**
      * Delete a record
      */
-    async deleteRecord(
-        entityLogicalName: string,
-        recordId: string,
-    ): Promise<void> {
+    async deleteRecord(entityLogicalName: string, recordId: string): Promise<void> {
         try {
-            await window.dataverseAPI.delete(
-                entityLogicalName,
-                recordId,
-                this.connectionTarget,
-            );
+            await window.dataverseAPI.delete(entityLogicalName, recordId, this.connectionTarget);
         } catch (error: any) {
             console.error(`Failed to delete record in ${entityLogicalName}:`, error);
             throw new Error(`Failed to delete record: ${error.message}`);
