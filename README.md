@@ -10,6 +10,7 @@ Tools for Power Platform ToolBox (PPTB) - a comprehensive toolkit for working wi
         - [Entity Field Catalog](#entity-field-catalog)
         - [View Layout Replicator](#view-layout-replicator)
         - [Dataverse Trace Analyzer](#dataverse-trace-analyzer)
+        - [Data Migrator](#data-migrator)
     - [Contributing](#contributing)
     - [License](#license)
 
@@ -151,7 +152,7 @@ Analyze and view Plugin Trace Logs from Microsoft Dataverse. Exclusively for PPT
 - Track related operations using correlation IDs
 - Clean up old trace logs
 
-### [@power-maverick/tool-data-migrator](./tools/data-migrator)
+### [Data Migrator](./tools/data-migrator)
 
 Tool README: [here](./tools/data-migrator/README.md)
 
