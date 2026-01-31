@@ -1,0 +1,57 @@
+{
+  "name": "@power-maverick/tool-data-migrator",
+  "displayName": "Data Migrator",
+  "version": "0.0.1",
+  "description": "Migrate data from one Dataverse environment to another with auto-mapping and smart operations",
+  "contributors": [
+    {
+      "name": "Power Maverick",
+      "url": "https://github.com/Power-Maverick"
+    }
+  ],
+  "license": "GPL-2.0",
+  "configurations": {
+    "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/data-migrator",
+    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/data-migrator/README.md",
+    "iconUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/data-migrator/icons/dataMigrator.png"
+  },
+  "features": {
+    "multiConnection": "required"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "npm run typecheck && vite build",
+    "typecheck": "tsc --noEmit",
+    "dev": "vite",
+    "preview": "vite preview",
+    "finalize-package": "npm shrinkwrap"
+  },
+  "files": [
+    "dist",
+    "npm-shrinkwrap.json"
+  ],
+  "keywords": [
+    "dataverse",
+    "migration",
+    "data-transfer",
+    "auto-mapping",
+    "power-platform",
+    "pptb",
+    "toolbox"
+  ],
+  "author": "Power Maverick",
+  "dependencies": {
+    "@fluentui/react-components": "^9.56.2",
+    "@fluentui/react-icons": "^2.0.264",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@pptb/types": "^1.0.17",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.7"
+  }
+}
