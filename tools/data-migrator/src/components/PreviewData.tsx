@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { PreviewRecord, DataverseField } from "../models/interfaces";
 
 interface PreviewDataProps {
@@ -5,7 +6,7 @@ interface PreviewDataProps {
   selectedFields: string[];
   fields: DataverseField[];
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (selectedRecords: PreviewRecord[]) => void;
 }
 
 export function PreviewData({
@@ -15,9 +16,34 @@ export function PreviewData({
   onClose,
   onConfirm,
 }: PreviewDataProps) {
+  // Initialize local state for selections
+  const [records, setRecords] = useState<PreviewRecord[]>(() => 
+    previewRecords.map(record => ({ ...record, isSelected: record.isSelected ?? true }))
+  );
+
   const getFieldDisplayName = (logicalName: string) => {
     const field = fields.find((f) => f.logicalName === logicalName);
     return field?.displayName || logicalName;
+  };
+
+  const selectedCount = records.filter(r => r.isSelected).length;
+  const allSelected = selectedCount === records.length;
+  const someSelected = selectedCount > 0 && selectedCount < records.length;
+
+  const handleToggleAll = () => {
+    const newSelectState = !allSelected;
+    setRecords(records.map(record => ({ ...record, isSelected: newSelectState })));
+  };
+
+  const handleToggleRecord = (index: number) => {
+    setRecords(records.map((record, i) => 
+      i === index ? { ...record, isSelected: !record.isSelected } : record
+    ));
+  };
+
+  const handleConfirm = () => {
+    const selectedRecords = records.filter(r => r.isSelected);
+    onConfirm(selectedRecords);
   };
 
   return (
@@ -35,8 +61,10 @@ export function PreviewData({
 
         <div className="preview-info">
           <p>
-            <strong>{previewRecords.length} records</strong> will be migrated
-            with the selected operation.
+            <strong>{selectedCount} of {records.length} records</strong> selected for migration.
+          </p>
+          <p style={{ fontSize: '12px', marginTop: '4px', color: 'var(--text-secondary)' }}>
+            Use checkboxes to select/deselect records before migrating.
           </p>
         </div>
 
@@ -44,6 +72,17 @@ export function PreviewData({
           <table className="preview-table">
             <thead>
               <tr>
+                <th style={{ width: '40px' }}>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={input => {
+                      if (input) input.indeterminate = someSelected;
+                    }}
+                    onChange={handleToggleAll}
+                    title={allSelected ? "Deselect all" : "Select all"}
+                  />
+                </th>
                 <th>Action</th>
                 <th>Primary ID</th>
                 <th>Primary Name</th>
@@ -53,8 +92,15 @@ export function PreviewData({
               </tr>
             </thead>
             <tbody>
-              {previewRecords.slice(0, 100).map((record, index) => (
-                <tr key={index}>
+              {records.slice(0, 100).map((record, index) => (
+                <tr key={index} className={record.isSelected ? '' : 'row-unselected'}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={record.isSelected}
+                      onChange={() => handleToggleRecord(index)}
+                    />
+                  </td>
                   <td>
                     <span className={`action-badge action-${record.action.toLowerCase()}`}>
                       {record.action}
@@ -71,9 +117,9 @@ export function PreviewData({
               ))}
             </tbody>
           </table>
-          {previewRecords.length > 100 && (
+          {records.length > 100 && (
             <p className="preview-note">
-              Showing first 100 of {previewRecords.length} records
+              Showing first 100 of {records.length} records (all {records.length} will be available for selection)
             </p>
           )}
         </div>
@@ -82,8 +128,12 @@ export function PreviewData({
           <button className="btn-secondary" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn-primary" onClick={onConfirm}>
-            Start Migration
+          <button 
+            className="btn-primary" 
+            onClick={handleConfirm}
+            disabled={selectedCount === 0}
+          >
+            Start Migration ({selectedCount} {selectedCount === 1 ? 'record' : 'records'})
           </button>
         </div>
       </div>

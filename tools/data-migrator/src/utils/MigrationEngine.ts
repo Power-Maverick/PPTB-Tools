@@ -1,4 +1,4 @@
-import type { AutoMappingResult, BusinessUnitRecord, MigrationConfig, MigrationProgress, MigrationRecord, TeamRecord, UserRecord } from "../models/interfaces";
+import type { AutoMappingResult, BusinessUnitRecord, MigrationConfig, MigrationProgress, MigrationRecord, PreviewRecord, TeamRecord, UserRecord } from "../models/interfaces";
 import { DataverseClient } from "./DataverseClient";
 
 type EntityMetadataResponse = {
@@ -140,12 +140,12 @@ export class MigrationEngine {
     /**
      * Migrate records based on configuration
      */
-    async migrateRecords(config: MigrationConfig, onProgress: (progress: MigrationProgress) => void): Promise<void> {
+    async migrateRecords(config: MigrationConfig, selectedRecords: PreviewRecord[], onProgress: (progress: MigrationProgress) => void): Promise<void> {
         try {
-            // Fetch source records
-            const selectFields: string[] = config.fieldMappings.filter((m) => m.isEnabled).map((m) => m.sourceField);
-
-            // Add primary ID field
+            // Use the selected records directly from preview
+            const sourceRecords = selectedRecords.map(pr => pr.data);
+            
+            // Fetch primary ID field from entity metadata
             const entityMetadata = (await window.dataverseAPI.getEntityMetadata(
                 config.entityLogicalName,
                 true, // searchByLogicalName should be true
@@ -159,25 +159,10 @@ export class MigrationEngine {
 
             const primaryIdField = entityMetadata.PrimaryIdAttribute;
 
-            if (!selectFields.includes(primaryIdField)) {
-                selectFields.push(primaryIdField);
-            }
-
             const entityMetadataForName = (await window.dataverseAPI.getEntityMetadata(config.entityLogicalName, true, ["PrimaryNameAttribute"], "primary")) as EntityMetadataResponse | null;
 
             const primaryNameField =
                 typeof entityMetadataForName?.PrimaryNameAttribute === "string" && entityMetadataForName.PrimaryNameAttribute.trim() !== "" ? entityMetadataForName.PrimaryNameAttribute : undefined;
-
-            let sourceRecords: any[];
-
-            // Use appropriate query method based on filter type
-            if (config.filterType === "fetchxml" && config.filterQuery) {
-                // Use FetchXML query
-                sourceRecords = await this.sourceClient.queryRecordsWithFetchXml(config.filterQuery);
-            } else {
-                // Use OData query
-                sourceRecords = await this.sourceClient.queryRecords(config.entityLogicalName, selectFields, config.filterQuery);
-            }
 
             const totalRecords = sourceRecords.length;
             const totalBatches = Math.ceil(totalRecords / config.batchSize);

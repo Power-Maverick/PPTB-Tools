@@ -744,6 +744,23 @@ select.modern-input:focus {
   background-color: var(--background-light);
 }
 
+.preview-table tbody tr.row-unselected {
+  opacity: 0.5;
+  background-color: #f9f9f9;
+}
+
+.preview-table tbody tr.row-unselected:hover {
+  opacity: 0.7;
+  background-color: #f5f5f5;
+}
+
+.preview-table th input[type="checkbox"],
+.preview-table td input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
 .action-badge {
   padding: 4px 10px;
   border-radius: 12px;
