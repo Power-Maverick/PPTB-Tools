@@ -143,6 +143,8 @@ export class MigrationEngine {
     async migrateRecords(config: MigrationConfig, selectedRecords: PreviewRecord[], onProgress: (progress: MigrationProgress) => void): Promise<void> {
         try {
             // Use the selected records directly from preview
+            // Note: The preview records must contain all field data that is required for the configured field mappings
+            // This is ensured by the preview query which fetches all enabled fields from the source
             const sourceRecords = selectedRecords.map(pr => pr.data);
             
             // Fetch primary ID field from entity metadata

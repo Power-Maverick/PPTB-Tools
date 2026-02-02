@@ -27,12 +27,17 @@ export function PreviewData({
   };
 
   const selectedCount = records.filter(r => r.isSelected).length;
-  const allSelected = selectedCount === records.length;
-  const someSelected = selectedCount > 0 && selectedCount < records.length;
+  const displayedRecords = records.slice(0, 100);
+  const displayedSelectedCount = displayedRecords.filter(r => r.isSelected).length;
+  const allDisplayedSelected = displayedSelectedCount === displayedRecords.length;
+  const someDisplayedSelected = displayedSelectedCount > 0 && displayedSelectedCount < displayedRecords.length;
 
   const handleToggleAll = () => {
-    const newSelectState = !allSelected;
-    setRecords(records.map(record => ({ ...record, isSelected: newSelectState })));
+    // Toggle all displayed records only
+    const newSelectState = !allDisplayedSelected;
+    setRecords(records.map((record, i) => 
+      i < 100 ? { ...record, isSelected: newSelectState } : record
+    ));
   };
 
   const handleToggleRecord = (index: number) => {
@@ -75,12 +80,12 @@ export function PreviewData({
                 <th style={{ width: '40px' }}>
                   <input
                     type="checkbox"
-                    checked={allSelected}
+                    checked={allDisplayedSelected}
                     ref={input => {
-                      if (input) input.indeterminate = someSelected;
+                      if (input) input.indeterminate = someDisplayedSelected;
                     }}
                     onChange={handleToggleAll}
-                    title={allSelected ? "Deselect all" : "Select all"}
+                    title={allDisplayedSelected ? "Deselect all displayed" : "Select all displayed"}
                   />
                 </th>
                 <th>Action</th>
@@ -92,7 +97,7 @@ export function PreviewData({
               </tr>
             </thead>
             <tbody>
-              {records.slice(0, 100).map((record, index) => (
+              {displayedRecords.map((record, index) => (
                 <tr key={index} className={record.isSelected ? '' : 'row-unselected'}>
                   <td>
                     <input
@@ -119,7 +124,7 @@ export function PreviewData({
           </table>
           {records.length > 100 && (
             <p className="preview-note">
-              Showing first 100 of {records.length} records (all {records.length} will be available for selection)
+              Showing first 100 of {records.length} records. Only displayed records can be individually selected/deselected. To modify beyond 100 records, adjust your filters.
             </p>
           )}
         </div>
