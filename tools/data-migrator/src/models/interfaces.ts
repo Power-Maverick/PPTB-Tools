@@ -214,4 +214,6 @@ export interface PreviewRecord {
   primaryId: string;
   /** Primary name value */
   primaryName: string;
+  /** Whether this record is selected for migration */
+  isSelected?: boolean;
 }

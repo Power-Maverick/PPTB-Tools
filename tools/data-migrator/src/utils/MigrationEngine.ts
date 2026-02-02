@@ -1,4 +1,4 @@
-import type { AutoMappingResult, BusinessUnitRecord, MigrationConfig, MigrationProgress, MigrationRecord, TeamRecord, UserRecord } from "../models/interfaces";
+import type { AutoMappingResult, BusinessUnitRecord, MigrationConfig, MigrationProgress, MigrationRecord, PreviewRecord, TeamRecord, UserRecord } from "../models/interfaces";
 import { DataverseClient } from "./DataverseClient";
 
 type EntityMetadataResponse = {
@@ -140,12 +140,36 @@ export class MigrationEngine {
     /**
      * Migrate records based on configuration
      */
-    async migrateRecords(config: MigrationConfig, onProgress: (progress: MigrationProgress) => void): Promise<void> {
+    async migrateRecords(config: MigrationConfig, selectedRecords: PreviewRecord[], onProgress: (progress: MigrationProgress) => void): Promise<void> {
         try {
-            // Fetch source records
-            const selectFields: string[] = config.fieldMappings.filter((m) => m.isEnabled).map((m) => m.sourceField);
-
-            // Add primary ID field
+            // Use the selected records directly from preview
+            // Note: The preview records must contain all field data that is required for the configured field mappings
+            // This is ensured by the preview query which fetches all enabled fields from the source
+            const sourceRecords = selectedRecords.map(previewRecord => previewRecord.data);
+            
+            // Validate that preview data contains all required fields from current field mappings
+            const enabledMappings = config.fieldMappings.filter(m => m.isEnabled);
+            if (enabledMappings.length > 0 && selectedRecords.length > 0) {
+                const missingFields = new Set<string>();
+                const sampleRecord = selectedRecords[0].data;
+                
+                for (const mapping of enabledMappings) {
+                    if (!(mapping.sourceField in sampleRecord)) {
+                        missingFields.add(mapping.sourceField);
+                    }
+                }
+                
+                if (missingFields.size > 0) {
+                    const missingList = Array.from(missingFields).join(', ');
+                    throw new Error(
+                        `The preview data is out of sync with current field mappings. ` +
+                        `The following mapped fields are missing from preview: ${missingList}. ` +
+                        `Please regenerate the preview before starting migration.`
+                    );
+                }
+            }
+            
+            // Fetch primary ID field from entity metadata
             const entityMetadata = (await window.dataverseAPI.getEntityMetadata(
                 config.entityLogicalName,
                 true, // searchByLogicalName should be true
@@ -159,25 +183,10 @@ export class MigrationEngine {
 
             const primaryIdField = entityMetadata.PrimaryIdAttribute;
 
-            if (!selectFields.includes(primaryIdField)) {
-                selectFields.push(primaryIdField);
-            }
-
             const entityMetadataForName = (await window.dataverseAPI.getEntityMetadata(config.entityLogicalName, true, ["PrimaryNameAttribute"], "primary")) as EntityMetadataResponse | null;
 
             const primaryNameField =
                 typeof entityMetadataForName?.PrimaryNameAttribute === "string" && entityMetadataForName.PrimaryNameAttribute.trim() !== "" ? entityMetadataForName.PrimaryNameAttribute : undefined;
-
-            let sourceRecords: any[];
-
-            // Use appropriate query method based on filter type
-            if (config.filterType === "fetchxml" && config.filterQuery) {
-                // Use FetchXML query
-                sourceRecords = await this.sourceClient.queryRecordsWithFetchXml(config.filterQuery);
-            } else {
-                // Use OData query
-                sourceRecords = await this.sourceClient.queryRecords(config.entityLogicalName, selectFields, config.filterQuery);
-            }
 
             const totalRecords = sourceRecords.length;
             const totalBatches = Math.ceil(totalRecords / config.batchSize);

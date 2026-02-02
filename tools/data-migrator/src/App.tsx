@@ -235,6 +235,7 @@ function App() {
                 data: record,
                 primaryId: record[selectedEntity.primaryIdAttribute] || "",
                 primaryName: record[selectedEntity.primaryNameAttribute] || "",
+                isSelected: true, // Default all records to selected
             }));
 
             setPreviewRecords(preview);
@@ -246,9 +247,14 @@ function App() {
         }
     };
 
-    const handleStartMigration = async () => {
+    const handleStartMigration = async (selectedRecords: PreviewRecord[]) => {
         if (!selectedEntity) {
             setError("Please select an entity first");
+            return;
+        }
+
+        if (selectedRecords.length === 0) {
+            setError("No records selected for migration");
             return;
         }
 
@@ -268,7 +274,7 @@ function App() {
         };
 
         try {
-            await migrationEngine.migrateRecords(config, (progress) => {
+            await migrationEngine.migrateRecords(config, selectedRecords, (progress) => {
                 setMigrationProgress(progress);
             });
         } catch (error: any) {
