@@ -113,6 +113,8 @@ function App() {
             const client = new DataverseClient();
 
             const view = await client.getView(sourceView);
+            // Extract ONLY the layoutxml from the source view
+            // The fetchxml is not used or copied to target views
             setSourceViewLayout(view.layoutxml);
         } catch (error: any) {
             showError(`Failed to load source view layout: ${error.message}`);
@@ -179,6 +181,8 @@ function App() {
             const viewName = views.find((v) => v.savedqueryid === viewId)?.name || viewId;
 
             try {
+                // Update ONLY the layoutxml of the target view
+                // The target view's fetchxml remains unchanged
                 await client.updateViewLayout(selectedEntity, viewId, sourceViewLayout);
                 progress[i] = {
                     viewId,
