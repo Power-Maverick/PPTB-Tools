@@ -84,7 +84,7 @@ export function PreviewData({
           </p>
           <p className="preview-helper-text">
             {records.length > recordsPerPage
-              ? `Use checkboxes to select/deselect records across all pages. You are viewing page ${currentPage} of ${totalPages}.`
+              ? `Use checkboxes to select/deselect records. Selections are preserved as you navigate between pages. Currently viewing page ${currentPage} of ${totalPages}.`
               : "Use checkboxes to select/deselect records before migrating."}
           </p>
           {records.length > recordsPerPage && (
@@ -164,7 +164,7 @@ export function PreviewData({
                 ‹
               </button>
               <span className="pagination-info">
-                Page {currentPage} of {totalPages} ({displayedRecords.length} records on this page)
+                Page {currentPage} of {totalPages} (Records {startIndex + 1}-{Math.min(endIndex, records.length)} of {records.length})
               </span>
               <button 
                 className="pagination-btn" 
