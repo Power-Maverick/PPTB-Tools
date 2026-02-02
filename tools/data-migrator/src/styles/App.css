@@ -702,6 +702,12 @@ select.modern-input:focus {
   border-left: 4px solid var(--primary-color);
 }
 
+.preview-helper-text {
+  font-size: 12px;
+  margin-top: 4px;
+  color: var(--text-secondary);
+}
+
 .preview-table-container {
   overflow: auto;
   max-height: calc(85vh - 250px);

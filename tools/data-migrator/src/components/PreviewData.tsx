@@ -68,7 +68,7 @@ export function PreviewData({
           <p>
             <strong>{selectedCount} of {records.length} records</strong> selected for migration.
           </p>
-          <p style={{ fontSize: '12px', marginTop: '4px', color: 'var(--text-secondary)' }}>
+          <p className="preview-helper-text">
             Use checkboxes to select/deselect records before migrating.
           </p>
         </div>
@@ -124,7 +124,7 @@ export function PreviewData({
           </table>
           {records.length > 100 && (
             <p className="preview-note">
-              Showing first 100 of {records.length} records. Only displayed records can be individually selected/deselected. To modify beyond 100 records, adjust your filters.
+              Showing first 100 of {records.length} records. Only the displayed records can be individually selected or deselected. To modify records beyond the first 100, adjust your filters.
             </p>
           )}
         </div>

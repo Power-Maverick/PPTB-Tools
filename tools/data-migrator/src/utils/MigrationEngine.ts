@@ -145,7 +145,7 @@ export class MigrationEngine {
             // Use the selected records directly from preview
             // Note: The preview records must contain all field data that is required for the configured field mappings
             // This is ensured by the preview query which fetches all enabled fields from the source
-            const sourceRecords = selectedRecords.map(pr => pr.data);
+            const sourceRecords = selectedRecords.map(previewRecord => previewRecord.data);
             
             // Fetch primary ID field from entity metadata
             const entityMetadata = (await window.dataverseAPI.getEntityMetadata(
