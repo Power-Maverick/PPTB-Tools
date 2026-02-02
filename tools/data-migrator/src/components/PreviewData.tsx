@@ -20,6 +20,10 @@ export function PreviewData({
   const [records, setRecords] = useState<PreviewRecord[]>(() => 
     previewRecords.map(record => ({ ...record, isSelected: record.isSelected ?? true }))
   );
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const recordsPerPage = 100;
 
   const getFieldDisplayName = (logicalName: string) => {
     const field = fields.find((f) => f.logicalName === logicalName);
@@ -27,23 +31,33 @@ export function PreviewData({
   };
 
   const selectedCount = records.filter(r => r.isSelected).length;
-  const displayedRecords = records.slice(0, 100);
+  const totalPages = Math.ceil(records.length / recordsPerPage);
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const displayedRecords = records.slice(startIndex, endIndex);
   const displayedSelectedCount = displayedRecords.filter(r => r.isSelected).length;
-  const allDisplayedSelected = displayedSelectedCount === displayedRecords.length;
+  const allDisplayedSelected = displayedSelectedCount === displayedRecords.length && displayedRecords.length > 0;
   const someDisplayedSelected = displayedSelectedCount > 0 && displayedSelectedCount < displayedRecords.length;
 
   const handleToggleAll = () => {
-    // Toggle all displayed records only
+    // Toggle all displayed records on current page only
     const newSelectState = !allDisplayedSelected;
     setRecords(records.map((record, i) => 
-      i < 100 ? { ...record, isSelected: newSelectState } : record
+      i >= startIndex && i < endIndex ? { ...record, isSelected: newSelectState } : record
     ));
   };
 
-  const handleToggleRecord = (index: number) => {
+  const handleToggleRecord = (displayIndex: number) => {
+    const actualIndex = startIndex + displayIndex;
     setRecords(records.map((record, i) => 
-      i === index ? { ...record, isSelected: !record.isSelected } : record
+      i === actualIndex ? { ...record, isSelected: !record.isSelected } : record
     ));
+  };
+  
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
   };
 
   const handleConfirm = () => {
@@ -69,8 +83,15 @@ export function PreviewData({
             <strong>{selectedCount} of {records.length} records</strong> selected for migration.
           </p>
           <p className="preview-helper-text">
-            Use checkboxes to select/deselect records before migrating.
+            {records.length > recordsPerPage
+              ? `Use checkboxes to select/deselect records across all pages. You are viewing page ${currentPage} of ${totalPages}.`
+              : "Use checkboxes to select/deselect records before migrating."}
           </p>
+          {records.length > recordsPerPage && (
+            <p className="preview-warning-text">
+              ⚠️ You have {records.length} records. Use pagination below to review and select records from all pages.
+            </p>
+          )}
         </div>
 
         <div className="preview-table-container">
@@ -86,6 +107,7 @@ export function PreviewData({
                     }}
                     onChange={handleToggleAll}
                     title={allDisplayedSelected ? "Deselect all displayed" : "Select all displayed"}
+                    aria-label={allDisplayedSelected ? "Deselect all displayed records" : "Select all displayed records"}
                   />
                 </th>
                 <th>Action</th>
@@ -98,12 +120,13 @@ export function PreviewData({
             </thead>
             <tbody>
               {displayedRecords.map((record, index) => (
-                <tr key={index} className={record.isSelected ? '' : 'row-unselected'}>
+                <tr key={startIndex + index} className={record.isSelected ? '' : 'row-unselected'}>
                   <td>
                     <input
                       type="checkbox"
                       checked={record.isSelected}
                       onChange={() => handleToggleRecord(index)}
+                      aria-label={`Select record ${record.primaryName || record.primaryId}`}
                     />
                   </td>
                   <td>
@@ -122,10 +145,44 @@ export function PreviewData({
               ))}
             </tbody>
           </table>
-          {records.length > 100 && (
-            <p className="preview-note">
-              Showing first 100 of {records.length} records. Only the displayed records can be individually selected or deselected. To modify records beyond the first 100, adjust your filters.
-            </p>
+          {totalPages > 1 && (
+            <div className="preview-pagination">
+              <button 
+                className="pagination-btn" 
+                onClick={() => handlePageChange(1)}
+                disabled={currentPage === 1}
+                aria-label="First page"
+              >
+                «
+              </button>
+              <button 
+                className="pagination-btn" 
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                aria-label="Previous page"
+              >
+                ‹
+              </button>
+              <span className="pagination-info">
+                Page {currentPage} of {totalPages} ({displayedRecords.length} records on this page)
+              </span>
+              <button 
+                className="pagination-btn" 
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                aria-label="Next page"
+              >
+                ›
+              </button>
+              <button 
+                className="pagination-btn" 
+                onClick={() => handlePageChange(totalPages)}
+                disabled={currentPage === totalPages}
+                aria-label="Last page"
+              >
+                »
+              </button>
+            </div>
           )}
         </div>
 
@@ -138,7 +195,9 @@ export function PreviewData({
             onClick={handleConfirm}
             disabled={selectedCount === 0}
           >
-            Start Migration ({selectedCount} {selectedCount === 1 ? 'record' : 'records'})
+            {selectedCount === 0 
+              ? "Start Migration (No records selected)" 
+              : `Start Migration (${selectedCount} ${selectedCount === 1 ? 'record' : 'records'})`}
           </button>
         </div>
       </div>

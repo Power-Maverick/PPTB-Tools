@@ -147,6 +147,28 @@ export class MigrationEngine {
             // This is ensured by the preview query which fetches all enabled fields from the source
             const sourceRecords = selectedRecords.map(previewRecord => previewRecord.data);
             
+            // Validate that preview data contains all required fields from current field mappings
+            const enabledMappings = config.fieldMappings.filter(m => m.isEnabled);
+            if (enabledMappings.length > 0 && selectedRecords.length > 0) {
+                const missingFields = new Set<string>();
+                const sampleRecord = selectedRecords[0].data;
+                
+                for (const mapping of enabledMappings) {
+                    if (!(mapping.sourceField in sampleRecord)) {
+                        missingFields.add(mapping.sourceField);
+                    }
+                }
+                
+                if (missingFields.size > 0) {
+                    const missingList = Array.from(missingFields).join(', ');
+                    throw new Error(
+                        `The preview data is out of sync with current field mappings. ` +
+                        `The following mapped fields are missing from preview: ${missingList}. ` +
+                        `Please regenerate the preview before starting migration.`
+                    );
+                }
+            }
+            
             // Fetch primary ID field from entity metadata
             const entityMetadata = (await window.dataverseAPI.getEntityMetadata(
                 config.entityLogicalName,
