@@ -268,7 +268,7 @@ function getTypeIcon(kind: AssetKind): string {
     report: '📊',
     emailtemplate: '✉️',
     optionset: '🎛️',
-    connector: '🔌',
+    connector: '🔄',
     sitemap: '🗺️',
     role: '🔐',
     other: '❓'

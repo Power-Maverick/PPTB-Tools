@@ -24,7 +24,7 @@ const ASSET_ICONS: Record<AssetKind, string> = {
   report: '📊',
   emailtemplate: '✉️',
   optionset: '🎛️',
-  connector: '🔌',
+  connector: '🔄',
   sitemap: '🗺️',
   role: '🔐',
   other: '❓'

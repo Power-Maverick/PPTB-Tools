@@ -48,7 +48,7 @@ export function SearchFilter({
           <option value="report">📊 Report</option>
           <option value="emailtemplate">✉️ Email Template</option>
           <option value="optionset">🎛️ Option Set</option>
-          <option value="connector">🔌 Connector</option>
+          <option value="connector">🔄 Connector</option>
           <option value="sitemap">🗺️ Site Map</option>
           <option value="role">🔐 Security Role</option>
           <option value="other">❓ Other</option>
