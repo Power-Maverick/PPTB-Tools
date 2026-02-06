@@ -12,7 +12,6 @@ import './models/windowTypes';
 type ViewModeType = 'tree' | 'graph' | 'summary';
 
 function App() {
-  const [isPPTB, setIsPPTB] = useState<boolean>(false);
   const [connectionString, setConnectionString] = useState<string>('');
   const [solutionRecords, setSolutionRecords] = useState<SolutionRecord[]>([]);
   const [selectedSolutionId, setSelectedSolutionId] = useState<string>('');
@@ -28,19 +27,19 @@ function App() {
 
   useEffect(() => {
     const initializeApp = async () => {
-      if (window.toolboxAPI) {
-        setIsPPTB(true);
-        try {
-          const activeConn = await window.toolboxAPI.connections.getActiveConnection();
-          setConnectionString(activeConn?.url || '');
-        } catch (err) {
-          displayError('Failed to retrieve connection details');
-        }
+      if (!window.toolboxAPI) {
+        displayError('This tool must run within Power Platform Toolbox');
         setInitializationInProgress(false);
-      } else {
-        displayError('Application must run within Power Platform Toolbox');
-        setInitializationInProgress(false);
+        return;
       }
+
+      try {
+        const activeConn = await window.toolboxAPI.connections.getActiveConnection();
+        setConnectionString(activeConn?.url || '');
+      } catch (err) {
+        displayError('Failed to retrieve connection details');
+      }
+      setInitializationInProgress(false);
     };
 
     initializeApp();
@@ -89,7 +88,7 @@ function App() {
       const result = scanner.performAnalysis();
       setAnalysisResult(result);
       
-      if (isPPTB && window.toolboxAPI) {
+      if (window.toolboxAPI) {
         await window.toolboxAPI.utils.showNotification({
           title: 'Analysis Complete',
           body: `Found ${result.assets.length} components with ${result.loops.length} circular dependencies`,
