@@ -23,7 +23,9 @@ export class DataverseConnector {
   }
 
   async fetchSolutionAssets(solutionId: string): Promise<any[]> {
-    const odataQuery = `solutioncomponents?$filter=_solutionid_value eq ${solutionId}&$select=objectid,componenttype`;
+    // Sanitize the solutionId - it should be a GUID
+    const sanitizedId = this.sanitizeGuid(solutionId);
+    const odataQuery = `solutioncomponents?$filter=_solutionid_value eq ${sanitizedId}&$select=objectid,componenttype`;
     
     try {
       const responseData = await this.executeQuery(odataQuery);
@@ -35,7 +37,8 @@ export class DataverseConnector {
   }
 
   async fetchEntityMetadata(entityId: string): Promise<any> {
-    const odataQuery = `EntityDefinitions(${entityId})?$select=LogicalName,DisplayName,SchemaName,MetadataId`;
+    const sanitizedId = this.sanitizeGuid(entityId);
+    const odataQuery = `EntityDefinitions(${sanitizedId})?$select=LogicalName,DisplayName,SchemaName,MetadataId`;
     
     try {
       return await this.executeQuery(odataQuery);
@@ -46,7 +49,8 @@ export class DataverseConnector {
   }
 
   async fetchFormMetadata(formId: string): Promise<any> {
-    const odataQuery = `systemforms(${formId})?$select=formid,name,objecttypecode,formxml`;
+    const sanitizedId = this.sanitizeGuid(formId);
+    const odataQuery = `systemforms(${sanitizedId})?$select=formid,name,objecttypecode,formxml`;
     
     try {
       return await this.executeQuery(odataQuery);
@@ -57,7 +61,8 @@ export class DataverseConnector {
   }
 
   async fetchViewMetadata(viewId: string): Promise<any> {
-    const odataQuery = `savedqueries(${viewId})?$select=savedqueryid,name,returnedtypecode,fetchxml`;
+    const sanitizedId = this.sanitizeGuid(viewId);
+    const odataQuery = `savedqueries(${sanitizedId})?$select=savedqueryid,name,returnedtypecode,fetchxml`;
     
     try {
       return await this.executeQuery(odataQuery);
@@ -68,7 +73,8 @@ export class DataverseConnector {
   }
 
   async fetchPluginMetadata(pluginId: string): Promise<any> {
-    const odataQuery = `plugintypes(${pluginId})?$select=plugintypeid,typename,friendlyname`;
+    const sanitizedId = this.sanitizeGuid(pluginId);
+    const odataQuery = `plugintypes(${sanitizedId})?$select=plugintypeid,typename,friendlyname`;
     
     try {
       return await this.executeQuery(odataQuery);
@@ -79,7 +85,8 @@ export class DataverseConnector {
   }
 
   async fetchWebResourceMetadata(webResourceId: string): Promise<any> {
-    const odataQuery = `webresources(${webResourceId})?$select=webresourceid,name,displayname,webresourcetype`;
+    const sanitizedId = this.sanitizeGuid(webResourceId);
+    const odataQuery = `webresources(${sanitizedId})?$select=webresourceid,name,displayname,webresourcetype`;
     
     try {
       return await this.executeQuery(odataQuery);
@@ -90,7 +97,8 @@ export class DataverseConnector {
   }
 
   async fetchWorkflowMetadata(workflowId: string): Promise<any> {
-    const odataQuery = `workflows(${workflowId})?$select=workflowid,name,type,category`;
+    const sanitizedId = this.sanitizeGuid(workflowId);
+    const odataQuery = `workflows(${sanitizedId})?$select=workflowid,name,type,category`;
     
     try {
       return await this.executeQuery(odataQuery);
@@ -98,6 +106,17 @@ export class DataverseConnector {
       console.error(`Workflow metadata fetch failed for ${workflowId}:`, err);
       return null;
     }
+  }
+
+  private sanitizeGuid(rawValue: string): string {
+    const trimmed = rawValue.trim().toLowerCase();
+    const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    
+    if (!guidPattern.test(trimmed)) {
+      throw new Error('Invalid identifier format detected');
+    }
+    
+    return trimmed;
   }
 
   private async executeQuery(queryPath: string): Promise<any> {
