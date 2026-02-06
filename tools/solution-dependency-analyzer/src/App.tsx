@@ -1,344 +1,435 @@
-import { useEffect, useState } from 'react';
-import { SolutionPicker } from './components/SolutionSelector';
-import { AssetDetails } from './components/ComponentDetails';
-import { DependencyGraph } from './components/DependencyGraph';
-import { SummaryReport } from './components/SummaryReport';
-import { SearchFilter } from './components/SearchFilter';
+import { useState, useEffect } from 'react';
+import { SolutionRecord, Asset, AnalysisOutput, AssetKind } from './models/interfaces';
 import { DataverseConnector } from './utils/dataverseClient';
 import { DependencyScanner } from './utils/dependencyAnalyzer';
-import { SolutionRecord, Asset, AnalysisOutput, AssetKind } from './models/interfaces';
+import { SolutionPicker } from './components/SolutionSelector';
+import { SearchFilter } from './components/SearchFilter';
+import { TreeView } from './components/DependencyTree';
+import { DependencyGraph } from './components/DependencyGraph';
+import { SummaryReport } from './components/SummaryReport';
+import { AssetDetails } from './components/ComponentDetails';
 import './models/windowTypes';
 
-type ViewModeType = 'tree' | 'graph' | 'summary';
+type ViewMode = 'tree' | 'graph' | 'summary';
 
-function App() {
-  const [connectionString, setConnectionString] = useState<string>('');
-  const [solutionRecords, setSolutionRecords] = useState<SolutionRecord[]>([]);
+// Comprehensive component type mapping based on Microsoft Learn documentation
+const COMPONENT_TYPE_MAP: Record<number, { kind: AssetKind; label: string }> = {
+  1: { kind: 'entity', label: 'Entity' },
+  2: { kind: 'attribute', label: 'Attribute' },
+  3: { kind: 'relationship', label: 'Relationship' },
+  9: { kind: 'optionset', label: 'Option Set' },
+  24: { kind: 'form', label: 'Form' },
+  26: { kind: 'view', label: 'Saved Query/View' },
+  29: { kind: 'report', label: 'Report' },
+  35: { kind: 'emailtemplate', label: 'Email Template' },
+  60: { kind: 'webresource', label: 'Web Resource' },
+  61: { kind: 'sitemap', label: 'Site Map' },
+  20: { kind: 'role', label: 'Security Role' },
+  71: { kind: 'plugin', label: 'Plugin Type' },
+  27: { kind: 'workflow', label: 'Workflow' },
+  80: { kind: 'app', label: 'Model-driven App' },
+  82: { kind: 'connector', label: 'Connector' },
+  95: { kind: 'canvasapp', label: 'Canvas App' }
+};
+
+function getComponentTypeInfo(typeCode: number): { kind: AssetKind; label: string } {
+  return COMPONENT_TYPE_MAP[typeCode] || { kind: 'other', label: 'Unknown' };
+}
+
+export default function App() {
+  const [solutions, setSolutions] = useState<SolutionRecord[]>([]);
   const [selectedSolutionId, setSelectedSolutionId] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [initializationInProgress, setInitializationInProgress] = useState<boolean>(true);
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  
+  const [isScanning, setIsScanning] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisOutput | null>(null);
-  const [currentView, setCurrentView] = useState<ViewModeType>('tree');
-  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('tree');
+  const [searchTerm, setSearchTerm] = useState('');
   const [kindFilter, setKindFilter] = useState<AssetKind | 'all'>('all');
+  const [showLoopsOnly, setShowLoopsOnly] = useState(false);
 
+  // Load solutions on mount
   useEffect(() => {
-    const initializeApp = async () => {
-      if (!window.toolboxAPI) {
-        displayError('This tool must run within Power Platform Toolbox');
-        setInitializationInProgress(false);
-        return;
-      }
-
-      try {
-        const activeConn = await window.toolboxAPI.connections.getActiveConnection();
-        setConnectionString(activeConn?.url || '');
-      } catch (err) {
-        displayError('Failed to retrieve connection details');
-      }
-      setInitializationInProgress(false);
-    };
-
-    initializeApp();
+    loadSolutions();
   }, []);
 
-  useEffect(() => {
-    if (connectionString) {
-      retrieveSolutionList();
-    }
-  }, [connectionString]);
-
-  const retrieveSolutionList = async () => {
+  const loadSolutions = async () => {
     try {
-      const connector = new DataverseConnector(connectionString);
-      const solutions = await connector.fetchSolutions();
-      setSolutionRecords(solutions);
-    } catch (err: any) {
-      displayError(`Solution retrieval failed: ${err.message}`);
+      if (!window.dataverseAPI) {
+        throw new Error('Dataverse API not available');
+      }
+
+      const envUrl = await window.dataverseAPI.getEnvironmentUrl();
+      const connector = new DataverseConnector(envUrl);
+      const solutionList = await connector.fetchSolutions();
+      setSolutions(solutionList);
+    } catch (error: any) {
+      await DataverseConnector.showMessage(
+        'Error',
+        error.message || 'Failed to load solutions',
+        'error'
+      );
     }
   };
 
-  const displayError = (msg: string) => {
-    setErrorMessage(msg);
-    setTimeout(() => setErrorMessage(''), 6000);
-  };
+  const analyzeSolution = async () => {
+    if (!selectedSolutionId) return;
 
-  const handleAnalyze = async () => {
-    if (!selectedSolutionId) {
-      displayError('Please select a solution');
-      return;
-    }
-
-    setIsProcessing(true);
+    setIsScanning(true);
     setAnalysisResult(null);
+    setSelectedAsset(null);
 
     try {
-      const connector = new DataverseConnector(connectionString);
-      const scanner = new DependencyScanner();
+      if (!window.dataverseAPI) {
+        throw new Error('Dataverse API not available');
+      }
+
+      const envUrl = await window.dataverseAPI.getEnvironmentUrl();
+      const connector = new DataverseConnector(envUrl);
       
+      // Fetch solution components
       const components = await connector.fetchSolutionAssets(selectedSolutionId);
       
+      const scanner = new DependencyScanner();
+
+      // Process each component based on type
       for (const component of components) {
-        await processComponent(component, connector, scanner);
+        const componentId = component.objectid;
+        const typeCode = component.componenttype;
+        const typeInfo = getComponentTypeInfo(typeCode);
+
+        let metadata: any = null;
+        let assetName = 'Unknown';
+        let fullName = componentId;
+        let logicalName = componentId;
+        let dependencies: string[] = [];
+
+        try {
+          // Fetch metadata based on component type
+          switch (typeCode) {
+            case 1: // Entity
+              metadata = await connector.fetchEntityMetadata(componentId);
+              if (metadata) {
+                assetName = metadata.DisplayName?.UserLocalizedLabel?.Label || metadata.LogicalName;
+                fullName = metadata.SchemaName || metadata.LogicalName;
+                logicalName = metadata.LogicalName;
+              }
+              break;
+
+            case 24: // Form
+              metadata = await connector.fetchFormMetadata(componentId);
+              if (metadata) {
+                assetName = metadata.name;
+                fullName = metadata.name;
+                logicalName = metadata.objecttypecode || '';
+                // Parse form XML to extract dependencies
+                if (metadata.formxml) {
+                  dependencies = parseFormDependencies(metadata.formxml);
+                }
+              }
+              break;
+
+            case 26: // View (Saved Query)
+              metadata = await connector.fetchViewMetadata(componentId);
+              if (metadata) {
+                assetName = metadata.name;
+                fullName = metadata.name;
+                logicalName = metadata.returnedtypecode || '';
+                // Parse FetchXML to extract dependencies
+                if (metadata.fetchxml) {
+                  dependencies = parseFetchXmlDependencies(metadata.fetchxml);
+                }
+              }
+              break;
+
+            case 71: // Plugin Type
+              metadata = await connector.fetchPluginMetadata(componentId);
+              if (metadata) {
+                assetName = metadata.friendlyname || metadata.typename;
+                fullName = metadata.typename;
+                logicalName = metadata.typename;
+              }
+              break;
+
+            case 60: // Web Resource
+              metadata = await connector.fetchWebResourceMetadata(componentId);
+              if (metadata) {
+                assetName = metadata.displayname || metadata.name;
+                fullName = metadata.name;
+                logicalName = metadata.name;
+              }
+              break;
+
+            case 27: // Workflow
+              metadata = await connector.fetchWorkflowMetadata(componentId);
+              if (metadata) {
+                assetName = metadata.name;
+                fullName = metadata.name;
+                logicalName = metadata.name;
+              }
+              break;
+
+            default:
+              assetName = `${typeInfo.label} (${componentId.substring(0, 8)})`;
+              fullName = componentId;
+              logicalName = componentId;
+              break;
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch metadata for component ${componentId}:`, err);
+        }
+
+        scanner.registerAsset(
+          componentId,
+          assetName,
+          fullName,
+          typeInfo.kind,
+          logicalName,
+          dependencies
+        );
       }
 
-      const result = scanner.performAnalysis();
-      setAnalysisResult(result);
-      
-      if (window.toolboxAPI) {
-        await window.toolboxAPI.utils.showNotification({
-          title: 'Analysis Complete',
-          body: `Found ${result.assets.length} components with ${result.loops.length} circular dependencies`,
-          type: 'success'
-        });
-      }
-    } catch (err: any) {
-      displayError(`Analysis failed: ${err.message}`);
+      const analysis = scanner.performAnalysis();
+      setAnalysisResult(analysis);
+
+      await DataverseConnector.showMessage(
+        'Analysis Complete',
+        `Analyzed ${analysis.stats.assetCount} components with ${analysis.stats.linkCount} dependencies`,
+        'success'
+      );
+    } catch (error: any) {
+      await DataverseConnector.showMessage(
+        'Analysis Failed',
+        error.message || 'An error occurred during analysis',
+        'error'
+      );
     } finally {
-      setIsProcessing(false);
+      setIsScanning(false);
     }
   };
 
-  const processComponent = async (
-    component: any,
-    connector: DataverseConnector,
-    scanner: DependencyScanner
-  ) => {
-    const compType = component.componenttype;
-    const compId = component.objectid;
-    
-    const typeMapping: Record<number, { kind: AssetKind; fetcher: (id: string) => Promise<any> }> = {
-      1: { kind: 'entity', fetcher: (id) => connector.fetchEntityMetadata(id) },
-      60: { kind: 'form', fetcher: (id) => connector.fetchFormMetadata(id) },
-      26: { kind: 'view', fetcher: (id) => connector.fetchViewMetadata(id) },
-      90: { kind: 'plugin', fetcher: (id) => connector.fetchPluginMetadata(id) },
-      61: { kind: 'webresource', fetcher: (id) => connector.fetchWebResourceMetadata(id) },
-      29: { kind: 'workflow', fetcher: (id) => connector.fetchWorkflowMetadata(id) },
-      80: { kind: 'app', fetcher: () => Promise.resolve({ name: 'App Component' }) }
-    };
-
-    const mapping = typeMapping[compType];
-    if (!mapping) return;
-
+  const parseFormDependencies = (formXml: string): string[] => {
+    const dependencies: string[] = [];
     try {
-      const metadata = await mapping.fetcher(compId);
-      if (!metadata) return;
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(formXml, 'text/xml');
+      
+      // Extract field references
+      const fields = doc.querySelectorAll('control[datafieldname]');
+      fields.forEach(field => {
+        const fieldName = field.getAttribute('datafieldname');
+        if (fieldName) {
+          dependencies.push(fieldName);
+        }
+      });
 
-      const dependencies = extractDependencies(metadata, mapping.kind);
-      const displayName = extractDisplayName(metadata, mapping.kind);
-      const logicalIdentifier = extractLogicalName(metadata, mapping.kind);
-
-      scanner.registerAsset(
-        compId,
-        displayName,
-        `${mapping.kind}:${displayName}`,
-        mapping.kind,
-        logicalIdentifier,
-        dependencies
-      );
+      // Extract web resource references
+      const webResources = doc.querySelectorAll('control[classid]');
+      webResources.forEach(wr => {
+        const wrName = wr.getAttribute('name');
+        if (wrName) {
+          dependencies.push(wrName);
+        }
+      });
     } catch (err) {
-      console.error(`Failed to process ${mapping.kind} ${compId}:`, err);
+      console.warn('Failed to parse form XML:', err);
     }
+    return dependencies;
   };
 
-  const extractDependencies = (metadata: any, kind: AssetKind): string[] => {
-    const deps: string[] = [];
-
-    if (kind === 'form' && metadata.formxml) {
+  const parseFetchXmlDependencies = (fetchXml: string): string[] => {
+    const dependencies: string[] = [];
+    try {
       const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(metadata.formxml, 'text/xml');
-      const libs = xmlDoc.querySelectorAll('Library');
-      libs.forEach(lib => {
-        const libName = lib.getAttribute('name');
-        if (libName) deps.push(libName);
+      const doc = parser.parseFromString(fetchXml, 'text/xml');
+      
+      // Extract entity references
+      const entities = doc.querySelectorAll('entity');
+      entities.forEach(entity => {
+        const entityName = entity.getAttribute('name');
+        if (entityName) {
+          dependencies.push(entityName);
+        }
       });
-    } else if (kind === 'view' && metadata.fetchxml) {
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(metadata.fetchxml, 'text/xml');
-      const entities = xmlDoc.querySelectorAll('entity');
-      entities.forEach(ent => {
-        const entName = ent.getAttribute('name');
-        if (entName) deps.push(entName);
+
+      // Extract attribute references
+      const attributes = doc.querySelectorAll('attribute');
+      attributes.forEach(attr => {
+        const attrName = attr.getAttribute('name');
+        if (attrName) {
+          dependencies.push(attrName);
+        }
       });
+
+      // Extract link-entity references
+      const linkEntities = doc.querySelectorAll('link-entity');
+      linkEntities.forEach(linkEntity => {
+        const linkName = linkEntity.getAttribute('name');
+        if (linkName) {
+          dependencies.push(linkName);
+        }
+      });
+    } catch (err) {
+      console.warn('Failed to parse FetchXML:', err);
     }
-
-    return deps;
+    return dependencies;
   };
 
-  const extractDisplayName = (metadata: any, kind: AssetKind): string => {
-    if (kind === 'entity') return metadata.DisplayName?.UserLocalizedLabel?.Label || metadata.LogicalName;
-    if (kind === 'form') return metadata.name;
-    if (kind === 'view') return metadata.name;
-    if (kind === 'plugin') return metadata.friendlyname || metadata.typename;
-    if (kind === 'webresource') return metadata.displayname || metadata.name;
-    if (kind === 'workflow') return metadata.name;
-    return metadata.name || 'Unknown';
+  const handleAssetClick = (asset: Asset) => {
+    setSelectedAsset(asset);
   };
 
-  const extractLogicalName = (metadata: any, kind: AssetKind): string => {
-    if (kind === 'entity') return metadata.LogicalName;
-    if (kind === 'form') return metadata.objecttypecode;
-    if (kind === 'view') return metadata.returnedtypecode;
-    return metadata.name || 'unknown';
-  };
-
-  const getFilteredAssets = (): Asset[] => {
-    if (!analysisResult) return [];
-    
-    let filtered = analysisResult.assets;
-    
-    if (kindFilter !== 'all') {
-      filtered = filtered.filter(a => a.kind === kindFilter);
+  const handleGraphAssetClick = (assetId: string) => {
+    const asset = analysisResult?.assets.find(a => a.assetId === assetId);
+    if (asset) {
+      setSelectedAsset(asset);
     }
-    
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(a => 
-        a.label.toLowerCase().includes(query) ||
-        a.logicalName.toLowerCase().includes(query)
-      );
-    }
-    
-    return filtered;
   };
 
-  const selectedAsset = analysisResult?.assets.find(a => a.assetId === selectedAssetId) || null;
-
-  if (initializationInProgress) {
-    return (
-      <div className="app-container">
-        <div className="loading-overlay">Initializing...</div>
-      </div>
-    );
-  }
+  const getSelectedSolutionName = (): string => {
+    const solution = solutions.find(s => s.solutionid === selectedSolutionId);
+    return solution?.friendlyname || 'Unknown Solution';
+  };
 
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <h1>Solution Dependency Analyzer</h1>
-        <p className="subtitle">Visualize and analyze solution component dependencies</p>
-      </header>
-
-      {errorMessage && (
-        <div className="notification error-notification">
-          {errorMessage}
-        </div>
-      )}
-
-      <div className="main-layout">
-        <aside className="sidebar">
+    <div className="app-wrapper">
+      <div className="columns-layout">
+        {/* Left Column - Controls */}
+        <div className="column-left">
           <SolutionPicker
-            solutionOptions={solutionRecords}
+            solutionOptions={solutions}
             selectedValue={selectedSolutionId}
             onSelectionChange={setSelectedSolutionId}
-            onTriggerScan={handleAnalyze}
-            scanningInProgress={isProcessing}
+            onTriggerScan={analyzeSolution}
+            scanningInProgress={isScanning}
           />
 
           {analysisResult && (
             <>
-              <div className="view-selector">
-                <h3>View Mode</h3>
-                <div className="view-buttons">
-                  <button
-                    className={`view-btn ${currentView === 'tree' ? 'active' : ''}`}
-                    onClick={() => setCurrentView('tree')}
-                  >
-                    📋 Tree
-                  </button>
-                  <button
-                    className={`view-btn ${currentView === 'graph' ? 'active' : ''}`}
-                    onClick={() => setCurrentView('graph')}
-                  >
-                    🔷 Graph
-                  </button>
-                  <button
-                    className={`view-btn ${currentView === 'summary' ? 'active' : ''}`}
-                    onClick={() => setCurrentView('summary')}
-                  >
-                    📊 Summary
-                  </button>
+              <div className="quick-stats-card">
+                <h3>Quick Stats</h3>
+                <div className="quick-stats-grid">
+                  <div className="quick-stat">
+                    <div className="quick-stat-value">{analysisResult.stats.assetCount}</div>
+                    <div className="quick-stat-label">Components</div>
+                  </div>
+                  <div className="quick-stat">
+                    <div className="quick-stat-value">{analysisResult.stats.linkCount}</div>
+                    <div className="quick-stat-label">Dependencies</div>
+                  </div>
+                  <div className="quick-stat">
+                    <div className="quick-stat-value">{analysisResult.stats.loopCount}</div>
+                    <div className="quick-stat-label">Circular</div>
+                  </div>
+                  <div className="quick-stat">
+                    <div className="quick-stat-value">{analysisResult.notFoundAssets.length}</div>
+                    <div className="quick-stat-label">Missing</div>
+                  </div>
                 </div>
               </div>
 
               <SearchFilter
-                searchValue={searchQuery}
-                onSearchChange={setSearchQuery}
+                searchValue={searchTerm}
+                onSearchChange={setSearchTerm}
                 kindFilterValue={kindFilter}
                 onKindFilterChange={setKindFilter}
               />
+
+              <div className="loop-filter-checkbox">
+                <input
+                  type="checkbox"
+                  id="loop-filter"
+                  checked={showLoopsOnly}
+                  onChange={(e) => setShowLoopsOnly(e.target.checked)}
+                />
+                <label htmlFor="loop-filter">🔄 Show Only Circular Dependencies</label>
+              </div>
             </>
           )}
-        </aside>
+        </div>
 
-        <main className="content-area">
-          {!analysisResult ? (
-            <div className="empty-state">
-              <p>Select a solution and click "Analyze Dependencies" to begin</p>
+        {/* Center Column - Main View */}
+        <div className="column-center">
+          {isScanning ? (
+            <div className="loading-container">
+              <div className="spinner"></div>
+              <div className="loading-text">Analyzing solution dependencies...</div>
             </div>
-          ) : (
+          ) : analysisResult ? (
             <>
-              {currentView === 'summary' && (
-                <SummaryReport 
-                  analysisData={analysisResult}
-                  solutionName={solutionRecords.find(s => s.solutionid === selectedSolutionId)?.friendlyname || 'Unknown'}
-                />
-              )}
-              
-              {currentView === 'graph' && (
-                <DependencyGraph
-                  assets={getFilteredAssets()}
-                  links={analysisResult.links}
-                  onAssetClick={setSelectedAssetId}
-                  selectedAssetId={selectedAssetId}
-                />
-              )}
+              <div className="view-tabs">
+                <button
+                  className={`view-tab ${viewMode === 'tree' ? 'active' : ''}`}
+                  onClick={() => setViewMode('tree')}
+                >
+                  🌳 Tree View
+                </button>
+                <button
+                  className={`view-tab ${viewMode === 'graph' ? 'active' : ''}`}
+                  onClick={() => setViewMode('graph')}
+                >
+                  📊 Graph View
+                </button>
+                <button
+                  className={`view-tab ${viewMode === 'summary' ? 'active' : ''}`}
+                  onClick={() => setViewMode('summary')}
+                >
+                  📋 Summary Report
+                </button>
+              </div>
 
-              {currentView === 'tree' && (
-                <div className="tree-view">
-                  {getFilteredAssets().map(asset => (
-                    <div
-                      key={asset.assetId}
-                      className={`tree-item ${selectedAssetId === asset.assetId ? 'selected' : ''} ${asset.hasLoop ? 'has-loop' : ''}`}
-                      onClick={() => setSelectedAssetId(asset.assetId)}
-                    >
-                      <span className="asset-icon">{getAssetIcon(asset.kind)}</span>
-                      <span className="asset-name">{asset.label}</span>
-                      {asset.hasLoop && <span className="loop-badge">🔄</span>}
-                      <span className="dep-count">{asset.linksTo.length} deps</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="view-content">
+                {viewMode === 'tree' && (
+                  <TreeView
+                    assets={analysisResult.assets}
+                    onAssetClick={handleAssetClick}
+                    selectedAssetId={selectedAsset?.assetId || null}
+                    searchTerm={searchTerm}
+                    kindFilter={kindFilter}
+                    showOnlyLoops={showLoopsOnly}
+                  />
+                )}
 
-              {selectedAsset && (
-                <AssetDetails selectedAsset={selectedAsset} allAssets={analysisResult.assets} />
-              )}
+                {viewMode === 'graph' && (
+                  <DependencyGraph
+                    assets={analysisResult.assets}
+                    links={analysisResult.links}
+                    onAssetClick={handleGraphAssetClick}
+                    selectedAssetId={selectedAsset?.assetId || null}
+                  />
+                )}
+
+                {viewMode === 'summary' && (
+                  <SummaryReport
+                    analysisData={analysisResult}
+                    solutionName={getSelectedSolutionName()}
+                  />
+                )}
+              </div>
             </>
+          ) : (
+            <div className="empty-analysis-state">
+              <div className="icon">📦</div>
+              <h3>No Analysis Yet</h3>
+              <p>Select a solution and click "Analyze Dependencies" to get started</p>
+            </div>
           )}
-        </main>
+        </div>
+
+        {/* Right Column - Details */}
+        <div className="column-right">
+          {analysisResult && (
+            <AssetDetails
+              selectedAsset={selectedAsset}
+              allAssets={analysisResult.assets}
+            />
+          )}
+          {!analysisResult && (
+            <div className="no-selection">
+              <p>Component details will appear here after analysis</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
-
-function getAssetIcon(kind: AssetKind): string {
-  const icons: Record<AssetKind, string> = {
-    entity: '📦',
-    form: '📝',
-    view: '👁️',
-    plugin: '🔌',
-    webresource: '🌐',
-    workflow: '⚡',
-    app: '📱',
-    attribute: '🏷️',
-    relationship: '🔗',
-    other: '❓'
-  };
-  return icons[kind] || '❓';
-}
-
-export default App;

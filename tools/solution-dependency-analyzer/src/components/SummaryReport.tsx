@@ -256,14 +256,21 @@ export function SummaryReport({ analysisData, solutionName }: SummaryReportProps
 function getTypeIcon(kind: AssetKind): string {
   const icons: Record<AssetKind, string> = {
     entity: '📦',
+    attribute: '🔤',
+    relationship: '🔗',
     form: '📝',
     view: '👁️',
+    workflow: '⚙️',
     plugin: '🔌',
-    webresource: '🌐',
-    workflow: '⚡',
+    webresource: '📄',
     app: '📱',
-    attribute: '🏷️',
-    relationship: '🔗',
+    canvasapp: '🎨',
+    report: '📊',
+    emailtemplate: '✉️',
+    optionset: '🎛️',
+    connector: '🔌',
+    sitemap: '🗺️',
+    role: '🔐',
     other: '❓'
   };
   return icons[kind] || '❓';

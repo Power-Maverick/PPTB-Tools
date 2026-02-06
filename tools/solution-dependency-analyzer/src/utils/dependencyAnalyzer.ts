@@ -118,6 +118,13 @@ export class DependencyScanner {
       plugin: 0,
       webresource: 0,
       app: 0,
+      canvasapp: 0,
+      report: 0,
+      emailtemplate: 0,
+      optionset: 0,
+      connector: 0,
+      sitemap: 0,
+      role: 0,
       other: 0
     };
 

@@ -18,6 +18,7 @@ declare global {
     };
     dataverseAPI?: {
       queryData: (query: string) => Promise<any>;
+      getEnvironmentUrl: () => Promise<string>;
     };
   }
 }

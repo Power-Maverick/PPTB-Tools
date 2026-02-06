@@ -164,12 +164,21 @@ export function DependencyGraph({ assets, links, onAssetClick, selectedAssetId }
     
     const typeColors: Record<string, string> = {
       entity: '#5f27cd',
+      attribute: '#ff6b81',
+      relationship: '#48dbfb',
       form: '#00d2d3',
       view: '#1e90ff',
       plugin: '#ff6348',
       webresource: '#48dbfb',
       workflow: '#ff9ff3',
       app: '#54a0ff',
+      canvasapp: '#f368e0',
+      report: '#ff9f43',
+      emailtemplate: '#feca57',
+      optionset: '#ee5a6f',
+      connector: '#0abde3',
+      sitemap: '#10ac84',
+      role: '#576574',
       other: '#a4b0be'
     };
     

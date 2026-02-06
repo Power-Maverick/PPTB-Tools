@@ -36,14 +36,21 @@ export function SearchFilter({
         >
           <option value="all">All Types</option>
           <option value="entity">📦 Entity</option>
+          <option value="attribute">🔤 Attribute</option>
+          <option value="relationship">🔗 Relationship</option>
           <option value="form">📝 Form</option>
           <option value="view">👁️ View</option>
+          <option value="workflow">⚙️ Workflow</option>
           <option value="plugin">🔌 Plugin</option>
-          <option value="webresource">🌐 Web Resource</option>
-          <option value="workflow">⚡ Workflow</option>
-          <option value="app">📱 App</option>
-          <option value="attribute">🏷️ Attribute</option>
-          <option value="relationship">🔗 Relationship</option>
+          <option value="webresource">📄 Web Resource</option>
+          <option value="app">📱 Model-driven App</option>
+          <option value="canvasapp">🎨 Canvas App</option>
+          <option value="report">📊 Report</option>
+          <option value="emailtemplate">✉️ Email Template</option>
+          <option value="optionset">🎛️ Option Set</option>
+          <option value="connector">🔌 Connector</option>
+          <option value="sitemap">🗺️ Site Map</option>
+          <option value="role">🔐 Security Role</option>
           <option value="other">❓ Other</option>
         </select>
       </div>

@@ -10,6 +10,13 @@ export type AssetKind =
   | 'plugin'
   | 'webresource'
   | 'app'
+  | 'canvasapp'
+  | 'report'
+  | 'emailtemplate'
+  | 'optionset'
+  | 'connector'
+  | 'sitemap'
+  | 'role'
   | 'other';
 
 export interface Asset {

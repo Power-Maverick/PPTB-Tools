@@ -20,6 +20,13 @@ const ASSET_ICONS: Record<AssetKind, string> = {
   plugin: '🔌',
   webresource: '📄',
   app: '📱',
+  canvasapp: '🎨',
+  report: '📊',
+  emailtemplate: '✉️',
+  optionset: '🎛️',
+  connector: '🔌',
+  sitemap: '🗺️',
+  role: '🔐',
   other: '❓'
 };
 
@@ -63,6 +70,13 @@ export function TreeView({
       plugin: [],
       webresource: [],
       app: [],
+      canvasapp: [],
+      report: [],
+      emailtemplate: [],
+      optionset: [],
+      connector: [],
+      sitemap: [],
+      role: [],
       other: []
     };
 
