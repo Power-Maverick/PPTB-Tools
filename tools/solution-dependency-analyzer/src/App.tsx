@@ -18,19 +18,39 @@ const COMPONENT_TYPE_MAP: Record<number, { kind: AssetKind; label: string }> = {
   2: { kind: 'attribute', label: 'Attribute' },
   3: { kind: 'relationship', label: 'Relationship' },
   9: { kind: 'optionset', label: 'Option Set' },
+  20: { kind: 'role', label: 'Security Role' },
   24: { kind: 'form', label: 'Form' },
   26: { kind: 'view', label: 'Saved Query/View' },
+  27: { kind: 'workflow', label: 'Workflow' },
   29: { kind: 'report', label: 'Report' },
   35: { kind: 'emailtemplate', label: 'Email Template' },
   60: { kind: 'webresource', label: 'Web Resource' },
   61: { kind: 'sitemap', label: 'Site Map' },
-  20: { kind: 'role', label: 'Security Role' },
   71: { kind: 'plugin', label: 'Plugin Type' },
-  27: { kind: 'workflow', label: 'Workflow' },
   80: { kind: 'app', label: 'Model-driven App' },
   82: { kind: 'connector', label: 'Connector' },
   95: { kind: 'canvasapp', label: 'Canvas App' }
 };
+
+// Component type code constants for easy reference
+const ComponentTypeCode = {
+  ENTITY: 1,
+  ATTRIBUTE: 2,
+  RELATIONSHIP: 3,
+  OPTION_SET: 9,
+  SECURITY_ROLE: 20,
+  FORM: 24,
+  VIEW: 26,
+  WORKFLOW: 27,
+  REPORT: 29,
+  EMAIL_TEMPLATE: 35,
+  WEB_RESOURCE: 60,
+  SITE_MAP: 61,
+  PLUGIN_TYPE: 71,
+  MODEL_DRIVEN_APP: 80,
+  CONNECTOR: 82,
+  CANVAS_APP: 95
+} as const;
 
 function getComponentTypeInfo(typeCode: number): { kind: AssetKind; label: string } {
   return COMPONENT_TYPE_MAP[typeCode] || { kind: 'other', label: 'Unknown' };
@@ -106,7 +126,7 @@ export default function App() {
         try {
           // Fetch metadata based on component type
           switch (typeCode) {
-            case 1: // Entity
+            case ComponentTypeCode.ENTITY:
               metadata = await connector.fetchEntityMetadata(componentId);
               if (metadata) {
                 assetName = metadata.DisplayName?.UserLocalizedLabel?.Label || metadata.LogicalName;
@@ -115,7 +135,7 @@ export default function App() {
               }
               break;
 
-            case 24: // Form
+            case ComponentTypeCode.FORM:
               metadata = await connector.fetchFormMetadata(componentId);
               if (metadata) {
                 assetName = metadata.name;
@@ -128,7 +148,7 @@ export default function App() {
               }
               break;
 
-            case 26: // View (Saved Query)
+            case ComponentTypeCode.VIEW:
               metadata = await connector.fetchViewMetadata(componentId);
               if (metadata) {
                 assetName = metadata.name;
@@ -141,7 +161,7 @@ export default function App() {
               }
               break;
 
-            case 71: // Plugin Type
+            case ComponentTypeCode.PLUGIN_TYPE:
               metadata = await connector.fetchPluginMetadata(componentId);
               if (metadata) {
                 assetName = metadata.friendlyname || metadata.typename;
@@ -150,7 +170,7 @@ export default function App() {
               }
               break;
 
-            case 60: // Web Resource
+            case ComponentTypeCode.WEB_RESOURCE:
               metadata = await connector.fetchWebResourceMetadata(componentId);
               if (metadata) {
                 assetName = metadata.displayname || metadata.name;
@@ -159,7 +179,7 @@ export default function App() {
               }
               break;
 
-            case 27: // Workflow
+            case ComponentTypeCode.WORKFLOW:
               metadata = await connector.fetchWorkflowMetadata(componentId);
               if (metadata) {
                 assetName = metadata.name;
