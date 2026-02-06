@@ -208,6 +208,20 @@ export function DependencyGraph({ assets, links, onAssetClick, selectedAssetId }
             const controlOffsetX = (targetCoord.yCoord - sourceCoord.yCoord) * 0.1;
             const controlOffsetY = (sourceCoord.xCoord - targetCoord.xCoord) * 0.1;
 
+            // Calculate arrow position at edge of target node
+            const dx = targetCoord.xCoord - sourceCoord.xCoord;
+            const dy = targetCoord.yCoord - sourceCoord.yCoord;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const nodeRadius = 8;
+            
+            // Position arrow at edge of target node
+            const arrowX = targetCoord.xCoord - (dx / distance) * (nodeRadius + 2);
+            const arrowY = targetCoord.yCoord - (dy / distance) * (nodeRadius + 2);
+            
+            // Calculate arrow angle based on direction
+            const angle = Math.atan2(dy, dx);
+            const arrowSize = 6;
+
             return (
               <g key={`link-${idx}`}>
                 <path
@@ -217,11 +231,12 @@ export function DependencyGraph({ assets, links, onAssetClick, selectedAssetId }
                   fill="none"
                   opacity="0.6"
                 />
-                {/* Arrow marker */}
+                {/* Arrow marker with proper orientation */}
                 <polygon
-                  points={`${targetCoord.xCoord},${targetCoord.yCoord} ${targetCoord.xCoord - 6},${targetCoord.yCoord - 3} ${targetCoord.xCoord - 6},${targetCoord.yCoord + 3}`}
+                  points={`0,-${arrowSize/2} ${arrowSize},0 0,${arrowSize/2}`}
                   fill="#888"
                   opacity="0.6"
+                  transform={`translate(${arrowX}, ${arrowY}) rotate(${angle * 180 / Math.PI})`}
                 />
               </g>
             );

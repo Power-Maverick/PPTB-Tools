@@ -316,9 +316,7 @@ function App() {
               )}
 
               {selectedAsset && (
-                <div className="details-panel">
-                  <AssetDetails selectedAsset={selectedAsset} allAssets={analysisResult.assets} />
-                </div>
+                <AssetDetails selectedAsset={selectedAsset} allAssets={analysisResult.assets} />
               )}
             </>
           )}
