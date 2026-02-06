@@ -151,7 +151,7 @@ export function TreeView({
         );
       })}
       {filtered.length === 0 && (
-        <div className="empty-state">
+        <div className="tree-empty-state">
           No assets match the current filters
         </div>
       )}

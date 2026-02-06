@@ -436,7 +436,8 @@ body {
   margin-left: 20px;
 }
 
-.empty-state {
+/* Tree view empty state */
+.tree-empty-state {
   padding: 40px 20px;
   text-align: center;
   color: #5f6368;

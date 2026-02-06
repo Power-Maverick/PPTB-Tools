@@ -12,7 +12,11 @@ import './models/windowTypes';
 
 type ViewMode = 'tree' | 'graph' | 'summary';
 
-// Comprehensive component type mapping based on Microsoft Learn documentation
+/**
+ * Comprehensive component type mapping based on Microsoft Learn documentation
+ * Maps component type codes to their asset kind and display label
+ * See ComponentTypeCode constants below for named references to these type codes
+ */
 const COMPONENT_TYPE_MAP: Record<number, { kind: AssetKind; label: string }> = {
   1: { kind: 'entity', label: 'Entity' },
   2: { kind: 'attribute', label: 'Attribute' },
@@ -32,7 +36,11 @@ const COMPONENT_TYPE_MAP: Record<number, { kind: AssetKind; label: string }> = {
   95: { kind: 'canvasapp', label: 'Canvas App' }
 };
 
-// Component type code constants for easy reference
+/**
+ * Component type code constants for Microsoft Dataverse components
+ * Based on Microsoft Learn documentation: https://learn.microsoft.com/en-us/power-apps/developer/data-platform/reference/entities/solutioncomponent
+ * These codes identify different types of components that can be included in a Power Platform solution
+ */
 const ComponentTypeCode = {
   ENTITY: 1,
   ATTRIBUTE: 2,
