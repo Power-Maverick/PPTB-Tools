@@ -72,7 +72,9 @@ export class DataverseClient {
 
     async updateViewLayout(entityLogicalName: string, viewId: string, layoutXml: string): Promise<void> {
         try {
-            // Use update to modify the savedquery's layoutxml
+            // IMPORTANT: This method ONLY updates the layoutxml field of the savedquery.
+            // It does NOT modify the fetchxml field. The fetchxml of the target view remains unchanged.
+            // This ensures that only the visual layout is copied, not the query logic.
             await window.dataverseAPI.update("savedquery", viewId, {
                 layoutxml: layoutXml,
             });

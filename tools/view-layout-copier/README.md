@@ -21,6 +21,13 @@ View Layout Copier simplifies the process of maintaining consistent view layouts
 3. **Select Target Views**: Choose one or more views to apply the layout to
 4. **Copy**: Click the "Copy Layout" button to apply the changes
 
+## Important Notes
+
+- **Layout Only**: This tool copies **ONLY** the layout XML from the source view to target views
+- **FetchXML Preserved**: The FetchXML (query definition) of target views remains unchanged
+- **Column References**: If a target view's FetchXML contains attributes not present in the copied layout, those attributes will remain in the FetchXML but won't be visible in the view
+- **Best Practice**: Ensure that the target views' FetchXML includes all attributes referenced in the source layout for optimal results
+
 ## Technical Details
 
 - **Built with**: React 18 + TypeScript + Vite
