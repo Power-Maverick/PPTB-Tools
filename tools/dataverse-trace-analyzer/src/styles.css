@@ -16,6 +16,24 @@
     --shadow-md: 0 3.2px 7.2px rgba(0, 0, 0, 0.132), 0 0.6px 1.8px rgba(0, 0, 0, 0.108);
 }
 
+body.dark-theme {
+    --primary-color: #4a9eff;
+    --primary-hover: #6cb0ff;
+    --success-color: #54b054;
+    --danger-color: #f48771;
+    --warning-color: #ffd666;
+    --background: #1e1e1e;
+    --surface: #2d2d2d;
+    --border-color: #3f3f3f;
+    --text-color: #e0e0e0;
+    --text-secondary: #b0b0b0;
+    --text-muted: #8a8886;
+    --error-bg: #4a2c2e;
+    --error-border: #6d3a3e;
+    --shadow-sm: 0 1.6px 3.6px rgba(0, 0, 0, 0.4), 0 0.3px 0.9px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 3.2px 7.2px rgba(0, 0, 0, 0.4), 0 0.6px 1.8px rgba(0, 0, 0, 0.3);
+}
+
 * {
     margin: 0;
     padding: 0;

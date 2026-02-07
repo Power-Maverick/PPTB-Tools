@@ -7,6 +7,14 @@
     --color-primary: #2563eb;
     --color-accent: #0ea5e9;
     --color-success: #0f9d58;
+    --color-error-bg: rgba(254, 242, 242, 0.9);
+    --color-error-border: rgba(220, 38, 38, 0.2);
+    --color-error-text: #991b1b;
+    --color-console-bg: #0b1120;
+    --color-console-text: #cbd5f5;
+    --color-console-header: rgba(203, 213, 225, 0.7);
+    --color-modal-backdrop: rgba(15, 23, 42, 0.45);
+    --color-input-bg: #fff;
     --shadow-soft: 0 20px 45px rgba(15, 23, 42, 0.08);
     --radius-lg: 18px;
     --radius-md: 12px;
@@ -19,6 +27,26 @@
         sans-serif;
 }
 
+body.dark-theme {
+    --color-bg: #1e1e1e;
+    --color-surface: #2d2d2d;
+    --color-border: #3f3f3f;
+    --color-muted: #b0b0b0;
+    --color-text: #e0e0e0;
+    --color-primary: #4a9eff;
+    --color-accent: #66c2ff;
+    --color-success: #54b054;
+    --color-error-bg: rgba(74, 44, 46, 0.9);
+    --color-error-border: rgba(244, 135, 113, 0.3);
+    --color-error-text: #f48771;
+    --color-console-bg: #0d0d0d;
+    --color-console-text: #cbd5f5;
+    --color-console-header: rgba(203, 213, 225, 0.5);
+    --color-modal-backdrop: rgba(0, 0, 0, 0.6);
+    --color-input-bg: #252525;
+    --shadow-soft: 0 20px 45px rgba(0, 0, 0, 0.4);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -27,7 +55,7 @@
 
 body {
     min-height: 100vh;
-    background: linear-gradient(135deg, #eff3ff, #fdf2f8 40%, #eef9f2 100%);
+    background: var(--color-bg);
     color: var(--color-text);
 }
 
@@ -82,15 +110,15 @@ body {
     border-radius: var(--radius-md);
     padding: 14px 18px;
     font-size: 0.9rem;
-    border: 1px solid rgba(220, 38, 38, 0.2);
-    background: rgba(254, 242, 242, 0.9);
-    color: #991b1b;
+    border: 1px solid var(--color-error-border);
+    background: var(--color-error-bg);
+    color: var(--color-error-text);
 }
 
 .loading-state,
 .empty-state {
     border-radius: var(--radius-md);
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--color-surface);
     border: 1px dashed var(--color-border);
     padding: 32px;
     text-align: center;
@@ -110,7 +138,8 @@ textarea {
     padding: 10px 12px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--color-border);
-    background: #fff;
+    background: var(--color-input-bg);
+    color: var(--color-text);
     font-size: 0.92rem;
     transition:
         border-color 0.15s ease,
@@ -194,10 +223,10 @@ textarea {
 }
 
 .command-console {
-    background: #0b1120;
+    background: var(--color-console-bg);
     border-radius: var(--radius-lg);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    color: #cbd5f5;
+    color: var(--color-console-text);
     font-family: "JetBrains Mono", "Fira Code", monospace;
     padding: 18px;
     min-height: 160px;
@@ -208,7 +237,7 @@ textarea {
     font-size: 0.85rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: rgba(203, 213, 225, 0.7);
+    color: var(--color-console-header);
     margin-bottom: 8px;
 }
 
@@ -222,7 +251,7 @@ textarea {
 .modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.45);
+    background: var(--color-modal-backdrop);
     display: flex;
     align-items: center;
     justify-content: center;
