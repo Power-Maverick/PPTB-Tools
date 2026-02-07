@@ -18,18 +18,20 @@ const resolveTheme = async () => {
     }
 };
 
+const themeEventHandler = (_event: any, payload: any) => {
+    if (payload.event !== "settings:updated") return;
+
+    const theme = (payload.data as { theme?: string }).theme;
+    if (theme) {
+        applyThemeClass(theme);
+    } else {
+        resolveTheme();
+    }
+};
+
 const registerToolboxEvents = () => {
     if (window.toolboxAPI) {
-        window.toolboxAPI.events.on((_event, payload) => {
-            if (payload.event !== "settings:updated") return;
-
-            const theme = (payload.data as { theme?: string }).theme;
-            if (theme) {
-                applyThemeClass(theme);
-            } else {
-                resolveTheme();
-            }
-        });
+        window.toolboxAPI.events.on(themeEventHandler);
     }
 };
 
