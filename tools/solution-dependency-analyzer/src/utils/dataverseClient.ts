@@ -199,7 +199,8 @@ export class DataverseConnector {
             if (!window.dataverseAPI) {
                 throw new Error("Dataverse API not available");
             }
-            return await window.dataverseAPI.retrieve("webresource", webResourceId, ["webresourceid", "name", "displayname", "webresourcetype"]);
+            //TODO: Fix the PPTB API
+            return await window.dataverseAPI.retrieve("webresourceset", webResourceId, ["webresourceid", "name", "displayname", "webresourcetype"]);
         } catch (err) {
             console.error(`Web resource metadata fetch failed for ${webResourceId}:`, err);
             return null;
@@ -247,7 +248,7 @@ export class DataverseConnector {
             if (!window.dataverseAPI) {
                 throw new Error("Dataverse API not available");
             }
-            return await window.dataverseAPI.retrieve("appmodule", appId, ["appmoduleid", "name", "displayname"]);
+            return await window.dataverseAPI.retrieve("appmodule", appId, ["appmoduleid", "name"]);
         } catch (err) {
             console.error(`App metadata fetch failed for ${appId}:`, err);
             return null;
