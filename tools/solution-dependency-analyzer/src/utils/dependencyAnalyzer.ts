@@ -1,142 +1,175 @@
-import { Asset, AssetKind, Link, AnalysisOutput } from '../models/interfaces';
-import { LoopFinder } from './circularDetector';
+import { AnalysisOutput, Asset, AssetKind, Link } from "../models/interfaces";
+import { LoopFinder } from "./circularDetector";
 
 export class DependencyScanner {
-  private assetMap: Map<string, Asset>;
-  private linkList: Link[];
+    private assetMap: Map<string, Asset>;
+    private linkList: Link[];
 
-  constructor() {
-    this.assetMap = new Map();
-    this.linkList = [];
-  }
+    constructor() {
+        this.assetMap = new Map();
+        this.linkList = [];
+    }
 
-  registerAsset(
-    id: string,
-    name: string,
-    fullName: string,
-    kind: AssetKind,
-    logicalName: string,
-    dependencies: string[]
-  ): void {
-    const asset: Asset = {
-      assetId: id,
-      label: name,
-      fullName: fullName,
-      kind: kind,
-      logicalName: logicalName,
-      linksTo: dependencies,
-      linkedBy: [],
-      hasLoop: false,
-      notFound: false
-    };
+    registerAsset(id: string, name: string, fullName: string, kind: AssetKind, logicalName: string, dependencies: string[], warningMessage?: string): void;
+    registerAsset(asset: Asset): void;
+    registerAsset(idOrAsset: string | Asset, name?: string, fullName?: string, kind?: AssetKind, logicalName?: string, dependencies?: string[], warningMessage?: string): void {
+        let asset: Asset;
 
-    this.assetMap.set(id, asset);
-
-    // Create link records
-    dependencies.forEach(depId => {
-      this.linkList.push({
-        sourceId: id,
-        targetId: depId,
-        linkKind: 'direct'
-      });
-    });
-  }
-
-  computeReverseLinks(): void {
-    this.assetMap.forEach(asset => {
-      asset.linkedBy = [];
-    });
-
-    this.linkList.forEach(link => {
-      const target = this.assetMap.get(link.targetId);
-      if (target) {
-        if (!target.linkedBy) {
-          target.linkedBy = [];
+        if (typeof idOrAsset === "string") {
+            // Old signature
+            asset = {
+                assetId: idOrAsset,
+                label: name!,
+                fullName: fullName!,
+                kind: kind!,
+                logicalName: logicalName!,
+                linksTo: dependencies || [],
+                linkedBy: [],
+                hasLoop: false,
+                notFound: false,
+                hasWarning: !!warningMessage,
+                warningMessage: warningMessage,
+            };
+        } else {
+            // New signature - Asset object
+            asset = {
+                ...idOrAsset,
+                linkedBy: idOrAsset.linkedBy || [],
+                hasLoop: idOrAsset.hasLoop || false,
+                notFound: idOrAsset.notFound || false,
+            };
         }
-        target.linkedBy.push(link.sourceId);
-      }
-    });
-  }
 
-  identifyMissingAssets(): Asset[] {
-    const missingList: Asset[] = [];
-    const knownIds = new Set(this.assetMap.keys());
+        this.assetMap.set(asset.assetId, asset);
 
-    this.linkList.forEach(link => {
-      if (!knownIds.has(link.targetId)) {
-        // Check if we already marked this as missing
-        if (!this.assetMap.has(link.targetId)) {
-          const missingAsset: Asset = {
-            assetId: link.targetId,
-            label: 'Unknown Asset',
-            fullName: link.targetId,
-            kind: 'other',
-            logicalName: link.targetId,
-            linksTo: [],
-            linkedBy: [],
-            hasLoop: false,
-            notFound: true
-          };
-          this.assetMap.set(link.targetId, missingAsset);
-          missingList.push(missingAsset);
-        }
-      }
-    });
+        // Create link records
+        asset.linksTo.forEach((depId) => {
+            this.linkList.push({
+                sourceId: asset.assetId,
+                targetId: depId,
+                linkKind: "direct",
+            });
+        });
+    }
 
-    return missingList;
-  }
+    computeReverseLinks(): void {
+        this.assetMap.forEach((asset) => {
+            asset.linkedBy = [];
+        });
 
-  performAnalysis(): AnalysisOutput {
-    this.computeReverseLinks();
-    const missingAssets = this.identifyMissingAssets();
+        this.linkList.forEach((link) => {
+            const target = this.assetMap.get(link.targetId);
+            if (target) {
+                if (!target.linkedBy) {
+                    target.linkedBy = [];
+                }
+                target.linkedBy.push(link.sourceId);
+            }
+        });
+    }
 
-    const assets = Array.from(this.assetMap.values());
-    const loopFinder = new LoopFinder(assets);
-    const loops = loopFinder.findAllLoops();
+    identifyMissingAssets(): Asset[] {
+        const missingList: Asset[] = [];
+        const knownIds = new Set(this.assetMap.keys());
 
-    LoopFinder.markLoopAssets(assets, loops);
+        this.linkList.forEach((link) => {
+            if (!knownIds.has(link.targetId)) {
+                // Check if we already marked this as missing
+                if (!this.assetMap.has(link.targetId)) {
+                    const missingAsset: Asset = {
+                        assetId: link.targetId,
+                        label: "Unknown Asset",
+                        fullName: link.targetId,
+                        kind: "other",
+                        logicalName: link.targetId,
+                        linksTo: [],
+                        linkedBy: [],
+                        hasLoop: false,
+                        notFound: true,
+                    };
+                    this.assetMap.set(link.targetId, missingAsset);
+                    missingList.push(missingAsset);
+                }
+            }
+        });
 
-    const stats = this.calculateStatistics(assets, loops);
+        return missingList;
+    }
 
-    return {
-      assets,
-      links: this.linkList,
-      loops,
-      notFoundAssets: missingAssets,
-      stats
-    };
-  }
+    performAnalysis(): AnalysisOutput {
+        this.computeReverseLinks();
+        this.nestAttributes();
+        const missingAssets = this.identifyMissingAssets();
 
-  private calculateStatistics(assets: Asset[], loops: string[][]) {
-    const kindStats: Record<AssetKind, number> = {
-      entity: 0,
-      attribute: 0,
-      relationship: 0,
-      form: 0,
-      view: 0,
-      workflow: 0,
-      plugin: 0,
-      webresource: 0,
-      app: 0,
-      canvasapp: 0,
-      report: 0,
-      emailtemplate: 0,
-      optionset: 0,
-      connector: 0,
-      sitemap: 0,
-      role: 0,
-      other: 0
-    };
+        const assets = Array.from(this.assetMap.values());
+        const loopFinder = new LoopFinder(assets);
+        const loops = loopFinder.findAllLoops();
 
-    assets.forEach(asset => {
-      kindStats[asset.kind]++;
-    });
+        LoopFinder.markLoopAssets(assets, loops);
 
-    return {
-      assetCount: assets.length,
-      linkCount: this.linkList.length,
-      loopCount: loops.length,
-      kindStats
-    };
-  }
+        const stats = this.calculateStatistics(assets, loops);
+
+        return {
+            assets,
+            links: this.linkList,
+            loops,
+            notFoundAssets: missingAssets,
+            stats,
+        };
+    }
+
+    private nestAttributes(): void {
+        const attributes: Asset[] = [];
+
+        // Collect all attributes
+        this.assetMap.forEach((asset) => {
+            if (asset.kind === "attribute" && asset.parentEntityId) {
+                attributes.push(asset);
+            }
+        });
+
+        // Nest attributes under their parent entities
+        attributes.forEach((attr) => {
+            const parentEntity = this.assetMap.get(attr.parentEntityId!);
+            if (parentEntity) {
+                if (!parentEntity.children) {
+                    parentEntity.children = [];
+                }
+                parentEntity.children.push(attr);
+            }
+        });
+    }
+
+    private calculateStatistics(assets: Asset[], loops: string[][]) {
+        const kindStats: Record<AssetKind, number> = {
+            entity: 0,
+            attribute: 0,
+            relationship: 0,
+            form: 0,
+            view: 0,
+            workflow: 0,
+            plugin: 0,
+            webresource: 0,
+            app: 0,
+            canvasapp: 0,
+            report: 0,
+            emailtemplate: 0,
+            optionset: 0,
+            connector: 0,
+            sitemap: 0,
+            role: 0,
+            other: 0,
+        };
+
+        assets.forEach((asset) => {
+            kindStats[asset.kind]++;
+        });
+
+        return {
+            assetCount: assets.length,
+            linkCount: this.linkList.length,
+            loopCount: loops.length,
+            kindStats,
+        };
+    }
 }
