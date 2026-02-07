@@ -18,18 +18,14 @@ function Root() {
       }
     };
 
-    const registerToolboxEvents = () => {
-      if (window.toolboxAPI) {
-        window.toolboxAPI.events.on((_event, payload) => {
-          if (payload.event !== "settings:updated") return;
+    const eventHandler = (_event: any, payload: any) => {
+      if (payload.event !== "settings:updated") return;
 
-          const themeName = (payload.data as { theme?: string }).theme;
-          if (themeName) {
-            applyTheme(themeName);
-          } else {
-            resolveTheme();
-          }
-        });
+      const themeName = (payload.data as { theme?: string }).theme;
+      if (themeName) {
+        applyTheme(themeName);
+      } else {
+        resolveTheme();
       }
     };
 
@@ -37,7 +33,16 @@ function Root() {
     resolveTheme();
 
     // Register event handler
-    registerToolboxEvents();
+    if (window.toolboxAPI) {
+      window.toolboxAPI.events.on(eventHandler);
+    }
+
+    // Cleanup function
+    return () => {
+      if (window.toolboxAPI) {
+        window.toolboxAPI.events.off(eventHandler);
+      }
+    };
   }, []);
 
   return (
