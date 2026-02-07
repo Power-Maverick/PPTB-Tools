@@ -3,6 +3,8 @@ import { SolutionRecord } from "../models/interfaces";
 export class DataverseConnector {
     private environmentBaseUrl: string;
     private apiVersionNumber: string;
+    private entityAttributesCache: Map<string, any[]> = new Map();
+    private entityTypeCodeMap: Map<number, string> = new Map();
 
     constructor(envUrl: string, version: string = "9.2") {
         this.environmentBaseUrl = envUrl.replace(/\/$/, "");
@@ -39,14 +41,24 @@ export class DataverseConnector {
             if (!window.dataverseAPI) {
                 throw new Error("Dataverse API not available");
             }
-            return await window.dataverseAPI.getEntityMetadata(entityId, false, ["LogicalName", "DisplayName", "SchemaName", "MetadataId"]);
+            const metadata = await window.dataverseAPI.getEntityMetadata(entityId, false, ["LogicalName", "DisplayName", "SchemaName", "MetadataId", "ObjectTypeCode"]);
+            if (metadata?.ObjectTypeCode && typeof metadata.ObjectTypeCode === "number" && typeof metadata.LogicalName === "string") {
+                this.entityTypeCodeMap.set(metadata.ObjectTypeCode, metadata.LogicalName);
+            }
+            return metadata;
         } catch (err) {
             console.error(`Entity metadata fetch failed for ${entityId}:`, err);
             return null;
         }
     }
 
-    async fetchEntityAttributes(entityId: string): Promise<any[]> {
+    async fetchEntityAttributes(
+        entityId: string,
+        options?: {
+            solutionAttributeIds?: Set<string>;
+            implicitAllIfNoneExplicit?: boolean;
+        },
+    ): Promise<any[]> {
         try {
             if (!window.dataverseAPI) {
                 throw new Error("Dataverse API not available");
@@ -66,7 +78,26 @@ export class DataverseConnector {
                 "AttributeType",
             ]);
 
-            return (attributes?.value || attributes || []) as any[];
+            const attributeList = (attributes?.value || attributes || []) as any[];
+            const solutionAttributeIds = options?.solutionAttributeIds;
+            const implicitAllIfNoneExplicit = options?.implicitAllIfNoneExplicit ?? false;
+
+            let hasExplicitAttributes = false;
+            if (solutionAttributeIds && solutionAttributeIds.size > 0) {
+                hasExplicitAttributes = attributeList.some((attr) => solutionAttributeIds.has(String(attr.MetadataId || "").toLowerCase()));
+            }
+
+            const withSolutionInfo = attributeList.map((attr) => {
+                const attrId = String(attr.MetadataId || "").toLowerCase();
+                const inSolution = solutionAttributeIds ? (hasExplicitAttributes ? solutionAttributeIds.has(attrId) : implicitAllIfNoneExplicit) : undefined;
+                return {
+                    ...attr,
+                    inSolution,
+                };
+            });
+
+            this.entityAttributesCache.set(entityMetadata.LogicalName, withSolutionInfo);
+            return withSolutionInfo;
         } catch (err) {
             console.error(`Entity attributes fetch failed for ${entityId}:`, err);
             return [];
@@ -90,10 +121,64 @@ export class DataverseConnector {
             if (!window.dataverseAPI) {
                 throw new Error("Dataverse API not available");
             }
-            return await window.dataverseAPI.retrieve("savedquery", viewId, ["savedqueryid", "name", "fetchxml"]);
+            const viewMetadata = await window.dataverseAPI.retrieve("savedquery", viewId, ["savedqueryid", "name", "fetchxml", "returnedtypecode", "layoutxml"]);
+            if (!viewMetadata) {
+                return null;
+            }
+
+            const layoutXml = typeof viewMetadata.layoutxml === "string" ? viewMetadata.layoutxml : "";
+            const entityLogicalName = typeof viewMetadata.returnedtypecode === "string" ? viewMetadata.returnedtypecode : undefined;
+            const viewColumns = await this.fetchViewColumns(layoutXml, entityLogicalName);
+
+            console.log(layoutXml, viewMetadata, entityLogicalName, viewColumns);
+
+            return {
+                ...viewMetadata,
+                viewColumns,
+            };
         } catch (err) {
             console.error(`View metadata fetch failed for ${viewId}:`, err);
             return null;
+        }
+    }
+
+    async fetchViewColumns(layoutXml: string, entityLogicalName?: string): Promise<any[]> {
+        try {
+            if (!window.dataverseAPI) {
+                throw new Error("Dataverse API not available");
+            }
+            if (!layoutXml) {
+                return [];
+            }
+
+            const logicalNames = this.parseLayoutXmlAttributeNames(layoutXml);
+            if (logicalNames.length === 0) {
+                return [];
+            }
+
+            if (!entityLogicalName) {
+                return [];
+            }
+
+            const cachedAttributes = this.entityAttributesCache.get(entityLogicalName) || [];
+            const logicalNameSet = new Set(logicalNames.map((name) => name.toLowerCase()));
+            return cachedAttributes.filter((attr) => logicalNameSet.has(String(attr.LogicalName || "").toLowerCase()));
+        } catch (err) {
+            console.error("View columns fetch failed:", err);
+            return [];
+        }
+    }
+
+    private parseLayoutXmlAttributeNames(layoutXml: string): string[] {
+        try {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(layoutXml, "text/xml");
+            const cells = Array.from(xmlDoc.getElementsByTagName("cell"));
+            const logicalNames = cells.map((cell) => cell.getAttribute("name")).filter((name): name is string => !!name);
+            return [...new Set(logicalNames)];
+        } catch (err) {
+            console.error("Failed to parse view layout XML:", err);
+            return [];
         }
     }
 

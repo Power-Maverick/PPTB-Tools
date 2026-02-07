@@ -60,7 +60,7 @@ const ComponentTypeCode = {
 } as const;
 
 function getComponentTypeInfo(typeCode: number): { kind: AssetKind; label: string } {
-    return COMPONENT_TYPE_MAP[typeCode] || { kind: "other", label: "Unknown" };
+    return COMPONENT_TYPE_MAP[typeCode] || { kind: "other", label: `Unknown (${typeCode})` };
 }
 
 export default function App() {
@@ -73,6 +73,7 @@ export default function App() {
     const [searchTerm, setSearchTerm] = useState("");
     const [kindFilter, setKindFilter] = useState<AssetKind | "all">("all");
     const [showLoopsOnly, setShowLoopsOnly] = useState(false);
+    const [isDetailsVisible, setIsDetailsVisible] = useState(true);
 
     // Load solutions on mount
     useEffect(() => {
@@ -160,24 +161,15 @@ export default function App() {
                                 fullName = metadata.SchemaName || metadata.LogicalName;
                                 logicalName = metadata.LogicalName;
 
-                                // Fetch attributes for this entity
-                                const attributes = await connector.fetchEntityAttributes(componentId);
+                                // Fetch attributes for this entity (cached with solution status)
+                                const attributes = await connector.fetchEntityAttributes(componentId, {
+                                    solutionAttributeIds: solutionComponentIds,
+                                    implicitAllIfNoneExplicit: true,
+                                });
                                 if (attributes && attributes.length > 0) {
-                                    // Check if ANY attributes for this entity are explicitly in the solution
-                                    const hasExplicitAttributes = attributes.some((attr: any) => solutionComponentIds.has(attr.MetadataId?.toLowerCase()));
-
                                     let hasNonSolutionAttributes = false;
                                     dependencies = attributes.map((attr: any) => {
-                                        const attrId = attr.MetadataId?.toLowerCase();
-
-                                        // Determine if attribute is in solution:
-                                        // - If NO attributes are explicitly added for this entity,
-                                        //   then all attributes are implicitly included (Option 1)
-                                        // - If SOME attributes are explicitly added for this entity,
-                                        //   then only those explicitly added are in solution (Option 2)
-                                        const isInSolution = hasExplicitAttributes
-                                            ? solutionComponentIds.has(attrId) // Option 2: Only explicit attributes
-                                            : true; // Option 1: All attributes implicitly included
+                                        const isInSolution = attr.inSolution !== false;
 
                                         if (!isInSolution) {
                                             hasNonSolutionAttributes = true;
@@ -233,6 +225,48 @@ export default function App() {
                                 // Parse FetchXML to extract dependencies
                                 if (metadata.fetchxml) {
                                     dependencies = parseFetchXmlDependencies(metadata.fetchxml);
+                                }
+
+                                const viewColumns = metadata.viewColumns || [];
+                                if (viewColumns.length > 0) {
+                                    // Check if ANY columns for this view are explicitly in the solution
+                                    const hasExplicitColumns = viewColumns.some((col: any) => solutionComponentIds.has(col.MetadataId?.toLowerCase()));
+
+                                    let hasNonSolutionColumns = false;
+                                    const columnDependencies = viewColumns.map((col: any) => {
+                                        const colId = col.MetadataId?.toLowerCase();
+
+                                        // Determine if column is in solution:
+                                        // - If NO columns are explicitly added for this view, all columns are implicitly included
+                                        // - If SOME columns are explicitly added, only those are in solution
+                                        const isInSolution = hasExplicitColumns ? solutionComponentIds.has(colId) : true;
+
+                                        if (!isInSolution) {
+                                            hasNonSolutionColumns = true;
+                                        }
+
+                                        const colAsset: Asset = {
+                                            assetId: col.MetadataId,
+                                            label: col.DisplayName?.UserLocalizedLabel?.Label || col.LogicalName,
+                                            fullName: col.LogicalName,
+                                            kind: "attribute",
+                                            logicalName: col.LogicalName,
+                                            typeCode: ComponentTypeCode.ATTRIBUTE,
+                                            linksTo: [],
+                                            hasLoop: false,
+                                            parentEntityId: componentId,
+                                            hasWarning: !isInSolution,
+                                            warningMessage: !isInSolution ? "Not included in solution" : undefined,
+                                        };
+                                        scanner.registerAsset(colAsset);
+                                        return col.MetadataId;
+                                    });
+
+                                    if (hasNonSolutionColumns) {
+                                        warningMessage = "Contains columns not in solution";
+                                    }
+
+                                    dependencies = [...dependencies, ...columnDependencies];
                                 }
                             }
                             break;
@@ -384,12 +418,14 @@ export default function App() {
 
     const handleAssetClick = (asset: Asset) => {
         setSelectedAsset(asset);
+        setIsDetailsVisible(true);
     };
 
     const handleGraphAssetClick = (assetId: string) => {
         const asset = analysisResult?.assets.find((a) => a.assetId === assetId);
         if (asset) {
             setSelectedAsset(asset);
+            setIsDetailsVisible(true);
         }
     };
 
@@ -400,7 +436,7 @@ export default function App() {
 
     return (
         <div className="app-wrapper">
-            <div className={`columns-layout ${selectedAsset ? "details-visible" : ""}`}>
+            <div className={`columns-layout ${selectedAsset && isDetailsVisible ? "details-visible" : ""}`}>
                 {/* Left Column - Controls */}
                 <div className="column-left">
                     <SolutionPicker
@@ -464,6 +500,13 @@ export default function App() {
                                 <button className={`view-tab ${viewMode === "summary" ? "active" : ""}`} onClick={() => setViewMode("summary")}>
                                     📋 Summary Report
                                 </button>
+                                <button
+                                    className={`view-tab ${selectedAsset && isDetailsVisible ? "active" : ""}`}
+                                    onClick={() => setIsDetailsVisible((visible) => !visible)}
+                                    disabled={!selectedAsset}
+                                >
+                                    {selectedAsset && isDetailsVisible ? "Hide Details" : "Show Details"}
+                                </button>
                             </div>
 
                             <div className="view-content">
@@ -500,7 +543,7 @@ export default function App() {
                 </div>
 
                 {/* Right Column - Details */}
-                <div className={`column-right ${selectedAsset ? "visible" : ""}`}>
+                <div className={`column-right ${selectedAsset && isDetailsVisible ? "visible" : ""}`}>
                     {analysisResult && <AssetDetails selectedAsset={selectedAsset} allAssets={analysisResult.assets} />}
                     {!analysisResult && (
                         <div className="no-selection">

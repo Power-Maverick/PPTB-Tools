@@ -342,6 +342,11 @@ body {
     color: #1a73e8;
 }
 
+.view-tab:disabled {
+    color: #9aa0a6;
+    cursor: not-allowed;
+}
+
 .view-tab.active {
     color: #1a73e8;
     border-bottom-color: #1a73e8;
