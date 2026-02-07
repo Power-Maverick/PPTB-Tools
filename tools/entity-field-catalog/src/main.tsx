@@ -11,16 +11,16 @@ function Root() {
       setTheme(themeName === "dark" ? webDarkTheme : webLightTheme);
     };
 
-    const resolveTheme = () => {
+    const resolveTheme = async () => {
       if (window.toolboxAPI) {
-        const currentTheme = window.toolboxAPI.utils.getCurrentTheme();
+        const currentTheme = await window.toolboxAPI.utils.getCurrentTheme();
         applyTheme(currentTheme);
       }
     };
 
     const registerToolboxEvents = () => {
       if (window.toolboxAPI) {
-        window.toolboxAPI.events.on((event, payload) => {
+        window.toolboxAPI.events.on((_event, payload) => {
           if (payload.event !== "settings:updated") return;
 
           const themeName = (payload.data as { theme?: string }).theme;
