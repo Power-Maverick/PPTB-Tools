@@ -9,6 +9,12 @@ function Root() {
   useEffect(() => {
     const applyTheme = (themeName: string) => {
       setTheme(themeName === "dark" ? webDarkTheme : webLightTheme);
+      // Also apply the CSS class for custom styles
+      if (themeName === "dark") {
+        document.body.classList.add("dark-theme");
+      } else {
+        document.body.classList.remove("dark-theme");
+      }
     };
 
     const resolveTheme = async () => {
