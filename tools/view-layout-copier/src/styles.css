@@ -93,6 +93,7 @@ body {
     border-radius: 2px;
     font-size: 14px;
     background-color: var(--background);
+    color: var(--text-color);
     transition: border-color 0.15s;
 }
 
@@ -230,13 +231,15 @@ body {
 }
 
 .view-item.selected {
-    background-color: #e3f2fd;
-    border-left: 3px solid var(--primary-color);
+    background-color: var(--primary-color);
+    color: var(--background);
+    border-left: 3px solid var(--primary-hover);
 }
 
 .view-item.source {
-    background-color: #fff9e6;
-    border-left: 3px solid var(--warning-color);
+    background-color: var(--warning-color);
+    color: var(--text-color);
+    border-left: 3px solid var(--success-color);
 }
 
 .view-item input[type="checkbox"],

@@ -195,9 +195,9 @@ textarea {
 }
 
 .btn-ghost {
-    background: rgba(15, 23, 42, 0.04);
+    background: var(--color-surface);
     color: var(--color-text);
-    border: 1px solid rgba(15, 23, 42, 0.08);
+    border: 1px solid var(--color-border);
 }
 
 .btn-ghost:hover:not(:disabled) {

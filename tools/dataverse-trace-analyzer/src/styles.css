@@ -182,8 +182,9 @@ body {
 }
 
 .log-item.selected {
-    background-color: #e3f2fd;
-    border-left: 3px solid var(--primary-color);
+    background-color: var(--primary-color);
+    color: var(--background);
+    border-left: 3px solid var(--primary-hover);
     padding-left: 9px;
 }
 
