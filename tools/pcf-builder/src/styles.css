@@ -15,6 +15,12 @@
     --color-console-header: rgba(203, 213, 225, 0.7);
     --color-modal-backdrop: rgba(15, 23, 42, 0.45);
     --color-input-bg: #fff;
+    --color-tab-strip-bg: rgba(255, 255, 255, 0.82);
+    --color-tab-strip-border: rgba(15, 23, 42, 0.08);
+    --color-tab-active-bg: rgba(37, 99, 235, 0.12);
+    --color-tab-active-border: rgba(37, 99, 235, 0.3);
+    --color-workspace-badge-bg: rgba(15, 23, 42, 0.02);
+    --color-workspace-badge-border: rgba(15, 23, 42, 0.14);
     --shadow-soft: 0 20px 45px rgba(15, 23, 42, 0.08);
     --radius-lg: 18px;
     --radius-md: 12px;
@@ -44,6 +50,12 @@ body.dark-theme {
     --color-console-header: rgba(203, 213, 225, 0.5);
     --color-modal-backdrop: rgba(0, 0, 0, 0.6);
     --color-input-bg: #252525;
+    --color-tab-strip-bg: rgba(45, 45, 45, 0.82);
+    --color-tab-strip-border: rgba(255, 255, 255, 0.1);
+    --color-tab-active-bg: rgba(74, 158, 255, 0.2);
+    --color-tab-active-border: rgba(74, 158, 255, 0.4);
+    --color-workspace-badge-bg: rgba(255, 255, 255, 0.05);
+    --color-workspace-badge-border: rgba(255, 255, 255, 0.14);
     --shadow-soft: 0 20px 45px rgba(0, 0, 0, 0.4);
 }
 
