@@ -68,7 +68,7 @@ export class ERDGenerator {
 
         if (this.config.maxAttributesPerTable > 0 && table.attributes.length > this.config.maxAttributesPerTable) {
           const remaining = table.attributes.length - this.config.maxAttributesPerTable;
-          lines.push(`        string more_attributes "plus ${remaining} more"`);
+          lines.push(`        string plus_${remaining}_more_attributes`);
         }
         
         lines.push(`    }`);
