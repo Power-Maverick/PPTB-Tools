@@ -88,3 +88,14 @@
         padding: 22px;
     }
 }
+
+.inputError {
+    border-color: var(--color-error, #dc2626) !important;
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15);
+}
+
+.fieldError {
+    font-size: 0.75rem;
+    color: var(--color-error, #dc2626);
+    margin-top: 4px;
+}

@@ -3,6 +3,9 @@ import styles from "./SolutionPanel.module.css";
 
 export type SolutionAction = "create" | "add-control" | "deploy" | "build-solution";
 
+export const PUBLISHER_NAME_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
+export const PUBLISHER_NAME_ERROR = "Publisher Name may only contain letters, digits, and underscores, and must start with a letter or underscore.";
+
 interface SolutionPanelProps {
     projectPath: string;
     solutionConfig: PCFSolutionConfig;
@@ -16,7 +19,8 @@ interface SolutionPanelProps {
 
 export function SolutionPanel({ projectPath, solutionConfig, activeAction, fieldsLocked, isControlReferenced, solutionProjectCreated, onSolutionChange, onAction }: SolutionPanelProps) {
     const hasPath = Boolean(projectPath);
-    const canCreate = hasPath && solutionConfig.publisherFriendlyName && solutionConfig.publisherPrefix && !solutionProjectCreated;
+    const publisherNameInvalid = Boolean(solutionConfig.publisherName) && !PUBLISHER_NAME_REGEX.test(solutionConfig.publisherName);
+    const canCreate = hasPath && solutionConfig.publisherName && !publisherNameInvalid && solutionConfig.publisherPrefix && !solutionProjectCreated;
     const canDeploy = hasPath && solutionConfig.solutionName;
     const canAddControl = hasPath && !isControlReferenced;
     const canBuildSolution = hasPath && solutionProjectCreated;
@@ -60,22 +64,34 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, field
 
             <div className={styles.grid}>
                 <div>
-                    <label htmlFor="publisherFriendlyName">Publisher Friendly Name *</label>
+                    <label htmlFor="publisherFriendlyName">Publisher Friendly Name</label>
                     <input
                         id="publisherFriendlyName"
                         type="text"
                         value={solutionConfig.publisherFriendlyName}
                         placeholder="Contoso"
                         readOnly={fieldsLocked}
-                        onChange={(event) => {
-                            const value = event.target.value;
-                            onSolutionChange({
-                                publisherFriendlyName: value,
-                                publisherName: value,
-                            });
-                        }}
+                        onChange={(event) => onSolutionChange({ publisherFriendlyName: event.target.value })}
                     />
                 </div>
+                <div>
+                    <label htmlFor="publisherName">Publisher Name *</label>
+                    <input
+                        id="publisherName"
+                        type="text"
+                        value={solutionConfig.publisherName}
+                        placeholder="contoso"
+                        readOnly={fieldsLocked}
+                        className={publisherNameInvalid ? styles.inputError : undefined}
+                        onChange={(event) => onSolutionChange({ publisherName: event.target.value })}
+                    />
+                    {publisherNameInvalid && (
+                        <p className={styles.fieldError}>{PUBLISHER_NAME_ERROR}</p>
+                    )}
+                </div>
+            </div>
+
+            <div className={styles.grid}>
                 <div>
                     <label htmlFor="publisherPrefix">Publisher Prefix *</label>
                     <input
@@ -87,9 +103,6 @@ export function SolutionPanel({ projectPath, solutionConfig, activeAction, field
                         onChange={(event) => onSolutionChange({ publisherPrefix: event.target.value })}
                     />
                 </div>
-            </div>
-
-            <div className={styles.grid}>
                 <div>
                     <label htmlFor="solutionVersion">Version</label>
                     <input

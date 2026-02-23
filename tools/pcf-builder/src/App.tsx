@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import { CommandOutput } from "./components/CommandOutput";
 import { ControlAction, ControlPanel } from "./components/ControlPanel";
 import { InputModal } from "./components/InputModal";
-import { SolutionAction, SolutionPanel } from "./components/SolutionPanel";
+import { SolutionAction, SolutionPanel, PUBLISHER_NAME_REGEX, PUBLISHER_NAME_ERROR } from "./components/SolutionPanel";
 import { TabDefinition, TabSwitcher } from "./components/TabSwitcher";
 import { PCFControlConfig, PCFSolutionConfig } from "./models/interfaces";
 import "./styles.css";
@@ -259,7 +259,8 @@ function App() {
             }
 
             const exitCode = typeof result.exitCode === "number" ? result.exitCode : 0;
-            const isSuccess = exitCode === 0 && !result.error;
+            const outputIndicatesError = /^\s*error:/im.test(output);
+            const isSuccess = exitCode === 0 && !result.error && !outputIndicatesError;
             didSucceed = isSuccess;
 
             if (wasAborted) {
@@ -859,6 +860,15 @@ function App() {
             case "create": {
                 const canRun = await ensureProjectPath();
                 if (!canRun || !solutionConfig.publisherName || !solutionConfig.publisherPrefix) {
+                    return;
+                }
+
+                if (!PUBLISHER_NAME_REGEX.test(solutionConfig.publisherName)) {
+                    await window.toolboxAPI?.utils.showNotification({
+                        title: "Invalid publisher name",
+                        body: PUBLISHER_NAME_ERROR,
+                        type: "error",
+                    });
                     return;
                 }
 
