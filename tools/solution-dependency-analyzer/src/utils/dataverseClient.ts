@@ -199,8 +199,7 @@ export class DataverseConnector {
             if (!window.dataverseAPI) {
                 throw new Error("Dataverse API not available");
             }
-            //TODO: Fix the PPTB API
-            return await window.dataverseAPI.retrieve("webresourceset", webResourceId, ["webresourceid", "name", "displayname", "webresourcetype"]);
+            return await window.dataverseAPI.retrieve("webresource", webResourceId, ["webresourceid", "name", "displayname", "webresourcetype"]);
         } catch (err) {
             console.error(`Web resource metadata fetch failed for ${webResourceId}:`, err);
             return null;

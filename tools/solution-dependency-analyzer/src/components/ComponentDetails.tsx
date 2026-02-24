@@ -3,14 +3,35 @@ import { Asset } from "../models/interfaces";
 interface AssetDetailsProps {
     selectedAsset: Asset | null;
     allAssets: Asset[];
+    onAssetClick?: (asset: Asset) => void;
 }
 
-export function AssetDetails({ selectedAsset, allAssets }: AssetDetailsProps) {
+const ASSET_ICONS: Record<string, string> = {
+    entity: "📦",
+    attribute: "🔤",
+    relationship: "🔗",
+    form: "📝",
+    view: "👁️",
+    workflow: "⚙️",
+    plugin: "🔌",
+    webresource: "🌐",
+    app: "📱",
+    canvasapp: "🎨",
+    report: "📊",
+    emailtemplate: "✉️",
+    optionset: "📋",
+    connector: "🔌",
+    sitemap: "🗺️",
+    role: "🔐",
+    other: "❓",
+};
+
+export function AssetDetails({ selectedAsset, allAssets, onAssetClick }: AssetDetailsProps) {
     if (!selectedAsset) {
         return (
             <div className="details-panel">
                 <div className="no-selection">
-                    <p>Select an asset from the tree to view details</p>
+                    <p>Select a component to view details</p>
                 </div>
             </div>
         );
@@ -23,6 +44,16 @@ export function AssetDetails({ selectedAsset, allAssets }: AssetDetailsProps) {
     // For specific component types, show fullName or logicalName as the asset ID
     const shouldUseDisplayId = ["attribute", "webresource", "app", "report", "sitemap"].includes(selectedAsset.kind);
     const displayedAssetId = shouldUseDisplayId ? selectedAsset.fullName : selectedAsset.assetId;
+
+    const handleDependencyClick = (asset: Asset) => {
+        if (onAssetClick) {
+            onAssetClick(asset);
+        }
+    };
+
+    const getAssetIcon = (kind: string): string => {
+        return ASSET_ICONS[kind] || "❓";
+    };
 
     return (
         <div className="details-panel">
@@ -68,7 +99,13 @@ export function AssetDetails({ selectedAsset, allAssets }: AssetDetailsProps) {
                             const asset = allAssets.find((a) => a.assetId === assetId);
                             return (
                                 <div key={idx} className="loop-step">
-                                    <span>{asset?.label || assetId}</span>
+                                    {asset && onAssetClick ? (
+                                        <button className="loop-link" onClick={() => handleDependencyClick(asset)}>
+                                            {asset.label}
+                                        </button>
+                                    ) : (
+                                        <span>{asset?.label || assetId}</span>
+                                    )}
                                     {idx < selectedAsset.loopChain!.length - 1 && <span className="arrow">→</span>}
                                 </div>
                             );
@@ -84,9 +121,19 @@ export function AssetDetails({ selectedAsset, allAssets }: AssetDetailsProps) {
                 ) : (
                     <ul className="dependency-list">
                         {dependenciesAssets.map((dep) => (
-                            <li key={dep.assetId}>
-                                <span className="dep-icon">{dep.kind === "entity" ? "📦" : dep.kind === "form" ? "📝" : "🔸"}</span>
-                                <span>{dep.label}</span>
+                            <li key={dep.assetId} className={dep.notFound ? "missing-ref" : ""}>
+                                <span className="dep-icon">{getAssetIcon(dep.kind)}</span>
+                                {onAssetClick ? (
+                                    <button className="dep-link" onClick={() => handleDependencyClick(dep)}>
+                                        {dep.label}
+                                        {dep.notFound && " (Missing)"}
+                                    </button>
+                                ) : (
+                                    <span>
+                                        {dep.label}
+                                        {dep.notFound && " (Missing)"}
+                                    </span>
+                                )}
                                 <span className="dep-kind">({dep.kind})</span>
                             </li>
                         ))}
@@ -101,9 +148,19 @@ export function AssetDetails({ selectedAsset, allAssets }: AssetDetailsProps) {
                 ) : (
                     <ul className="dependency-list">
                         {dependentsAssets.map((dep) => (
-                            <li key={dep.assetId}>
-                                <span className="dep-icon">{dep.kind === "entity" ? "📦" : dep.kind === "form" ? "📝" : "🔸"}</span>
-                                <span>{dep.label}</span>
+                            <li key={dep.assetId} className={dep.notFound ? "missing-ref" : ""}>
+                                <span className="dep-icon">{getAssetIcon(dep.kind)}</span>
+                                {onAssetClick ? (
+                                    <button className="dep-link" onClick={() => handleDependencyClick(dep)}>
+                                        {dep.label}
+                                        {dep.notFound && " (Missing)"}
+                                    </button>
+                                ) : (
+                                    <span>
+                                        {dep.label}
+                                        {dep.notFound && " (Missing)"}
+                                    </span>
+                                )}
                                 <span className="dep-kind">({dep.kind})</span>
                             </li>
                         ))}

@@ -1075,3 +1075,69 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--scrollbar-thumb-hover);
 }
+
+/* Close button for details panel */
+.details-close-button {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+}
+
+.close-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: var(--surface-muted);
+    color: var(--text-muted);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.close-btn:hover {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+}
+
+/* Clickable dependency links */
+.dep-link,
+.loop-link {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: none;
+    padding: 0;
+    font: inherit;
+    text-align: left;
+    transition: color 0.2s;
+}
+
+.dep-link:hover,
+.loop-link:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+/* Missing reference highlighting */
+.dependency-list li.missing-ref {
+    background: var(--warning-bg);
+    border-left: 3px solid var(--warning-border);
+}
+
+.dependency-list li.missing-ref .dep-kind {
+    color: var(--warning-text);
+    font-weight: 600;
+}
+
+/* Hidden state for right column */
+.column-right.hidden {
+    transform: translateX(100%);
+    opacity: 0;
+    pointer-events: none;
+}

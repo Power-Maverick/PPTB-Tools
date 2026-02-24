@@ -492,20 +492,15 @@ export default function App() {
                         <>
                             <div className="view-tabs">
                                 <button className={`view-tab ${viewMode === "tree" ? "active" : ""}`} onClick={() => setViewMode("tree")}>
-                                    🌳 Tree View
+                                    🌳 List View
                                 </button>
-                                <button className={`view-tab ${viewMode === "graph" ? "active" : ""}`} onClick={() => setViewMode("graph")}>
-                                    📊 Graph View
-                                </button>
+                                {analysisResult.stats.loopCount > 0 && (
+                                    <button className={`view-tab ${viewMode === "graph" ? "active" : ""}`} onClick={() => setViewMode("graph")}>
+                                        🔄 Circular Dependencies Graph
+                                    </button>
+                                )}
                                 <button className={`view-tab ${viewMode === "summary" ? "active" : ""}`} onClick={() => setViewMode("summary")}>
                                     📋 Summary Report
-                                </button>
-                                <button
-                                    className={`view-tab ${selectedAsset && isDetailsVisible ? "active" : ""}`}
-                                    onClick={() => setIsDetailsVisible((visible) => !visible)}
-                                    disabled={!selectedAsset}
-                                >
-                                    {selectedAsset && isDetailsVisible ? "Hide Details" : "Show Details"}
                                 </button>
                             </div>
 
@@ -521,10 +516,14 @@ export default function App() {
                                     />
                                 )}
 
-                                {viewMode === "graph" && (
+                                {viewMode === "graph" && analysisResult.stats.loopCount > 0 && (
                                     <DependencyGraph
-                                        assets={analysisResult.assets}
-                                        links={analysisResult.links}
+                                        assets={analysisResult.assets.filter(a => a.hasLoop)}
+                                        links={analysisResult.links.filter(l => {
+                                            const source = analysisResult.assets.find(a => a.assetId === l.sourceId);
+                                            const target = analysisResult.assets.find(a => a.assetId === l.targetId);
+                                            return source?.hasLoop || target?.hasLoop;
+                                        })}
                                         onAssetClick={handleGraphAssetClick}
                                         selectedAssetId={selectedAsset?.assetId || null}
                                     />
@@ -543,8 +542,15 @@ export default function App() {
                 </div>
 
                 {/* Right Column - Details */}
-                <div className={`column-right ${selectedAsset && isDetailsVisible ? "visible" : ""}`}>
-                    {analysisResult && <AssetDetails selectedAsset={selectedAsset} allAssets={analysisResult.assets} />}
+                <div className={`column-right ${selectedAsset && isDetailsVisible ? "visible" : "hidden"}`}>
+                    {selectedAsset && isDetailsVisible && (
+                        <div className="details-close-button">
+                            <button onClick={() => setIsDetailsVisible(false)} className="close-btn" title="Close details">
+                                ✕
+                            </button>
+                        </div>
+                    )}
+                    {analysisResult && <AssetDetails selectedAsset={selectedAsset} allAssets={analysisResult.assets} onAssetClick={handleAssetClick} />}
                     {!analysisResult && (
                         <div className="no-selection">
                             <p>Component details will appear here after analysis</p>
