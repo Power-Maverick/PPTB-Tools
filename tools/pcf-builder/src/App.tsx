@@ -207,6 +207,12 @@ function App() {
         setPublisherMode("new");
         setSelectedPublisher(null);
         setManualPublisher(DEFAULT_MANUAL_PUBLISHER);
+        setSolutionConfig((prev) => ({
+            ...prev,
+            publisherName: "",
+            publisherPrefix: "",
+            publisherFriendlyName: "",
+        }));
     }, [projectPath]);
 
     useEffect(() => {
