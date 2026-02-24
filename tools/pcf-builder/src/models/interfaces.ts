@@ -32,7 +32,12 @@ export interface PublisherDetails {
     customizationOptionValuePrefix: number;
 }
 
-// PCF Control Property
+// Manual publisher input for "Enter manually" mode
+export interface ManualPublisherInput {
+    localizedName: string;
+    localizedDescription: string;
+    customizationOptionValuePrefix: string; // stored as string for controlled input handling
+}
 export interface PCFControlProperty {
     name: string;
     displayName: string;

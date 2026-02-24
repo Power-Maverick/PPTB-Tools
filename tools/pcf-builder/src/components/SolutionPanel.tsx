@@ -1,11 +1,21 @@
-import { PublisherDetails } from "../models/interfaces";
+import { ManualPublisherInput, PublisherDetails } from "../models/interfaces";
 import { PCFSolutionConfig } from "../models/interfaces";
 import styles from "./SolutionPanel.module.css";
 
 export type SolutionAction = "create" | "add-control" | "deploy" | "build-solution";
 
-export const PUBLISHER_NAME_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
-export const PUBLISHER_NAME_ERROR = "Publisher Name may only contain letters, digits, and underscores, and must start with a letter or underscore.";
+// Unique name: no spaces, must start AND end with a letter or underscore
+export const PUBLISHER_NAME_REGEX = /^[A-Za-z_]([A-Za-z0-9_]*[A-Za-z_])?$/;
+export const PUBLISHER_NAME_ERROR = "Publisher Name must start and end with a letter or underscore (single characters allowed), and may only contain letters, digits, and underscores.";
+
+// Prefix: 1–6 chars, cannot start with a digit
+export const PUBLISHER_PREFIX_REGEX = /^[A-Za-z_][A-Za-z0-9_]{0,5}$/;
+export const PUBLISHER_PREFIX_ERROR = "Prefix must be 1–6 characters and cannot start with a number.";
+
+// Option value prefix range
+export const OPTION_VALUE_PREFIX_MIN = 10000;
+export const OPTION_VALUE_PREFIX_MAX = 99999;
+export const OPTION_VALUE_PREFIX_ERROR = `Option Value Prefix must be a number between ${OPTION_VALUE_PREFIX_MIN.toLocaleString()} and ${OPTION_VALUE_PREFIX_MAX.toLocaleString()}.`;
 
 interface SolutionPanelProps {
     projectPath: string;
@@ -18,7 +28,9 @@ interface SolutionPanelProps {
     publishers: PublisherDetails[];
     publishersLoading: boolean;
     selectedPublisher: PublisherDetails | null;
+    manualPublisher: ManualPublisherInput;
     onSolutionChange: (update: Partial<PCFSolutionConfig>) => void;
+    onManualPublisherChange: (update: Partial<ManualPublisherInput>) => void;
     onAction: (action: SolutionAction) => void | Promise<void>;
     onPublisherModeChange: (mode: "select" | "new") => void;
     onPublisherSelect: (publisher: PublisherDetails | null) => void;
@@ -36,18 +48,36 @@ export function SolutionPanel({
     publishers,
     publishersLoading,
     selectedPublisher,
+    manualPublisher,
     onSolutionChange,
+    onManualPublisherChange,
     onAction,
     onPublisherModeChange,
     onPublisherSelect,
     onFetchPublishers,
 }: SolutionPanelProps) {
     const hasPath = Boolean(projectPath);
+
+    // Validation for "new" mode
     const publisherNameInvalid = publisherMode === "new" && Boolean(solutionConfig.publisherName) && !PUBLISHER_NAME_REGEX.test(solutionConfig.publisherName);
+    const publisherPrefixInvalid = publisherMode === "new" && Boolean(solutionConfig.publisherPrefix) && !PUBLISHER_PREFIX_REGEX.test(solutionConfig.publisherPrefix);
+    const optionValueNum = parseInt(manualPublisher.customizationOptionValuePrefix, 10);
+    const optionValuePrefixInvalid =
+        publisherMode === "new" &&
+        Boolean(manualPublisher.customizationOptionValuePrefix) &&
+        (isNaN(optionValueNum) || optionValueNum < OPTION_VALUE_PREFIX_MIN || optionValueNum > OPTION_VALUE_PREFIX_MAX);
+
     const canCreate =
         hasPath &&
         !solutionProjectCreated &&
-        (publisherMode === "select" ? Boolean(selectedPublisher) : Boolean(solutionConfig.publisherName) && !publisherNameInvalid && Boolean(solutionConfig.publisherPrefix));
+        (publisherMode === "select"
+            ? Boolean(selectedPublisher)
+            : Boolean(solutionConfig.publisherName) &&
+              !publisherNameInvalid &&
+              Boolean(solutionConfig.publisherPrefix) &&
+              !publisherPrefixInvalid &&
+              Boolean(manualPublisher.customizationOptionValuePrefix) &&
+              !optionValuePrefixInvalid);
     const canDeploy = hasPath && solutionConfig.solutionName;
     const canAddControl = hasPath && !isControlReferenced;
     const canBuildSolution = hasPath && solutionProjectCreated;
@@ -93,15 +123,9 @@ export function SolutionPanel({
                 <>
                     <div className={styles.grid}>
                         <div>
-                            <label htmlFor="publisherName">Publisher Name</label>
-                            <input id="publisherName" type="text" value={solutionConfig.publisherName} readOnly />
-                        </div>
-                        <div>
                             <label htmlFor="publisherPrefix">Publisher Prefix</label>
                             <input id="publisherPrefix" type="text" value={solutionConfig.publisherPrefix} readOnly />
                         </div>
-                    </div>
-                    <div className={styles.grid}>
                         <div>
                             <label htmlFor="solutionVersion">Version</label>
                             <input id="solutionVersion" type="text" value={solutionConfig.version} readOnly />
@@ -165,30 +189,69 @@ export function SolutionPanel({
                             )}
                         </div>
                     ) : (
-                        <div className={styles.grid}>
-                            <div>
-                                <label htmlFor="publisherName">Publisher Name *</label>
-                                <input
-                                    id="publisherName"
-                                    type="text"
-                                    value={solutionConfig.publisherName}
-                                    placeholder="contoso"
-                                    className={publisherNameInvalid ? styles.inputError : undefined}
-                                    onChange={(event) => onSolutionChange({ publisherName: event.target.value })}
-                                />
-                                {publisherNameInvalid && <p className={styles.fieldError}>{PUBLISHER_NAME_ERROR}</p>}
+                        <>
+                            <div className={styles.grid}>
+                                <div>
+                                    <label htmlFor="publisherName">Publisher Unique Name *</label>
+                                    <input
+                                        id="publisherName"
+                                        type="text"
+                                        value={solutionConfig.publisherName}
+                                        placeholder="contoso"
+                                        className={publisherNameInvalid ? styles.inputError : undefined}
+                                        onChange={(event) => onSolutionChange({ publisherName: event.target.value })}
+                                    />
+                                    {publisherNameInvalid && <p className={styles.fieldError}>{PUBLISHER_NAME_ERROR}</p>}
+                                </div>
+                                <div>
+                                    <label htmlFor="publisherPrefix">Customization Prefix *</label>
+                                    <input
+                                        id="publisherPrefix"
+                                        type="text"
+                                        value={solutionConfig.publisherPrefix}
+                                        placeholder="con"
+                                        className={publisherPrefixInvalid ? styles.inputError : undefined}
+                                        onChange={(event) => onSolutionChange({ publisherPrefix: event.target.value })}
+                                    />
+                                    {publisherPrefixInvalid && <p className={styles.fieldError}>{PUBLISHER_PREFIX_ERROR}</p>}
+                                </div>
+                            </div>
+                            <div className={styles.grid}>
+                                <div>
+                                    <label htmlFor="publisherLocalizedName">Localized Name</label>
+                                    <input
+                                        id="publisherLocalizedName"
+                                        type="text"
+                                        value={manualPublisher.localizedName}
+                                        placeholder="Contoso"
+                                        onChange={(event) => onManualPublisherChange({ localizedName: event.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="optionValuePrefix">Option Value Prefix *</label>
+                                    <input
+                                        id="optionValuePrefix"
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={manualPublisher.customizationOptionValuePrefix}
+                                        placeholder="10000"
+                                        className={optionValuePrefixInvalid ? styles.inputError : undefined}
+                                        onChange={(event) => onManualPublisherChange({ customizationOptionValuePrefix: event.target.value })}
+                                    />
+                                    {optionValuePrefixInvalid && <p className={styles.fieldError}>{OPTION_VALUE_PREFIX_ERROR}</p>}
+                                </div>
                             </div>
                             <div>
-                                <label htmlFor="publisherPrefix">Publisher Prefix *</label>
+                                <label htmlFor="publisherLocalizedDesc">Localized Description</label>
                                 <input
-                                    id="publisherPrefix"
+                                    id="publisherLocalizedDesc"
                                     type="text"
-                                    value={solutionConfig.publisherPrefix}
-                                    placeholder="con"
-                                    onChange={(event) => onSolutionChange({ publisherPrefix: event.target.value })}
+                                    value={manualPublisher.localizedDescription}
+                                    placeholder="Publisher description"
+                                    onChange={(event) => onManualPublisherChange({ localizedDescription: event.target.value })}
                                 />
                             </div>
-                        </div>
+                        </>
                     )}
 
                     <div className={styles.grid}>

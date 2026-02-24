@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import { CommandOutput } from "./components/CommandOutput";
 import { ControlAction, ControlPanel } from "./components/ControlPanel";
 import { InputModal } from "./components/InputModal";
-import { SolutionAction, SolutionPanel, PUBLISHER_NAME_REGEX, PUBLISHER_NAME_ERROR } from "./components/SolutionPanel";
+import { SolutionAction, SolutionPanel, PUBLISHER_NAME_REGEX, PUBLISHER_NAME_ERROR, PUBLISHER_PREFIX_REGEX, PUBLISHER_PREFIX_ERROR, OPTION_VALUE_PREFIX_MIN, OPTION_VALUE_PREFIX_MAX, OPTION_VALUE_PREFIX_ERROR } from "./components/SolutionPanel";
 import { TabDefinition, TabSwitcher } from "./components/TabSwitcher";
-import { PCFControlConfig, PCFSolutionConfig, PublisherDetails } from "./models/interfaces";
+import { PCFControlConfig, PCFSolutionConfig, PublisherDetails, ManualPublisherInput } from "./models/interfaces";
 import "./styles.css";
 import type { FileSystemAPI } from "./utils/hydration";
 import {
@@ -87,6 +87,12 @@ const DEFAULT_SOLUTION_CONFIG: PCFSolutionConfig = {
     version: "1.0.0",
 };
 
+const DEFAULT_MANUAL_PUBLISHER: ManualPublisherInput = {
+    localizedName: "",
+    localizedDescription: "",
+    customizationOptionValuePrefix: "",
+};
+
 const delay = (ms: number) =>
     new Promise<void>((resolve) => {
         window.setTimeout(resolve, ms);
@@ -154,6 +160,7 @@ function App() {
     const [publishers, setPublishers] = useState<PublisherDetails[]>([]);
     const [publishersLoading, setPublishersLoading] = useState(false);
     const [selectedPublisher, setSelectedPublisher] = useState<PublisherDetails | null>(null);
+    const [manualPublisher, setManualPublisher] = useState<ManualPublisherInput>(DEFAULT_MANUAL_PUBLISHER);
 
     const terminalIdRef = useRef<string | null>(null);
     const lastHydratedPathRef = useRef<string>("");
@@ -189,6 +196,7 @@ function App() {
         setManifestPaths((prev) => (prev.length > 0 ? [] : prev));
         setPublisherMode("new");
         setSelectedPublisher(null);
+        setManualPublisher(DEFAULT_MANUAL_PUBLISHER);
     }, [projectPath]);
 
     useEffect(() => {
@@ -713,6 +721,10 @@ function App() {
         }
     }, []);
 
+    const handleManualPublisherChange = useCallback((update: Partial<ManualPublisherInput>) => {
+        setManualPublisher((prev) => ({ ...prev, ...update }));
+    }, []);
+
     const updateSolutionXmlWithPublisher = useCallback(async (solutionFolderPath: string, publisher: PublisherDetails) => {
         const fsApi = getFileSystem();
         if (!fsApi || typeof fsApi.readText !== "function" || typeof fsApi.writeText !== "function") {
@@ -986,13 +998,32 @@ function App() {
                     return;
                 }
 
-                if (!PUBLISHER_NAME_REGEX.test(solutionConfig.publisherName) && publisherMode === "new") {
-                    await window.toolboxAPI?.utils.showNotification({
-                        title: "Invalid publisher name",
-                        body: PUBLISHER_NAME_ERROR,
-                        type: "error",
-                    });
-                    return;
+                if (publisherMode === "new") {
+                    if (!PUBLISHER_NAME_REGEX.test(solutionConfig.publisherName)) {
+                        await window.toolboxAPI?.utils.showNotification({
+                            title: "Invalid publisher name",
+                            body: PUBLISHER_NAME_ERROR,
+                            type: "error",
+                        });
+                        return;
+                    }
+                    if (!PUBLISHER_PREFIX_REGEX.test(solutionConfig.publisherPrefix)) {
+                        await window.toolboxAPI?.utils.showNotification({
+                            title: "Invalid customization prefix",
+                            body: PUBLISHER_PREFIX_ERROR,
+                            type: "error",
+                        });
+                        return;
+                    }
+                    const optVal = parseInt(manualPublisher.customizationOptionValuePrefix, 10);
+                    if (isNaN(optVal) || optVal < OPTION_VALUE_PREFIX_MIN || optVal > OPTION_VALUE_PREFIX_MAX) {
+                        await window.toolboxAPI?.utils.showNotification({
+                            title: "Invalid option value prefix",
+                            body: OPTION_VALUE_PREFIX_ERROR,
+                            type: "error",
+                        });
+                        return;
+                    }
                 }
 
                 const controlName = controlConfig.name?.trim();
@@ -1047,6 +1078,18 @@ function App() {
                     setSolutionConfig((prev) => ({ ...prev, solutionName: detectedSolutionName }));
                     if (publisherMode === "select" && selectedPublisher) {
                         await updateSolutionXmlWithPublisher(solutionFolderPath, selectedPublisher);
+                    } else if (publisherMode === "new") {
+                        const manualPublisherDetails: PublisherDetails = {
+                            publisherId: "",
+                            uniqueName: solutionConfig.publisherName,
+                            localizedName: manualPublisher.localizedName,
+                            localizedDescription: manualPublisher.localizedDescription,
+                            email: "",
+                            supportingWebsiteUrl: "",
+                            customizationPrefix: solutionConfig.publisherPrefix,
+                            customizationOptionValuePrefix: parseInt(manualPublisher.customizationOptionValuePrefix, 10),
+                        };
+                        await updateSolutionXmlWithPublisher(solutionFolderPath, manualPublisherDetails);
                     }
                     await hydrateProjectFromFolder(projectPath, { silent: true }).catch((err) => {
                         console.error("[PCF Builder] Post-solution hydration failed", err);
@@ -1372,7 +1415,9 @@ function App() {
                                 publishers={publishers}
                                 publishersLoading={publishersLoading}
                                 selectedPublisher={selectedPublisher}
+                                manualPublisher={manualPublisher}
                                 onSolutionChange={(update) => setSolutionConfig((prev) => ({ ...prev, ...update }))}
+                                onManualPublisherChange={handleManualPublisherChange}
                                 onAction={handleSolutionAction}
                                 onPublisherModeChange={handlePublisherModeChange}
                                 onPublisherSelect={handlePublisherSelect}
