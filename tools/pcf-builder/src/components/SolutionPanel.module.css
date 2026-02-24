@@ -99,3 +99,51 @@
     color: var(--color-error, #dc2626);
     margin-top: 4px;
 }
+
+.publisherModeToggle {
+    display: flex;
+    gap: 0;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    width: fit-content;
+}
+
+.modeBtn {
+    padding: 6px 14px;
+    font-size: 0.82rem;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--color-muted);
+    transition: background 0.15s, color 0.15s;
+}
+
+.modeBtn:hover {
+    background: rgba(15, 23, 42, 0.05);
+    color: var(--color-text);
+}
+
+.modeBtnActive {
+    background: var(--color-primary, #2563eb);
+    color: #fff;
+}
+
+.modeBtnActive:hover {
+    background: var(--color-primary, #2563eb);
+    color: #fff;
+}
+
+.publisherSelectRow {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.publisherSelectField {
+    flex: 1;
+}
+
+.publisherSelectField select {
+    width: 100%;
+}

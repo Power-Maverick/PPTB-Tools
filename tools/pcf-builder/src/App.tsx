@@ -4,7 +4,7 @@ import { ControlAction, ControlPanel } from "./components/ControlPanel";
 import { InputModal } from "./components/InputModal";
 import { SolutionAction, SolutionPanel, PUBLISHER_NAME_REGEX, PUBLISHER_NAME_ERROR } from "./components/SolutionPanel";
 import { TabDefinition, TabSwitcher } from "./components/TabSwitcher";
-import { PCFControlConfig, PCFSolutionConfig } from "./models/interfaces";
+import { PCFControlConfig, PCFSolutionConfig, PublisherDetails } from "./models/interfaces";
 import "./styles.css";
 import type { FileSystemAPI } from "./utils/hydration";
 import {
@@ -150,6 +150,10 @@ function App() {
     const [hasExistingProject, setHasExistingProject] = useState(false);
     const [isTestRunning, setIsTestRunning] = useState(false);
     const [promptState, setPromptState] = useState<PromptState | null>(null);
+    const [publisherMode, setPublisherMode] = useState<"select" | "new">("new");
+    const [publishers, setPublishers] = useState<PublisherDetails[]>([]);
+    const [publishersLoading, setPublishersLoading] = useState(false);
+    const [selectedPublisher, setSelectedPublisher] = useState<PublisherDetails | null>(null);
 
     const terminalIdRef = useRef<string | null>(null);
     const lastHydratedPathRef = useRef<string>("");
@@ -183,6 +187,8 @@ function App() {
 
     useEffect(() => {
         setManifestPaths((prev) => (prev.length > 0 ? [] : prev));
+        setPublisherMode("new");
+        setSelectedPublisher(null);
     }, [projectPath]);
 
     useEffect(() => {
@@ -646,6 +652,123 @@ function App() {
         return () => window.clearTimeout(timeoutId);
     }, [projectPath, hydrateProjectFromFolder]);
 
+    const fetchPublishers = useCallback(async () => {
+        const dataverseApi = window.dataverseAPI;
+        if (!dataverseApi || typeof dataverseApi.queryData !== "function") {
+            await window.toolboxAPI?.utils.showNotification({
+                title: "No environment connection",
+                body: "Connect to an environment in PPTB to browse available publishers.",
+                type: "warning",
+            });
+            return;
+        }
+
+        setPublishersLoading(true);
+        try {
+            const entitySetName = await dataverseApi.getEntitySetName("publisher");
+            const result = await dataverseApi.queryData(
+                `${entitySetName}?$select=publisherid,uniquename,friendlyname,description,customizationprefix,customizationoptionvalueprefix,emailaddress,supportingwebsiteurl&$filter=isreadonly eq false&$orderby=friendlyname asc`,
+            );
+            const list: PublisherDetails[] = (result.value ?? []).map((r) => ({
+                publisherId: String(r.publisherid ?? ""),
+                uniqueName: String(r.uniquename ?? ""),
+                localizedName: String(r.friendlyname ?? ""),
+                localizedDescription: String(r.description ?? ""),
+                email: String(r.emailaddress ?? ""),
+                supportingWebsiteUrl: String(r.supportingwebsiteurl ?? ""),
+                customizationPrefix: String(r.customizationprefix ?? ""),
+                customizationOptionValuePrefix: Number(r.customizationoptionvalueprefix ?? 0),
+            }));
+            setPublishers(list);
+        } catch (err) {
+            await window.toolboxAPI?.utils.showNotification({
+                title: "Unable to load publishers",
+                body: err instanceof Error ? err.message : "Failed to retrieve publishers from the connected environment.",
+                type: "error",
+            });
+        } finally {
+            setPublishersLoading(false);
+        }
+    }, []);
+
+    const handlePublisherModeChange = useCallback(
+        (mode: "select" | "new") => {
+            setPublisherMode(mode);
+            if (mode === "select" && publishers.length === 0 && !publishersLoading) {
+                fetchPublishers();
+            }
+        },
+        [publishers.length, publishersLoading, fetchPublishers],
+    );
+
+    const handlePublisherSelect = useCallback((publisher: PublisherDetails | null) => {
+        setSelectedPublisher(publisher);
+        if (publisher) {
+            setSolutionConfig((prev) => ({
+                ...prev,
+                publisherName: publisher.uniqueName,
+                publisherPrefix: publisher.customizationPrefix,
+                publisherFriendlyName: publisher.localizedName,
+            }));
+        }
+    }, []);
+
+    const updateSolutionXmlWithPublisher = useCallback(async (solutionFolderPath: string, publisher: PublisherDetails) => {
+        const fsApi = getFileSystem();
+        if (!fsApi || typeof fsApi.readText !== "function" || typeof fsApi.writeText !== "function") {
+            return;
+        }
+
+        const xmlPath = joinFsPath(solutionFolderPath, "src/Other/Solution.xml");
+        let content: string;
+        try {
+            content = await fsApi.readText(xmlPath);
+        } catch {
+            return;
+        }
+
+        const escXml = (str: string) =>
+            str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+        const publisherStart = content.indexOf("<Publisher>");
+        const publisherEnd = content.indexOf("</Publisher>") + "</Publisher>".length;
+        if (publisherStart === -1 || publisherEnd <= publisherStart) {
+            return;
+        }
+
+        // Detect indentation used before the <Publisher> tag
+        const lineStart = content.lastIndexOf("\n", publisherStart);
+        const pubIndent = lineStart === -1 ? "" : content.slice(lineStart + 1, publisherStart);
+        const ci = pubIndent + "  "; // child indent
+        const gi = pubIndent + "    "; // grandchild indent
+
+        const newPublisher =
+            `<Publisher>\n` +
+            `${ci}<UniqueName>${escXml(publisher.uniqueName)}</UniqueName>\n` +
+            `${ci}<LocalizedNames>\n` +
+            `${gi}<LocalizedName description="${escXml(publisher.localizedName)}" languagecode="1033" />\n` +
+            `${ci}</LocalizedNames>\n` +
+            `${ci}<Descriptions>\n` +
+            `${gi}<Description description="${escXml(publisher.localizedDescription)}" languagecode="1033" />\n` +
+            `${ci}</Descriptions>\n` +
+            `${ci}<EMailAddress>${escXml(publisher.email)}</EMailAddress>\n` +
+            `${ci}<SupportingWebsiteUrl>${escXml(publisher.supportingWebsiteUrl)}</SupportingWebsiteUrl>\n` +
+            `${ci}<CustomizationPrefix>${escXml(publisher.customizationPrefix)}</CustomizationPrefix>\n` +
+            `${ci}<CustomizationOptionValuePrefix>${publisher.customizationOptionValuePrefix}</CustomizationOptionValuePrefix>\n` +
+            `${pubIndent}</Publisher>`;
+
+        const updatedContent = content.slice(0, publisherStart) + newPublisher + content.slice(publisherEnd);
+        try {
+            await fsApi.writeText(xmlPath, updatedContent);
+        } catch (err) {
+            await window.toolboxAPI?.utils.showNotification({
+                title: "Unable to update Solution.xml",
+                body: err instanceof Error ? err.message : "Failed to write publisher data to Solution.xml.",
+                type: "warning",
+            });
+        }
+    }, []);
+
     const handleSelectFolder = async () => {
         if (!window.toolboxAPI) {
             return;
@@ -863,7 +986,7 @@ function App() {
                     return;
                 }
 
-                if (!PUBLISHER_NAME_REGEX.test(solutionConfig.publisherName)) {
+                if (!PUBLISHER_NAME_REGEX.test(solutionConfig.publisherName) && publisherMode === "new") {
                     await window.toolboxAPI?.utils.showNotification({
                         title: "Invalid publisher name",
                         body: PUBLISHER_NAME_ERROR,
@@ -922,6 +1045,9 @@ function App() {
                         setSolutionProjectCreated(true);
                     }
                     setSolutionConfig((prev) => ({ ...prev, solutionName: detectedSolutionName }));
+                    if (publisherMode === "select" && selectedPublisher) {
+                        await updateSolutionXmlWithPublisher(solutionFolderPath, selectedPublisher);
+                    }
                     await hydrateProjectFromFolder(projectPath, { silent: true }).catch((err) => {
                         console.error("[PCF Builder] Post-solution hydration failed", err);
                     });
@@ -1242,8 +1368,15 @@ function App() {
                                 fieldsLocked={solutionFieldsLocked}
                                 isControlReferenced={isControlInSolution}
                                 solutionProjectCreated={solutionProjectCreated}
+                                publisherMode={publisherMode}
+                                publishers={publishers}
+                                publishersLoading={publishersLoading}
+                                selectedPublisher={selectedPublisher}
                                 onSolutionChange={(update) => setSolutionConfig((prev) => ({ ...prev, ...update }))}
                                 onAction={handleSolutionAction}
+                                onPublisherModeChange={handlePublisherModeChange}
+                                onPublisherSelect={handlePublisherSelect}
+                                onFetchPublishers={fetchPublishers}
                             />
                         </div>
                     </div>
