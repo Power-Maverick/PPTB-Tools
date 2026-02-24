@@ -20,7 +20,24 @@ export interface PCFSolutionConfig {
     version: string;
 }
 
-// PCF Control Property
+// Publisher details fetched from a Dataverse environment
+export interface PublisherDetails {
+    publisherId: string;
+    uniqueName: string;
+    localizedName: string;
+    localizedDescription: string;
+    email: string;
+    supportingWebsiteUrl: string;
+    customizationPrefix: string;
+    customizationOptionValuePrefix: number;
+}
+
+// Manual publisher input for "Enter manually" mode
+export interface ManualPublisherInput {
+    localizedName: string;
+    localizedDescription: string;
+    customizationOptionValuePrefix: string; // stored as string for controlled input handling
+}
 export interface PCFControlProperty {
     name: string;
     displayName: string;

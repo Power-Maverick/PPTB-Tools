@@ -10,10 +10,30 @@
     --text-color: #323130;
     --text-secondary: #605e5c;
     --text-muted: #8a8886;
+    --background-muted: #f3f2f1;
     --error-bg: #fde7e9;
     --error-border: #f1aeb5;
     --shadow-sm: 0 1.6px 3.6px rgba(0, 0, 0, 0.132), 0 0.3px 0.9px rgba(0, 0, 0, 0.108);
     --shadow-md: 0 3.2px 7.2px rgba(0, 0, 0, 0.132), 0 0.6px 1.8px rgba(0, 0, 0, 0.108);
+}
+
+body.dark-theme {
+    --primary-color: #4a9eff;
+    --primary-hover: #6cb0ff;
+    --success-color: #54b054;
+    --danger-color: #f48771;
+    --warning-color: #ffd666;
+    --background: #1e1e1e;
+    --surface: #2d2d2d;
+    --border-color: #3f3f3f;
+    --text-color: #e0e0e0;
+    --text-secondary: #b0b0b0;
+    --text-muted: #8a8886;
+    --background-muted: #2d2d2d;
+    --error-bg: #4a2c2e;
+    --error-border: #6d3a3e;
+    --shadow-sm: 0 1.6px 3.6px rgba(0, 0, 0, 0.4), 0 0.3px 0.9px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 3.2px 7.2px rgba(0, 0, 0, 0.4), 0 0.6px 1.8px rgba(0, 0, 0, 0.3);
 }
 
 * {
@@ -164,8 +184,9 @@ body {
 }
 
 .log-item.selected {
-    background-color: #e3f2fd;
-    border-left: 3px solid var(--primary-color);
+    background-color: var(--background-muted);
+    color: var(--background);
+    border-left: 3px solid var(--primary-hover);
     padding-left: 9px;
 }
 
@@ -714,10 +735,15 @@ body {
 }
 
 @keyframes fadeInOut {
-    0%, 100% { opacity: 0; }
-    10%, 90% { opacity: 1; }
+    0%,
+    100% {
+        opacity: 0;
+    }
+    10%,
+    90% {
+        opacity: 1;
+    }
 }
-
 
 /* Common Form Styles */
 .form-group {

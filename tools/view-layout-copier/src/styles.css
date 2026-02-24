@@ -1,6 +1,8 @@
 :root {
     --primary-color: #0078d4;
     --primary-hover: #106ebe;
+    --secondary-color: #6c757d;
+    --secondary-hover: #5a6268;
     --success-color: #107c10;
     --danger-color: #d13438;
     --warning-color: #ffc83d;
@@ -11,6 +13,23 @@
     --text-secondary: #605e5c;
     --shadow-sm: 0 1.6px 3.6px rgba(0, 0, 0, 0.132), 0 0.3px 0.9px rgba(0, 0, 0, 0.108);
     --shadow-md: 0 3.2px 7.2px rgba(0, 0, 0, 0.132), 0 0.6px 1.8px rgba(0, 0, 0, 0.108);
+}
+
+body.dark-theme {
+    --primary-color: #4a9eff;
+    --primary-hover: #6cb0ff;
+    --secondary-color: #6c757d;
+    --secondary-hover: #5a6268;
+    --success-color: #54b054;
+    --danger-color: #f48771;
+    --warning-color: #ffd666;
+    --background: #1e1e1e;
+    --surface: #2d2d2d;
+    --border-color: #3f3f3f;
+    --text-color: #e0e0e0;
+    --text-secondary: #b0b0b0;
+    --shadow-sm: 0 1.6px 3.6px rgba(0, 0, 0, 0.4), 0 0.3px 0.9px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 3.2px 7.2px rgba(0, 0, 0, 0.4), 0 0.6px 1.8px rgba(0, 0, 0, 0.3);
 }
 
 * {
@@ -78,6 +97,7 @@ body {
     border-radius: 2px;
     font-size: 14px;
     background-color: var(--background);
+    color: var(--text-color);
     transition: border-color 0.15s;
 }
 
@@ -215,13 +235,15 @@ body {
 }
 
 .view-item.selected {
-    background-color: #e3f2fd;
-    border-left: 3px solid var(--primary-color);
+    background-color: var(--primary-color);
+    color: var(--background);
+    border-left: 3px solid var(--primary-hover);
 }
 
 .view-item.source {
-    background-color: #fff9e6;
-    border-left: 3px solid var(--warning-color);
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    border-left: 3px solid var(--success-color);
 }
 
 .view-item input[type="checkbox"],
