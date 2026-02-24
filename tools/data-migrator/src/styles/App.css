@@ -272,7 +272,6 @@ body {
 .step-card {
     background: var(--card-bg);
     border-radius: 12px;
-    overflow: hidden;
     box-shadow: var(--shadow-sm);
     transition: all 0.3s ease;
 }
@@ -283,6 +282,7 @@ body {
 
 .step-card.collapsed {
     box-shadow: var(--shadow-sm);
+    overflow: hidden;
 }
 
 .step-card.collapsed .step-content {
