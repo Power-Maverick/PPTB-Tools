@@ -427,6 +427,102 @@ select.modern-input:focus {
     margin: 6px 0 0 0;
 }
 
+/* Entity Combobox */
+.entity-combobox {
+    position: relative;
+}
+
+.entity-combobox-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.entity-combobox-input {
+    padding-right: 36px !important;
+    cursor: text;
+}
+
+.entity-combobox-arrow {
+    position: absolute;
+    right: 12px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    pointer-events: all;
+}
+
+.entity-combobox-clear {
+    position: absolute;
+    right: 36px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 6px;
+    line-height: 1;
+}
+
+.entity-combobox-clear:hover {
+    color: var(--error-color);
+}
+
+.entity-combobox-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 240px;
+    overflow-y: auto;
+    background: var(--card-bg);
+    border: 2px solid var(--primary-color);
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+}
+
+.entity-combobox-option {
+    padding: 8px 14px;
+    cursor: pointer;
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+}
+
+.entity-combobox-option:hover,
+.entity-combobox-option.selected {
+    background: var(--primary-light);
+}
+
+.entity-combobox-option.selected {
+    font-weight: 600;
+}
+
+.entity-option-display {
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.entity-option-logical {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.entity-combobox-empty {
+    padding: 12px 14px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 13px;
+    list-style: none;
+}
+
 /* Filter Type Selector */
 .filter-type-selector {
     display: flex;

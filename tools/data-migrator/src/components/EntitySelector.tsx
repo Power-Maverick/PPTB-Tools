@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DataverseEntity } from "../models/interfaces";
 
 interface EntitySelectorProps {
@@ -15,6 +15,12 @@ export function EntitySelector({
   loading,
 }: EntitySelectorProps) {
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const displayValue = selectedEntity
+    ? `${selectedEntity.displayName} (${selectedEntity.logicalName})`
+    : "";
 
   const filteredEntities = entities.filter((entity) => {
     if (!searchTerm) return true;
@@ -25,47 +31,80 @@ export function EntitySelector({
     );
   });
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setIsOpen(true);
+  };
+
+  const handleSelect = (entity: DataverseEntity) => {
+    onEntitySelect(entity);
+    setSearchTerm("");
+    setIsOpen(false);
+  };
+
+  const handleInputFocus = () => {
+    setIsOpen(true);
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearchTerm("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
     <div className="form-group">
-      <label htmlFor="entity-select">Select Entity</label>
+      <label htmlFor="entity-combobox">Select Entity</label>
       {loading ? (
         <div style={{ padding: "8px" }}>Loading entities...</div>
       ) : (
-        <>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search tables by name..."
-            className="modern-input"
-            style={{ marginBottom: "8px" }}
-          />
-          <select
-            id="entity-select"
-            className="modern-input"
-            value={selectedEntity?.logicalName || ""}
-            onChange={(e) => {
-              const entity = entities.find(
-                (ent) => ent.logicalName === e.target.value
-              );
-              if (entity) {
-                onEntitySelect(entity);
-              }
-            }}
-          >
-            <option value="">-- Select an entity --</option>
-            {filteredEntities.map((entity) => (
-              <option key={entity.logicalName} value={entity.logicalName}>
-                {entity.displayName} ({entity.logicalName})
-              </option>
-            ))}
-          </select>
-          {searchTerm && filteredEntities.length === 0 && (
-            <p style={{ textAlign: "center", padding: "8px", color: "#605e5c", fontSize: "13px" }}>
-              No tables match your search
-            </p>
+        <div ref={containerRef} className="entity-combobox">
+          <div className="entity-combobox-input-wrapper">
+            <input
+              id="entity-combobox"
+              type="text"
+              role="combobox"
+              aria-expanded={isOpen}
+              aria-controls="entity-combobox-listbox"
+              aria-autocomplete="list"
+              className="modern-input entity-combobox-input"
+              value={isOpen ? searchTerm : displayValue}
+              onChange={handleInputChange}
+              onFocus={handleInputFocus}
+              placeholder="Search or select a table..."
+              autoComplete="off"
+            />
+            <span className="entity-combobox-arrow" onClick={() => setIsOpen((o) => !o)}>
+              {isOpen ? "▲" : "▼"}
+            </span>
+          </div>
+          {isOpen && (
+            <ul id="entity-combobox-listbox" className="entity-combobox-dropdown" role="listbox">
+              {filteredEntities.length > 0 ? (
+                filteredEntities.map((entity) => (
+                  <li
+                    key={entity.logicalName}
+                    role="option"
+                    aria-selected={selectedEntity?.logicalName === entity.logicalName}
+                    className={`entity-combobox-option${selectedEntity?.logicalName === entity.logicalName ? " selected" : ""}`}
+                    onMouseDown={() => handleSelect(entity)}
+                  >
+                    <span className="entity-option-display">{entity.displayName}</span>
+                    <span className="entity-option-logical">({entity.logicalName})</span>
+                  </li>
+                ))
+              ) : (
+                <li className="entity-combobox-empty">No tables match your search</li>
+              )}
+            </ul>
           )}
-        </>
+        </div>
       )}
     </div>
   );
