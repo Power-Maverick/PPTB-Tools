@@ -15,7 +15,7 @@ declare global {
         // Mermaid library (loaded externally for visualization)
         mermaid?: {
             initialize: (config: any) => void;
-            init: (config: any, element: HTMLElement | null) => void;
+            init: (config: any, element: HTMLElement | null) => Promise<void>;
         };
     }
 }
@@ -275,11 +275,14 @@ function App() {
                             (async () => {
                                 if (!el) return;
                                 try {
+                                    // Remove stale processed flag so mermaid always re-renders
+                                    // when the same DOM element is reused across format switches
+                                    el.removeAttribute('data-processed');
                                     // Set the diagram source as text content for Mermaid to parse
                                     el.textContent = currentDiagram;
                                     await ensureMermaid();
                                     if (window.mermaid) {
-                                        window.mermaid.init(undefined, el);
+                                        await window.mermaid.init(undefined, el);
                                     }
                                 } catch (error) {
                                     console.error('Mermaid rendering error:', error);
