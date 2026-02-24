@@ -2,7 +2,17 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import { CommandOutput } from "./components/CommandOutput";
 import { ControlAction, ControlPanel } from "./components/ControlPanel";
 import { InputModal } from "./components/InputModal";
-import { SolutionAction, SolutionPanel, PUBLISHER_NAME_REGEX, PUBLISHER_NAME_ERROR, PUBLISHER_PREFIX_REGEX, PUBLISHER_PREFIX_ERROR, OPTION_VALUE_PREFIX_MIN, OPTION_VALUE_PREFIX_MAX, OPTION_VALUE_PREFIX_ERROR } from "./components/SolutionPanel";
+import {
+    SolutionAction,
+    SolutionPanel,
+    PUBLISHER_NAME_REGEX,
+    PUBLISHER_NAME_ERROR,
+    PUBLISHER_PREFIX_REGEX,
+    PUBLISHER_PREFIX_ERROR,
+    OPTION_VALUE_PREFIX_MIN,
+    OPTION_VALUE_PREFIX_MAX,
+    OPTION_VALUE_PREFIX_ERROR,
+} from "./components/SolutionPanel";
 import { TabDefinition, TabSwitcher } from "./components/TabSwitcher";
 import { PCFControlConfig, PCFSolutionConfig, PublisherDetails, ManualPublisherInput } from "./models/interfaces";
 import "./styles.css";
