@@ -21,7 +21,8 @@
     "typecheck": "tsc --noEmit",
     "dev": "vite",
     "preview": "vite preview",
-    "finalize-package": "npm shrinkwrap"
+    "finalize-package": "npm shrinkwrap",
+    "publish-package": "npm publish --access public"
   },
   "files": [
     "dist",
