@@ -1,7 +1,7 @@
 {
   "name": "@power-maverick/tool-pcf-builder",
   "displayName": "PCF Builder",
-  "version": "0.0.3",
+  "version": "1.0.0",
   "description": "Build, manage and deploy Power Apps Component Framework (PCF) controls",
   "contributors": [
     {
@@ -22,7 +22,8 @@
     "preview": "vite preview",
     "finalize-package": "npm shrinkwrap",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "publish-package": "npm publish --access public"
   },
   "files": [
     "dist",
