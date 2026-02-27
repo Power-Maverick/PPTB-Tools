@@ -163,6 +163,23 @@ export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, ki
             {Object.entries(grouped).map(([kind, kindAssets]) => {
                 if (kindAssets.length === 0) return null;
                 const kindAsType = kind as AssetKind;
+                
+                // For "other" (unknown) components, show a message instead of listing them
+                if (kind === "other") {
+                    return (
+                        <div key={kind} className="kind-group">
+                            <div className="kind-header">
+                                <span>{ASSET_ICONS[kindAsType]}</span>
+                                <span>{getPluralLabel(kind)}</span>
+                                <span className="count-badge">({kindAssets.length})</span>
+                            </div>
+                            <div className="unknown-components-message">
+                                <p>Additional component type checks will be added in future updates.</p>
+                            </div>
+                        </div>
+                    );
+                }
+                
                 return (
                     <div key={kind} className="kind-group">
                         <div className="kind-header">

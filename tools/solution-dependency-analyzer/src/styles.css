@@ -1141,3 +1141,19 @@ body {
     opacity: 0;
     pointer-events: none;
 }
+
+/* Unknown components message */
+.unknown-components-message {
+    padding: 16px;
+    margin: 8px 0;
+    background: var(--info-bg);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+}
+
+.unknown-components-message p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-style: italic;
+}
