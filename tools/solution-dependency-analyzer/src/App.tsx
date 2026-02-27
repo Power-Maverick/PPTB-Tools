@@ -13,26 +13,27 @@ type ViewMode = "tree" | "graph" | "summary";
 
 /**
  * Comprehensive component type mapping based on Microsoft Learn documentation
+ * Reference: https://learn.microsoft.com/en-us/power-apps/developer/data-platform/reference/entities/solutioncomponent#componenttype-choicesoptions
  * Maps component type codes to their asset kind and display label
- * See ComponentTypeCode constants below for named references to these type codes
  */
 const COMPONENT_TYPE_MAP: Record<number, { kind: AssetKind; label: string }> = {
     1: { kind: "entity", label: "Entity" },
     2: { kind: "attribute", label: "Attribute" },
     3: { kind: "relationship", label: "Relationship" },
     9: { kind: "optionset", label: "Option Set" },
-    20: { kind: "role", label: "Security Role" },
+    20: { kind: "role", label: "Role" },
     24: { kind: "form", label: "Form" },
-    26: { kind: "view", label: "Saved Query/View" },
-    27: { kind: "workflow", label: "Workflow" },
-    29: { kind: "report", label: "Report" },
-    35: { kind: "emailtemplate", label: "Email Template" },
-    60: { kind: "webresource", label: "Web Resource" },
-    61: { kind: "sitemap", label: "Site Map" },
-    71: { kind: "plugin", label: "Plugin Type" },
-    80: { kind: "app", label: "Model-driven App" },
-    82: { kind: "connector", label: "Connector" },
-    95: { kind: "canvasapp", label: "Canvas App" },
+    26: { kind: "view", label: "Saved Query" },
+    29: { kind: "workflow", label: "Workflow" },
+    31: { kind: "report", label: "Report" },
+    36: { kind: "emailtemplate", label: "Email Template" },
+    60: { kind: "form", label: "System Form" },
+    61: { kind: "webresource", label: "Web Resource" },
+    62: { kind: "sitemap", label: "Site Map" },
+    90: { kind: "plugin", label: "Plugin Type" },
+    300: { kind: "canvasapp", label: "Canvas App" },
+    371: { kind: "connector", label: "Connector" },
+    372: { kind: "connector", label: "Connector" },
 };
 
 /**
@@ -45,18 +46,18 @@ const ComponentTypeCode = {
     ATTRIBUTE: 2,
     RELATIONSHIP: 3,
     OPTION_SET: 9,
-    SECURITY_ROLE: 20,
+    ROLE: 20,
     FORM: 24,
-    VIEW: 26,
-    WORKFLOW: 27,
-    REPORT: 29,
-    EMAIL_TEMPLATE: 35,
-    WEB_RESOURCE: 60,
-    SITE_MAP: 61,
-    PLUGIN_TYPE: 71,
-    MODEL_DRIVEN_APP: 80,
-    CONNECTOR: 82,
-    CANVAS_APP: 95,
+    SAVED_QUERY: 26,
+    WORKFLOW: 29,
+    REPORT: 31,
+    EMAIL_TEMPLATE: 36,
+    SYSTEM_FORM: 60,
+    WEB_RESOURCE: 61,
+    SITE_MAP: 62,
+    PLUGIN_TYPE: 90,
+    CANVAS_APP: 300,
+    CONNECTOR: 371,
 } as const;
 
 function getComponentTypeInfo(typeCode: number): { kind: AssetKind; label: string } {
@@ -204,6 +205,7 @@ export default function App() {
                             continue;
 
                         case ComponentTypeCode.FORM:
+                        case ComponentTypeCode.SYSTEM_FORM:
                             metadata = await connector.fetchFormMetadata(componentId);
                             if (metadata) {
                                 assetName = metadata.name;
@@ -216,7 +218,7 @@ export default function App() {
                             }
                             break;
 
-                        case ComponentTypeCode.VIEW:
+                        case ComponentTypeCode.SAVED_QUERY:
                             metadata = await connector.fetchViewMetadata(componentId);
                             if (metadata) {
                                 assetName = metadata.name;
@@ -313,15 +315,6 @@ export default function App() {
                                 assetName = metadata.displayname || metadata.sitemapname;
                                 fullName = metadata.sitemapname;
                                 logicalName = metadata.sitemapname;
-                            }
-                            break;
-
-                        case ComponentTypeCode.MODEL_DRIVEN_APP:
-                            metadata = await connector.fetchAppMetadata(componentId);
-                            if (metadata) {
-                                assetName = metadata.displayname || metadata.name;
-                                fullName = metadata.name;
-                                logicalName = metadata.name;
                             }
                             break;
 
