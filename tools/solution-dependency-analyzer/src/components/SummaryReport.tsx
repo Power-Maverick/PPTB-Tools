@@ -6,8 +6,41 @@ interface SummaryReportProps {
     solutionName: string;
 }
 
+function isExcludedManagedAsset(asset: AnalysisOutput["assets"][number]): boolean {
+    return asset.isManaged === true;
+}
+
 export function SummaryReport({ analysisData, solutionName }: SummaryReportProps) {
     const [exportFormat, setExportFormat] = useState<"csv" | "json">("csv");
+
+    const isEffectivelyManaged = (asset: AnalysisOutput["assets"][number]): boolean => {
+        if (asset.isManaged === true) {
+            return true;
+        }
+
+        if (asset.parentEntityId) {
+            const parentEntity = analysisData.assets.find((candidate) => candidate.assetId === asset.parentEntityId);
+            return parentEntity?.isManaged === true;
+        }
+
+        return false;
+    };
+
+    const scopedAssets = analysisData.assets;
+    const scopedAssetIds = new Set(scopedAssets.map((asset) => asset.assetId));
+    const excludedManagedAssets = analysisData.assets.filter((asset) => isEffectivelyManaged(asset) && asset.hasWarning);
+
+    const scopedMissingAssets = scopedAssets.filter((asset) => asset.notFound);
+    const scopedWarningAssets = scopedAssets.filter((asset) => asset.hasWarning && !isEffectivelyManaged(asset));
+    const scopedLoopAssets = scopedAssets.filter((asset) => asset.hasLoop);
+
+    const blockerIds = new Set([...scopedMissingAssets, ...scopedWarningAssets, ...scopedLoopAssets].map((asset) => asset.assetId));
+    const blockerCount = blockerIds.size;
+
+    const scopedLoops = analysisData.loops.filter((loop) => loop.some((assetId) => scopedAssetIds.has(assetId)));
+
+    const importReadinessScore = Math.max(0, 100 - scopedMissingAssets.length * 30 - scopedWarningAssets.length * 20 - scopedLoops.length * 15);
+    const willImportSucceed = blockerCount === 0;
 
     const generateCSVContent = (): string => {
         const headers = ["Asset ID", "Name", "Type", "Logical Name", "Dependencies", "Dependent By", "Has Circular Ref", "Not Found"];
@@ -32,6 +65,22 @@ export function SummaryReport({ analysisData, solutionName }: SummaryReportProps
             solution: solutionName,
             timestamp: new Date().toISOString(),
             summary: analysisData.stats,
+            importReadiness: {
+                willImportSucceed,
+                score: importReadinessScore,
+                excludedManagedAssets: excludedManagedAssets.map((asset) => ({
+                    id: asset.assetId,
+                    name: asset.label,
+                    type: asset.kind,
+                    logicalName: asset.logicalName,
+                    isManaged: asset.isManaged === true,
+                })),
+                blockers: {
+                    missing: scopedMissingAssets.map((asset) => asset.assetId),
+                    warnings: scopedWarningAssets.map((asset) => asset.assetId),
+                    circularChains: scopedLoops,
+                },
+            },
             assets: analysisData.assets.map((asset) => ({
                 id: asset.assetId,
                 name: asset.label,
@@ -130,6 +179,41 @@ export function SummaryReport({ analysisData, solutionName }: SummaryReportProps
                     <div className="stat-value">{complexityScore}</div>
                     <div className="stat-label">Complexity Score</div>
                 </div>
+            </div>
+
+            <div className="breakdown-section">
+                <h3>Import Readiness</h3>
+                <div className="statistics-grid">
+                    <div className={`stat-card ${willImportSucceed ? "" : "warning"}`}>
+                        <div className="stat-value">{willImportSucceed ? "Yes" : "No"}</div>
+                        <div className="stat-label">Likely Import Success</div>
+                    </div>
+
+                    <div className={`stat-card ${importReadinessScore < 80 ? "warning" : ""}`}>
+                        <div className="stat-value">{importReadinessScore}</div>
+                        <div className="stat-label">Import Readiness Score</div>
+                    </div>
+
+                    <div className={`stat-card ${blockerCount > 0 ? "warning" : ""}`}>
+                        <div className="stat-value">{blockerCount}</div>
+                        <div className="stat-label">Blocking Components</div>
+                    </div>
+
+                    <div className="stat-card">
+                        <div className="stat-value">{excludedManagedAssets.length}</div>
+                        <div className="stat-label">Excluded Managed Baseline</div>
+                    </div>
+                </div>
+
+                <p>Assessment excludes components flagged as managed in Dataverse metadata so managed dependencies do not reduce import readiness.</p>
+
+                {blockerCount > 0 && (
+                    <ul className="missing-list">
+                        {scopedMissingAssets.length > 0 && <li>Missing references: {scopedMissingAssets.length}</li>}
+                        {scopedWarningAssets.length > 0 && <li>Not-in-solution warnings: {scopedWarningAssets.length}</li>}
+                        {scopedLoops.length > 0 && <li>Circular dependency chains: {scopedLoops.length}</li>}
+                    </ul>
+                )}
             </div>
 
             <div className="breakdown-section">

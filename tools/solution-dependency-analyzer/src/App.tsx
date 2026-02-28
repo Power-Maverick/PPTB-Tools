@@ -24,6 +24,7 @@ export default function App() {
     const [kindFilter, setKindFilter] = useState<AssetKind | "all">("all");
     const [showLoopsOnly, setShowLoopsOnly] = useState(false);
     const [showMissingOnly, setShowMissingOnly] = useState(false);
+    const [showImportBlockersOnly, setShowImportBlockersOnly] = useState(false);
     const [isDetailsVisible, setIsDetailsVisible] = useState(true);
 
     // Load solutions on mount
@@ -122,6 +123,7 @@ export default function App() {
                 const componentId = component.objectid;
                 const typeCode = component.componenttype;
                 const typeInfo = getComponentTypeInfo(typeCode);
+                const componentIsManaged = component.ismanaged === true || component.ismanaged === 1;
 
                 let metadata: any = null;
                 let assetName = "Unknown";
@@ -129,6 +131,7 @@ export default function App() {
                 let logicalName = componentId;
                 let dependencies: string[] = [];
                 let warningMessage: string | undefined = undefined;
+                let isManaged: boolean | undefined = componentIsManaged;
 
                 try {
                     // Fetch metadata based on component type
@@ -139,6 +142,7 @@ export default function App() {
                                 assetName = metadata.DisplayName?.UserLocalizedLabel?.Label || metadata.LogicalName;
                                 fullName = metadata.SchemaName || metadata.LogicalName;
                                 logicalName = metadata.LogicalName;
+                                isManaged = metadata.IsManaged === true || metadata.IsManaged === 1;
 
                                 // Fetch attributes for this entity (cached with solution status)
                                 const attributes = await connector.fetchEntityAttributes(componentId, {
@@ -161,6 +165,7 @@ export default function App() {
                                             kind: "attribute",
                                             logicalName: attr.LogicalName,
                                             typeCode: ComponentTypeCode.ATTRIBUTE,
+                                            isManaged: attr.IsManaged === true,
                                             linksTo: [],
                                             hasLoop: false,
                                             parentEntityId: componentId,
@@ -189,6 +194,7 @@ export default function App() {
                                 assetName = metadata.name;
                                 fullName = metadata.name;
                                 logicalName = metadata.objecttypecode || "";
+                                isManaged = metadata.ismanaged === true || metadata.ismanaged === 1;
                                 // Parse form XML to extract dependencies
                                 if (metadata.formxml) {
                                     dependencies = registerParsedDependencies(parseFormDependencies(metadata.formxml));
@@ -202,6 +208,7 @@ export default function App() {
                                 assetName = metadata.name;
                                 fullName = metadata.name;
                                 logicalName = metadata.returnedtypecode || "";
+                                isManaged = metadata.ismanaged === true || metadata.ismanaged === 1;
                                 // Parse FetchXML to extract dependencies
                                 if (metadata.fetchxml) {
                                     dependencies = registerParsedDependencies(parseFetchXmlDependencies(metadata.fetchxml));
@@ -232,6 +239,7 @@ export default function App() {
                                             kind: "attribute",
                                             logicalName: col.LogicalName,
                                             typeCode: ComponentTypeCode.ATTRIBUTE,
+                                            isManaged: col.IsManaged === true,
                                             linksTo: [],
                                             hasLoop: false,
                                             parentEntityId: componentId,
@@ -257,6 +265,7 @@ export default function App() {
                                 assetName = metadata.friendlyname || metadata.typename;
                                 fullName = metadata.typename;
                                 logicalName = metadata.typename;
+                                isManaged = metadata.ismanaged === true || metadata.ismanaged === 1;
                             }
                             break;
 
@@ -266,6 +275,7 @@ export default function App() {
                                 assetName = metadata.displayname || metadata.name;
                                 fullName = metadata.name;
                                 logicalName = metadata.name;
+                                isManaged = metadata.ismanaged === true || metadata.ismanaged === 1;
                             }
                             break;
 
@@ -275,6 +285,7 @@ export default function App() {
                                 assetName = metadata.name;
                                 fullName = metadata.name;
                                 logicalName = metadata.name;
+                                isManaged = metadata.ismanaged === true || metadata.ismanaged === 1;
                             }
                             break;
 
@@ -284,6 +295,7 @@ export default function App() {
                                 assetName = metadata.displayname || metadata.name;
                                 fullName = metadata.name;
                                 logicalName = metadata.name;
+                                isManaged = metadata.ismanaged === true || metadata.ismanaged === 1;
                             }
                             break;
 
@@ -293,6 +305,7 @@ export default function App() {
                                 assetName = metadata.displayname || metadata.sitemapname;
                                 fullName = metadata.sitemapname;
                                 logicalName = metadata.sitemapname;
+                                isManaged = metadata.ismanaged === true || metadata.ismanaged === 1;
                             }
                             break;
 
@@ -306,7 +319,7 @@ export default function App() {
                     console.warn(`Failed to fetch metadata for component ${componentId}:`, err);
                 }
 
-                scanner.registerAsset(componentId, assetName, fullName, typeInfo.kind, logicalName, dependencies, warningMessage, typeCode);
+                scanner.registerAsset(componentId, assetName, fullName, typeInfo.kind, logicalName, dependencies, warningMessage, typeCode, isManaged);
             }
 
             const analysis = scanner.performAnalysis();
@@ -453,6 +466,11 @@ export default function App() {
                                 <input type="checkbox" id="missing-filter" checked={showMissingOnly} onChange={(e) => setShowMissingOnly(e.target.checked)} />
                                 <label htmlFor="missing-filter">⚠️ Show Only Missing Dependencies</label>
                             </div>
+
+                            <div className="loop-filter-checkbox">
+                                <input type="checkbox" id="import-blockers-filter" checked={showImportBlockersOnly} onChange={(e) => setShowImportBlockersOnly(e.target.checked)} />
+                                <label htmlFor="import-blockers-filter">🚫 Show Only Import Blockers</label>
+                            </div>
                         </>
                     )}
                 </div>
@@ -490,6 +508,7 @@ export default function App() {
                                         kindFilter={kindFilter}
                                         showOnlyLoops={showLoopsOnly}
                                         showOnlyMissing={showMissingOnly}
+                                        showOnlyImportBlockers={showImportBlockersOnly}
                                     />
                                 )}
 

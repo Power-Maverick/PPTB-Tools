@@ -41,7 +41,7 @@ export class DataverseConnector {
             if (!window.dataverseAPI) {
                 throw new Error("Dataverse API not available");
             }
-            const metadata = await window.dataverseAPI.getEntityMetadata(entityId, false, ["LogicalName", "DisplayName", "SchemaName", "MetadataId", "ObjectTypeCode"]);
+            const metadata = await window.dataverseAPI.getEntityMetadata(entityId, false, ["LogicalName", "DisplayName", "SchemaName", "MetadataId", "ObjectTypeCode", "IsManaged"]);
             if (metadata?.ObjectTypeCode && typeof metadata.ObjectTypeCode === "number" && typeof metadata.LogicalName === "string") {
                 this.entityTypeCodeMap.set(metadata.ObjectTypeCode, metadata.LogicalName);
             }
@@ -76,6 +76,7 @@ export class DataverseConnector {
                 "SchemaName",
                 "MetadataId",
                 "AttributeType",
+                "IsManaged",
             ]);
 
             const attributeList = (attributes?.value || attributes || []) as any[];
@@ -109,7 +110,7 @@ export class DataverseConnector {
             if (!window.dataverseAPI) {
                 throw new Error("Dataverse API not available");
             }
-            return await window.dataverseAPI.retrieve("systemform", formId, ["formid", "name", "objecttypecode", "formxml"]);
+            return await window.dataverseAPI.retrieve("systemform", formId, ["formid", "name", "objecttypecode", "formxml", "ismanaged"]);
         } catch (err) {
             console.error(`Form metadata fetch failed for ${formId}:`, err);
             return null;
@@ -121,7 +122,7 @@ export class DataverseConnector {
             if (!window.dataverseAPI) {
                 throw new Error("Dataverse API not available");
             }
-            const viewMetadata = await window.dataverseAPI.retrieve("savedquery", viewId, ["savedqueryid", "name", "fetchxml", "returnedtypecode", "layoutxml"]);
+            const viewMetadata = await window.dataverseAPI.retrieve("savedquery", viewId, ["savedqueryid", "name", "fetchxml", "returnedtypecode", "layoutxml", "ismanaged"]);
             if (!viewMetadata) {
                 return null;
             }
@@ -187,7 +188,7 @@ export class DataverseConnector {
             if (!window.dataverseAPI) {
                 throw new Error("Dataverse API not available");
             }
-            return await window.dataverseAPI.retrieve("plugintype", pluginId, ["plugintypeid", "typename", "friendlyname"]);
+            return await window.dataverseAPI.retrieve("plugintype", pluginId, ["plugintypeid", "typename", "friendlyname", "ismanaged"]);
         } catch (err) {
             console.error(`Plugin metadata fetch failed for ${pluginId}:`, err);
             return null;
@@ -199,7 +200,7 @@ export class DataverseConnector {
             if (!window.dataverseAPI) {
                 throw new Error("Dataverse API not available");
             }
-            return await window.dataverseAPI.retrieve("webresource", webResourceId, ["webresourceid", "name", "displayname", "webresourcetype"]);
+            return await window.dataverseAPI.retrieve("webresource", webResourceId, ["webresourceid", "name", "displayname", "webresourcetype", "ismanaged"]);
         } catch (err) {
             console.error(`Web resource metadata fetch failed for ${webResourceId}:`, err);
             return null;
@@ -211,7 +212,7 @@ export class DataverseConnector {
             if (!window.dataverseAPI) {
                 throw new Error("Dataverse API not available");
             }
-            return await window.dataverseAPI.retrieve("workflow", workflowId, ["workflowid", "name", "type", "category"]);
+            return await window.dataverseAPI.retrieve("workflow", workflowId, ["workflowid", "name", "type", "category", "ismanaged"]);
         } catch (err) {
             console.error(`Workflow metadata fetch failed for ${workflowId}:`, err);
             return null;
@@ -223,7 +224,7 @@ export class DataverseConnector {
             if (!window.dataverseAPI) {
                 throw new Error("Dataverse API not available");
             }
-            return await window.dataverseAPI.retrieve("report", reportId, ["reportid", "name", "displayname"]);
+            return await window.dataverseAPI.retrieve("report", reportId, ["reportid", "name", "displayname", "ismanaged"]);
         } catch (err) {
             console.error(`Report metadata fetch failed for ${reportId}:`, err);
             return null;
@@ -235,7 +236,7 @@ export class DataverseConnector {
             if (!window.dataverseAPI) {
                 throw new Error("Dataverse API not available");
             }
-            return await window.dataverseAPI.retrieve("sitemap", siteMapId, ["sitemapid", "sitemapname", "displayname"]);
+            return await window.dataverseAPI.retrieve("sitemap", siteMapId, ["sitemapid", "sitemapname", "displayname", "ismanaged"]);
         } catch (err) {
             console.error(`Site map metadata fetch failed for ${siteMapId}:`, err);
             return null;

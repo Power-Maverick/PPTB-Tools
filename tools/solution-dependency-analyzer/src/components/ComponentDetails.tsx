@@ -82,6 +82,13 @@ export function AssetDetails({ selectedAsset, allAssets, onAssetClick }: AssetDe
                         </>
                     )}
 
+                    <dt>Managed:</dt>
+                    <dd>
+                        {selectedAsset.isManaged === true && <span className="status-warning">🔒 Managed</span>}
+                        {selectedAsset.isManaged === false && <span className="status-ok">🔓 Unmanaged</span>}
+                        {selectedAsset.isManaged === undefined && <span className="status-warning">❔ Unknown</span>}
+                    </dd>
+
                     <dt>Status:</dt>
                     <dd>
                         {selectedAsset.notFound && <span className="status-warning">⚠️ Not Found in Solution</span>}

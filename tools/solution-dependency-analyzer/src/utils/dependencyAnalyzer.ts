@@ -10,9 +10,19 @@ export class DependencyScanner {
         this.linkList = [];
     }
 
-    registerAsset(id: string, name: string, fullName: string, kind: AssetKind, logicalName: string, dependencies: string[], warningMessage?: string, typeCode?: number): void;
+    registerAsset(id: string, name: string, fullName: string, kind: AssetKind, logicalName: string, dependencies: string[], warningMessage?: string, typeCode?: number, isManaged?: boolean): void;
     registerAsset(asset: Asset): void;
-    registerAsset(idOrAsset: string | Asset, name?: string, fullName?: string, kind?: AssetKind, logicalName?: string, dependencies?: string[], warningMessage?: string, typeCode?: number): void {
+    registerAsset(
+        idOrAsset: string | Asset,
+        name?: string,
+        fullName?: string,
+        kind?: AssetKind,
+        logicalName?: string,
+        dependencies?: string[],
+        warningMessage?: string,
+        typeCode?: number,
+        isManaged?: boolean,
+    ): void {
         let asset: Asset;
 
         if (typeof idOrAsset === "string") {
@@ -24,6 +34,7 @@ export class DependencyScanner {
                 kind: kind!,
                 logicalName: logicalName!,
                 typeCode,
+                isManaged,
                 linksTo: dependencies || [],
                 linkedBy: [],
                 hasLoop: false,

@@ -10,6 +10,7 @@ interface TreeViewProps {
     kindFilter: AssetKind | "all";
     showOnlyLoops: boolean;
     showOnlyMissing: boolean;
+    showOnlyImportBlockers: boolean;
 }
 
 const ASSET_ICONS: Record<AssetKind, string> = {
@@ -32,8 +33,26 @@ const ASSET_ICONS: Record<AssetKind, string> = {
     other: "❓",
 };
 
-export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, kindFilter, showOnlyLoops, showOnlyMissing }: TreeViewProps) {
+export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, kindFilter, showOnlyLoops, showOnlyMissing, showOnlyImportBlockers }: TreeViewProps) {
     const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+
+    const isEffectivelyManaged = (asset: Asset): boolean => {
+        if (asset.isManaged === true) {
+            return true;
+        }
+
+        if (asset.parentEntityId) {
+            const parentEntity = assets.find((candidate) => candidate.assetId === asset.parentEntityId);
+            return parentEntity?.isManaged === true;
+        }
+
+        return false;
+    };
+
+    const isImportBlocker = (asset: Asset): boolean => {
+        const hasActionableWarning = asset.hasWarning === true && !isEffectivelyManaged(asset);
+        return !!asset.notFound || !!asset.hasLoop || hasActionableWarning;
+    };
 
     const hasMissingDependencies = (asset: Asset): boolean => {
         if (asset.notFound || asset.hasWarning) return true;
@@ -41,6 +60,13 @@ export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, ki
         return asset.linksTo.some((depId) => {
             const dependency = assets.find((a) => a.assetId === depId);
             return !!dependency && (dependency.notFound || dependency.hasWarning);
+        });
+    };
+
+    const hasImportBlockingDependencies = (asset: Asset): boolean => {
+        return asset.linksTo.some((depId) => {
+            const dependency = assets.find((a) => a.assetId === depId);
+            return !!dependency && isImportBlocker(dependency);
         });
     };
 
@@ -60,6 +86,7 @@ export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, ki
             if (asset.kind === "attribute" && asset.parentEntityId) return false;
             if (showOnlyLoops && !asset.hasLoop) return false;
             if (showOnlyMissing && !hasMissingDependencies(asset)) return false;
+            if (showOnlyImportBlockers && !(isImportBlocker(asset) || hasImportBlockingDependencies(asset))) return false;
             if (kindFilter !== "all" && asset.kind !== kindFilter) return false;
             if (searchTerm && !asset.label.toLowerCase().includes(searchTerm.toLowerCase())) return false;
             return true;

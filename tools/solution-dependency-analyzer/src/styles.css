@@ -222,7 +222,7 @@ body {
     background: var(--surface-muted);
     padding: 12px;
     border-radius: 6px;
-    margin-bottom: 16px;
+    margin-top: 16px;
     font-size: 13px;
 }
 

@@ -52,6 +52,10 @@ export function SolutionPicker({ solutionOptions, selectedValue, onSelectionChan
                 </select>
             </div>
 
+            <button className="analyze-button" onClick={onTriggerScan} disabled={!selectedValue || scanningInProgress}>
+                {scanningInProgress ? "Scanning Dependencies..." : "Analyze Dependencies"}
+            </button>
+
             {selectedValue && (
                 <div className="solution-info">
                     {(() => {
@@ -75,10 +79,6 @@ export function SolutionPicker({ solutionOptions, selectedValue, onSelectionChan
                     })()}
                 </div>
             )}
-
-            <button className="analyze-button" onClick={onTriggerScan} disabled={!selectedValue || scanningInProgress}>
-                {scanningInProgress ? "Scanning Dependencies..." : "Analyze Dependencies"}
-            </button>
         </div>
     );
 }

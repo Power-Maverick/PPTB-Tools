@@ -26,6 +26,7 @@ export interface Asset {
     kind: AssetKind;
     logicalName: string;
     typeCode?: number;
+    isManaged?: boolean;
     linksTo: string[];
     linkedBy?: string[];
     hasLoop: boolean;
