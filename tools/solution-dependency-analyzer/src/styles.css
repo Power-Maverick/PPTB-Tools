@@ -29,7 +29,8 @@
     --scrollbar-thumb-hover: #bdc1c6;
 }
 
-.theme-dark {
+.theme-dark,
+body.dark-theme {
     --bg: #0f1115;
     --text: #e6e9ef;
     --text-strong: #f5f7fa;
