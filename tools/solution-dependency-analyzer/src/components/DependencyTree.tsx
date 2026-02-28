@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { LEAF_ONLY_ASSET_KINDS } from "../models/componentTypes";
 import { Asset, AssetKind } from "../models/interfaces";
 
 interface TreeViewProps {
@@ -8,6 +9,7 @@ interface TreeViewProps {
     searchTerm: string;
     kindFilter: AssetKind | "all";
     showOnlyLoops: boolean;
+    showOnlyMissing: boolean;
 }
 
 const ASSET_ICONS: Record<AssetKind, string> = {
@@ -30,8 +32,17 @@ const ASSET_ICONS: Record<AssetKind, string> = {
     other: "❓",
 };
 
-export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, kindFilter, showOnlyLoops }: TreeViewProps) {
+export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, kindFilter, showOnlyLoops, showOnlyMissing }: TreeViewProps) {
     const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+
+    const hasMissingDependencies = (asset: Asset): boolean => {
+        if (asset.notFound || asset.hasWarning) return true;
+
+        return asset.linksTo.some((depId) => {
+            const dependency = assets.find((a) => a.assetId === depId);
+            return !!dependency && (dependency.notFound || dependency.hasWarning);
+        });
+    };
 
     const toggleNodeExpansion = (assetId: string) => {
         const newExpanded = new Set(expandedNodes);
@@ -48,6 +59,7 @@ export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, ki
             // Filter out attributes that have a parent entity - they'll be shown nested
             if (asset.kind === "attribute" && asset.parentEntityId) return false;
             if (showOnlyLoops && !asset.hasLoop) return false;
+            if (showOnlyMissing && !hasMissingDependencies(asset)) return false;
             if (kindFilter !== "all" && asset.kind !== kindFilter) return false;
             if (searchTerm && !asset.label.toLowerCase().includes(searchTerm.toLowerCase())) return false;
             return true;
@@ -86,7 +98,8 @@ export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, ki
     const grouped = groupByKind(filtered);
 
     const renderAssetNode = (asset: Asset, depth: number = 0): JSX.Element => {
-        const hasChildren = (asset.children && asset.children.length > 0) || (asset.linksTo && asset.linksTo.length > 0);
+        const supportsChildren = !LEAF_ONLY_ASSET_KINDS.has(asset.kind);
+        const hasChildren = supportsChildren && ((asset.children && asset.children.length > 0) || (asset.linksTo && asset.linksTo.length > 0));
         const isExpanded = expandedNodes.has(asset.assetId);
         const isSelected = selectedAssetId === asset.assetId;
 
@@ -163,9 +176,11 @@ export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, ki
             {Object.entries(grouped).map(([kind, kindAssets]) => {
                 if (kindAssets.length === 0) return null;
                 const kindAsType = kind as AssetKind;
-                
+
                 // For "other" (unknown) components, show a message instead of listing them
                 if (kind === "other") {
+                    const unknownTypeCodes = Array.from(new Set(kindAssets.map((asset) => asset.typeCode).filter((code): code is number => typeof code === "number"))).sort((a, b) => a - b);
+
                     return (
                         <div key={kind} className="kind-group">
                             <div className="kind-header">
@@ -174,12 +189,16 @@ export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, ki
                                 <span className="count-badge">({kindAssets.length})</span>
                             </div>
                             <div className="unknown-components-message">
-                                <p>Additional component type checks will be added in future updates.</p>
+                                {unknownTypeCodes.length > 0 ? (
+                                    <p>Unknown component type codes: {unknownTypeCodes.join(", ")}</p>
+                                ) : (
+                                    <p>Unknown component type codes are unavailable for this analysis run.</p>
+                                )}
                             </div>
                         </div>
                     );
                 }
-                
+
                 return (
                     <div key={kind} className="kind-group">
                         <div className="kind-header">

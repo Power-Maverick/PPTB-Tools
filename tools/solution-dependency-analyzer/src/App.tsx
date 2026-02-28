@@ -5,64 +5,13 @@ import { TreeView } from "./components/DependencyTree";
 import { SearchFilter } from "./components/SearchFilter";
 import { SolutionPicker } from "./components/SolutionSelector";
 import { SummaryReport } from "./components/SummaryReport";
+import { ComponentTypeCode, getComponentTypeInfo } from "./models/componentTypes";
 import { AnalysisOutput, Asset, AssetKind, SolutionRecord } from "./models/interfaces";
 import { DataverseConnector } from "./utils/dataverseClient";
 import { DependencyScanner } from "./utils/dependencyAnalyzer";
 
 type ViewMode = "tree" | "graph" | "summary";
-
-/**
- * Comprehensive component type mapping based on Microsoft Learn documentation
- * Reference: https://learn.microsoft.com/en-us/power-apps/developer/data-platform/reference/entities/solutioncomponent#componenttype-choicesoptions
- * Maps component type codes to their asset kind and display label
- */
-const COMPONENT_TYPE_MAP: Record<number, { kind: AssetKind; label: string }> = {
-    1: { kind: "entity", label: "Entity" },
-    2: { kind: "attribute", label: "Attribute" },
-    3: { kind: "relationship", label: "Relationship" },
-    9: { kind: "optionset", label: "Option Set" },
-    20: { kind: "role", label: "Role" },
-    24: { kind: "form", label: "Form" },
-    26: { kind: "view", label: "Saved Query" },
-    29: { kind: "workflow", label: "Workflow" },
-    31: { kind: "report", label: "Report" },
-    36: { kind: "emailtemplate", label: "Email Template" },
-    60: { kind: "form", label: "System Form" },
-    61: { kind: "webresource", label: "Web Resource" },
-    62: { kind: "sitemap", label: "Site Map" },
-    90: { kind: "plugin", label: "Plugin Type" },
-    300: { kind: "canvasapp", label: "Canvas App" },
-    371: { kind: "connector", label: "Connector" },
-    372: { kind: "connector", label: "Connector" },
-};
-
-/**
- * Component type code constants for Microsoft Dataverse components
- * Based on Microsoft Learn documentation: https://learn.microsoft.com/en-us/power-apps/developer/data-platform/reference/entities/solutioncomponent
- * These codes identify different types of components that can be included in a Power Platform solution
- */
-const ComponentTypeCode = {
-    ENTITY: 1,
-    ATTRIBUTE: 2,
-    RELATIONSHIP: 3,
-    OPTION_SET: 9,
-    ROLE: 20,
-    FORM: 24,
-    SAVED_QUERY: 26,
-    WORKFLOW: 29,
-    REPORT: 31,
-    EMAIL_TEMPLATE: 36,
-    SYSTEM_FORM: 60,
-    WEB_RESOURCE: 61,
-    SITE_MAP: 62,
-    PLUGIN_TYPE: 90,
-    CANVAS_APP: 300,
-    CONNECTOR: 371,
-} as const;
-
-function getComponentTypeInfo(typeCode: number): { kind: AssetKind; label: string } {
-    return COMPONENT_TYPE_MAP[typeCode] || { kind: "other", label: `Unknown (${typeCode})` };
-}
+type ParsedDependency = { key: string; kind: AssetKind };
 
 export default function App() {
     const [solutions, setSolutions] = useState<SolutionRecord[]>([]);
@@ -74,6 +23,7 @@ export default function App() {
     const [searchTerm, setSearchTerm] = useState("");
     const [kindFilter, setKindFilter] = useState<AssetKind | "all">("all");
     const [showLoopsOnly, setShowLoopsOnly] = useState(false);
+    const [showMissingOnly, setShowMissingOnly] = useState(false);
     const [isDetailsVisible, setIsDetailsVisible] = useState(true);
 
     // Load solutions on mount
@@ -138,6 +88,34 @@ export default function App() {
             });
 
             const scanner = new DependencyScanner();
+
+            const inferredTypeCodeByKind: Partial<Record<AssetKind, number>> = {
+                attribute: ComponentTypeCode.ATTRIBUTE,
+                entity: ComponentTypeCode.ENTITY,
+                relationship: ComponentTypeCode.RELATIONSHIP,
+                webresource: ComponentTypeCode.WEB_RESOURCE,
+            };
+
+            const registerParsedDependencies = (parsedDependencies: ParsedDependency[]): string[] => {
+                return parsedDependencies.map((dependency) => {
+                    const normalizedKey = dependency.key.trim().toLowerCase();
+                    const inferredAssetId = `inferred:${dependency.kind}:${normalizedKey}`;
+
+                    const inferredAsset: Asset = {
+                        assetId: inferredAssetId,
+                        label: dependency.key,
+                        fullName: dependency.key,
+                        kind: dependency.kind,
+                        logicalName: dependency.key,
+                        typeCode: inferredTypeCodeByKind[dependency.kind],
+                        linksTo: [],
+                        hasLoop: false,
+                    };
+
+                    scanner.registerAsset(inferredAsset);
+                    return inferredAssetId;
+                });
+            };
 
             // Process each component based on type
             for (const component of components) {
@@ -213,7 +191,7 @@ export default function App() {
                                 logicalName = metadata.objecttypecode || "";
                                 // Parse form XML to extract dependencies
                                 if (metadata.formxml) {
-                                    dependencies = parseFormDependencies(metadata.formxml);
+                                    dependencies = registerParsedDependencies(parseFormDependencies(metadata.formxml));
                                 }
                             }
                             break;
@@ -226,7 +204,7 @@ export default function App() {
                                 logicalName = metadata.returnedtypecode || "";
                                 // Parse FetchXML to extract dependencies
                                 if (metadata.fetchxml) {
-                                    dependencies = parseFetchXmlDependencies(metadata.fetchxml);
+                                    dependencies = registerParsedDependencies(parseFetchXmlDependencies(metadata.fetchxml));
                                 }
 
                                 const viewColumns = metadata.viewColumns || [];
@@ -328,7 +306,7 @@ export default function App() {
                     console.warn(`Failed to fetch metadata for component ${componentId}:`, err);
                 }
 
-                scanner.registerAsset(componentId, assetName, fullName, typeInfo.kind, logicalName, dependencies, warningMessage);
+                scanner.registerAsset(componentId, assetName, fullName, typeInfo.kind, logicalName, dependencies, warningMessage, typeCode);
             }
 
             const analysis = scanner.performAnalysis();
@@ -342,8 +320,8 @@ export default function App() {
         }
     };
 
-    const parseFormDependencies = (formXml: string): string[] => {
-        const dependencies: string[] = [];
+    const parseFormDependencies = (formXml: string): ParsedDependency[] => {
+        const dependencies: ParsedDependency[] = [];
         try {
             const parser = new DOMParser();
             const doc = parser.parseFromString(formXml, "text/xml");
@@ -353,7 +331,7 @@ export default function App() {
             fields.forEach((field) => {
                 const fieldName = field.getAttribute("datafieldname");
                 if (fieldName) {
-                    dependencies.push(fieldName);
+                    dependencies.push({ key: fieldName, kind: "attribute" });
                 }
             });
 
@@ -362,7 +340,7 @@ export default function App() {
             webResources.forEach((wr) => {
                 const wrName = wr.getAttribute("name");
                 if (wrName) {
-                    dependencies.push(wrName);
+                    dependencies.push({ key: wrName, kind: "webresource" });
                 }
             });
         } catch (err) {
@@ -371,8 +349,8 @@ export default function App() {
         return dependencies;
     };
 
-    const parseFetchXmlDependencies = (fetchXml: string): string[] => {
-        const dependencies: string[] = [];
+    const parseFetchXmlDependencies = (fetchXml: string): ParsedDependency[] => {
+        const dependencies: ParsedDependency[] = [];
         try {
             const parser = new DOMParser();
             const doc = parser.parseFromString(fetchXml, "text/xml");
@@ -382,7 +360,7 @@ export default function App() {
             entities.forEach((entity) => {
                 const entityName = entity.getAttribute("name");
                 if (entityName) {
-                    dependencies.push(entityName);
+                    dependencies.push({ key: entityName, kind: "entity" });
                 }
             });
 
@@ -391,7 +369,7 @@ export default function App() {
             attributes.forEach((attr) => {
                 const attrName = attr.getAttribute("name");
                 if (attrName) {
-                    dependencies.push(attrName);
+                    dependencies.push({ key: attrName, kind: "attribute" });
                 }
             });
 
@@ -400,7 +378,7 @@ export default function App() {
             linkEntities.forEach((linkEntity) => {
                 const linkName = linkEntity.getAttribute("name");
                 if (linkName) {
-                    dependencies.push(linkName);
+                    dependencies.push({ key: linkName, kind: "entity" });
                 }
             });
         } catch (err) {
@@ -470,6 +448,11 @@ export default function App() {
                                 <input type="checkbox" id="loop-filter" checked={showLoopsOnly} onChange={(e) => setShowLoopsOnly(e.target.checked)} />
                                 <label htmlFor="loop-filter">🔄 Show Only Circular Dependencies</label>
                             </div>
+
+                            <div className="loop-filter-checkbox">
+                                <input type="checkbox" id="missing-filter" checked={showMissingOnly} onChange={(e) => setShowMissingOnly(e.target.checked)} />
+                                <label htmlFor="missing-filter">⚠️ Show Only Missing Dependencies</label>
+                            </div>
                         </>
                     )}
                 </div>
@@ -506,15 +489,16 @@ export default function App() {
                                         searchTerm={searchTerm}
                                         kindFilter={kindFilter}
                                         showOnlyLoops={showLoopsOnly}
+                                        showOnlyMissing={showMissingOnly}
                                     />
                                 )}
 
                                 {viewMode === "graph" && analysisResult.stats.loopCount > 0 && (
                                     <DependencyGraph
-                                        assets={analysisResult.assets.filter(a => a.hasLoop)}
-                                        links={analysisResult.links.filter(l => {
-                                            const source = analysisResult.assets.find(a => a.assetId === l.sourceId);
-                                            const target = analysisResult.assets.find(a => a.assetId === l.targetId);
+                                        assets={analysisResult.assets.filter((a) => a.hasLoop)}
+                                        links={analysisResult.links.filter((l) => {
+                                            const source = analysisResult.assets.find((a) => a.assetId === l.sourceId);
+                                            const target = analysisResult.assets.find((a) => a.assetId === l.targetId);
                                             return source?.hasLoop || target?.hasLoop;
                                         })}
                                         onAssetClick={handleGraphAssetClick}

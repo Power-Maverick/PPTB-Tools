@@ -38,6 +38,7 @@ export function AssetDetails({ selectedAsset, allAssets, onAssetClick }: AssetDe
     }
 
     const dependenciesAssets = selectedAsset.linksTo.map((id) => allAssets.find((a) => a.assetId === id)).filter((a): a is Asset => a !== undefined);
+    const missingOrWarningDependencies = dependenciesAssets.filter((dep) => dep.notFound || dep.hasWarning);
 
     const dependentsAssets = (selectedAsset.linkedBy || []).map((id) => allAssets.find((a) => a.assetId === id)).filter((a): a is Asset => a !== undefined);
 
@@ -121,17 +122,19 @@ export function AssetDetails({ selectedAsset, allAssets, onAssetClick }: AssetDe
                 ) : (
                     <ul className="dependency-list">
                         {dependenciesAssets.map((dep) => (
-                            <li key={dep.assetId} className={dep.notFound ? "missing-ref" : ""}>
+                            <li key={dep.assetId} className={dep.notFound || dep.hasWarning ? "missing-ref" : ""}>
                                 <span className="dep-icon">{getAssetIcon(dep.kind)}</span>
                                 {onAssetClick ? (
                                     <button className="dep-link" onClick={() => handleDependencyClick(dep)}>
                                         {dep.label}
                                         {dep.notFound && " (Missing)"}
+                                        {!dep.notFound && dep.hasWarning && " (Not in solution)"}
                                     </button>
                                 ) : (
                                     <span>
                                         {dep.label}
                                         {dep.notFound && " (Missing)"}
+                                        {!dep.notFound && dep.hasWarning && " (Not in solution)"}
                                     </span>
                                 )}
                                 <span className="dep-kind">({dep.kind})</span>
@@ -140,6 +143,31 @@ export function AssetDetails({ selectedAsset, allAssets, onAssetClick }: AssetDe
                     </ul>
                 )}
             </div>
+
+            {selectedAsset.hasWarning && (
+                <div className="details-section">
+                    <h4>Not In Solution ({missingOrWarningDependencies.length})</h4>
+                    {missingOrWarningDependencies.length === 0 ? (
+                        <p className="empty-message">No specific dependency records were found for this warning.</p>
+                    ) : (
+                        <ul className="dependency-list">
+                            {missingOrWarningDependencies.map((dep) => (
+                                <li key={`warning-${dep.assetId}`} className="missing-ref">
+                                    <span className="dep-icon">{getAssetIcon(dep.kind)}</span>
+                                    {onAssetClick ? (
+                                        <button className="dep-link" onClick={() => handleDependencyClick(dep)}>
+                                            {dep.label}
+                                        </button>
+                                    ) : (
+                                        <span>{dep.label}</span>
+                                    )}
+                                    <span className="dep-kind">{dep.warningMessage || (dep.notFound ? "Missing" : "Not in solution")}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            )}
 
             <div className="details-section">
                 <h4>Depended By ({dependentsAssets.length})</h4>
