@@ -196,7 +196,7 @@ export function SummaryReport({ analysisData, solutionName }: SummaryReportProps
 
                     <div className={`stat-card ${blockerCount > 0 ? "warning" : ""}`}>
                         <div className="stat-value">{blockerCount}</div>
-                        <div className="stat-label">Blocking Components</div>
+                        <div className="stat-label">Missing Components</div>
                     </div>
 
                     <div className="stat-card">

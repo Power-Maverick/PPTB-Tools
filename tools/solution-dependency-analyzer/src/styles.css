@@ -365,7 +365,7 @@ body {
 .loop-filter-checkbox {
     display: flex;
     align-items: center;
-    padding: 12px;
+    padding: 4px;
     background: var(--warning-bg);
     border: 1px solid var(--warning-border);
     border-radius: 6px;
@@ -448,6 +448,13 @@ body {
     font-weight: 600;
     color: var(--text-strong);
     margin-bottom: 8px;
+}
+
+.kind-toggle {
+    width: 100%;
+    border: none;
+    text-align: left;
+    cursor: pointer;
 }
 
 .count-badge {

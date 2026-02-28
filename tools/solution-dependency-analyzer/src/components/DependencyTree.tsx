@@ -35,6 +35,7 @@ const ASSET_ICONS: Record<AssetKind, string> = {
 
 export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, kindFilter, showOnlyLoops, showOnlyMissing, showOnlyImportBlockers }: TreeViewProps) {
     const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+    const [collapsedKinds, setCollapsedKinds] = useState<Set<AssetKind>>(new Set());
 
     const isEffectivelyManaged = (asset: Asset): boolean => {
         if (asset.isManaged === true) {
@@ -78,6 +79,16 @@ export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, ki
             newExpanded.add(assetId);
         }
         setExpandedNodes(newExpanded);
+    };
+
+    const toggleKindCollapse = (kind: AssetKind) => {
+        const updated = new Set(collapsedKinds);
+        if (updated.has(kind)) {
+            updated.delete(kind);
+        } else {
+            updated.add(kind);
+        }
+        setCollapsedKinds(updated);
     };
 
     const filterAssets = (assetList: Asset[]): Asset[] => {
@@ -203,6 +214,7 @@ export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, ki
             {Object.entries(grouped).map(([kind, kindAssets]) => {
                 if (kindAssets.length === 0) return null;
                 const kindAsType = kind as AssetKind;
+                const isCollapsed = collapsedKinds.has(kindAsType);
 
                 // For "other" (unknown) components, show a message instead of listing them
                 if (kind === "other") {
@@ -210,30 +222,34 @@ export function TreeView({ assets, onAssetClick, selectedAssetId, searchTerm, ki
 
                     return (
                         <div key={kind} className="kind-group">
-                            <div className="kind-header">
+                            <button className="kind-header kind-toggle" onClick={() => toggleKindCollapse(kindAsType)}>
+                                <span>{isCollapsed ? "▶" : "▼"}</span>
                                 <span>{ASSET_ICONS[kindAsType]}</span>
                                 <span>{getPluralLabel(kind)}</span>
                                 <span className="count-badge">({kindAssets.length})</span>
-                            </div>
-                            <div className="unknown-components-message">
-                                {unknownTypeCodes.length > 0 ? (
-                                    <p>Unknown component type codes: {unknownTypeCodes.join(", ")}</p>
-                                ) : (
-                                    <p>Unknown component type codes are unavailable for this analysis run.</p>
-                                )}
-                            </div>
+                            </button>
+                            {!isCollapsed && (
+                                <div className="unknown-components-message">
+                                    {unknownTypeCodes.length > 0 ? (
+                                        <p>Unknown component type codes: {unknownTypeCodes.join(", ")}</p>
+                                    ) : (
+                                        <p>Unknown component type codes are unavailable for this analysis run.</p>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     );
                 }
 
                 return (
                     <div key={kind} className="kind-group">
-                        <div className="kind-header">
+                        <button className="kind-header kind-toggle" onClick={() => toggleKindCollapse(kindAsType)}>
+                            <span>{isCollapsed ? "▶" : "▼"}</span>
                             <span>{ASSET_ICONS[kindAsType]}</span>
                             <span>{getPluralLabel(kind)}</span>
                             <span className="count-badge">({kindAssets.length})</span>
-                        </div>
-                        <div className="kind-assets">{kindAssets.map((asset) => renderAssetNode(asset, 0))}</div>
+                        </button>
+                        {!isCollapsed && <div className="kind-assets">{kindAssets.map((asset) => renderAssetNode(asset, 0))}</div>}
                     </div>
                 );
             })}

@@ -418,6 +418,28 @@ export default function App() {
         return solution?.friendlyname || "Unknown Solution";
     };
 
+    const isEffectivelyManaged = (asset: Asset, allAssets: Asset[]): boolean => {
+        if (asset.isManaged === true) {
+            return true;
+        }
+
+        if (asset.parentEntityId) {
+            const parentEntity = allAssets.find((candidate) => candidate.assetId === asset.parentEntityId);
+            return parentEntity?.isManaged === true;
+        }
+
+        return false;
+    };
+
+    const getMissingImpactCount = (): number => {
+        if (!analysisResult) return 0;
+
+        return analysisResult.assets.filter((asset) => {
+            const hasActionableWarning = asset.hasWarning === true && !isEffectivelyManaged(asset, analysisResult.assets);
+            return !!asset.notFound || !!asset.hasLoop || hasActionableWarning;
+        }).length;
+    };
+
     return (
         <div className="app-wrapper">
             <div className={`columns-layout ${selectedAsset && isDetailsVisible ? "details-visible" : ""}`}>
@@ -449,8 +471,8 @@ export default function App() {
                                         <div className="quick-stat-label">Circular</div>
                                     </div>
                                     <div className="quick-stat">
-                                        <div className="quick-stat-value">{analysisResult.notFoundAssets.length}</div>
-                                        <div className="quick-stat-label">Missing</div>
+                                        <div className="quick-stat-value">{getMissingImpactCount()}</div>
+                                        <div className="quick-stat-label">Impacting Import</div>
                                     </div>
                                 </div>
                             </div>
@@ -469,7 +491,7 @@ export default function App() {
 
                             <div className="loop-filter-checkbox">
                                 <input type="checkbox" id="import-blockers-filter" checked={showImportBlockersOnly} onChange={(e) => setShowImportBlockersOnly(e.target.checked)} />
-                                <label htmlFor="import-blockers-filter">🚫 Show Only Import Blockers</label>
+                                <label htmlFor="import-blockers-filter">🚫 Show Components Impacting Import</label>
                             </div>
                         </>
                     )}
