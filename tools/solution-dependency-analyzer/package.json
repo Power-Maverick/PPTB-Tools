@@ -1,8 +1,9 @@
 {
   "name": "@power-maverick/tool-solution-dependency-analyzer",
   "displayName": "Solution Dependency Analyzer",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Analyze and visualize solution dependencies with circular dependency detection",
+  "icon": "icons/dependencyAnalyzer.svg",
   "contributors": [
     {
       "name": "Power Maverick",
@@ -12,8 +13,7 @@
   "license": "GPL-2.0",
   "configurations": {
     "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/solution-dependency-analyzer",
-    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/solution-dependency-analyzer/README.md",
-    "iconUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/solution-dependency-analyzer/icons/dependencyAnalyzer.png"
+    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/solution-dependency-analyzer/README.md"
   },
   "type": "module",
   "scripts": {
