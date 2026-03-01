@@ -131,8 +131,6 @@ export class DataverseConnector {
             const entityLogicalName = typeof viewMetadata.returnedtypecode === "string" ? viewMetadata.returnedtypecode : undefined;
             const viewColumns = await this.fetchViewColumns(layoutXml, entityLogicalName);
 
-            console.log(layoutXml, viewMetadata, entityLogicalName, viewColumns);
-
             return {
                 ...viewMetadata,
                 viewColumns,
