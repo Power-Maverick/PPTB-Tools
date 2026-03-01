@@ -1,0 +1,44 @@
+name: Bug Report
+description: File a bug report.
+title: "[Bug]: "
+labels: ["triage"]
+type: "bug"
+body:
+    - type: dropdown
+      id: tool
+      attributes:
+          label: Tool
+          description: Which tool are you reporting a bug for?
+          options:
+              - Data Migrator
+              - Dataverse Trace Analyzer
+              - Entity Field Catalog
+              - ERD Generator
+              - PCF Builder
+              - Solution Dependency Analyzer
+              - View Layout Copier
+          default: 0
+      validations:
+          required: true
+    - type: textarea
+      id: what-happened
+      attributes:
+          label: What happened?
+          description: Also tell us, what did you expect to happen?
+          placeholder: Tell us what you see!
+          value: "A bug happened!"
+      validations:
+          required: true
+    - type: input
+      id: version
+      attributes:
+          label: What version of the PPTB are you using?
+          description: You can find it under under `Help` > `About`.
+      validations:
+          required: true
+    - type: textarea
+      id: logs
+      attributes:
+          label: Relevant log output
+          description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+          render: shell

@@ -1,0 +1,37 @@
+name: Feature Request
+description: Suggest an idea for this project
+title: "[Feature]: "
+labels: ["triage"]
+type: "feature"
+body:
+    - type: dropdown
+      id: tool
+      attributes:
+          label: Tool
+          description: Which tool are you suggesting a feature for?
+          options:
+              - Data Migrator
+              - Dataverse Trace Analyzer
+              - Entity Field Catalog
+              - ERD Generator
+              - PCF Builder
+              - Solution Dependency Analyzer
+              - View Layout Copier
+          default: 0
+      validations:
+          required: true
+    - type: textarea
+      id: solution
+      attributes:
+          label: Provide an idea you would like to see in the tool?
+          description: Be as descriptive as you can be; providing mockup or screenshot will go a long way.
+          placeholder: Tell us your idea!
+          value: "My awesome idea is..."
+      validations:
+          required: true
+    - type: textarea
+      id: logs
+      attributes:
+          label: Relevant log output
+          description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+          render: shell
