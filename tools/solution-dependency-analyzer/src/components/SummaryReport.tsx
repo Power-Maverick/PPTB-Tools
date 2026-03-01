@@ -6,10 +6,6 @@ interface SummaryReportProps {
     solutionName: string;
 }
 
-function isExcludedManagedAsset(asset: AnalysisOutput["assets"][number]): boolean {
-    return asset.isManaged === true;
-}
-
 export function SummaryReport({ analysisData, solutionName }: SummaryReportProps) {
     const [exportFormat, setExportFormat] = useState<"csv" | "json">("csv");
 
