@@ -2,7 +2,6 @@ name: Feature Request
 description: Suggest an idea for this project
 title: "[Feature]: "
 labels: ["triage"]
-type: "feature"
 body:
     - type: dropdown
       id: tool
