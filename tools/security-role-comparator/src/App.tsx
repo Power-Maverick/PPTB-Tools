@@ -169,7 +169,13 @@ export default function App() {
                                         ))}
                                 </select>
                                 {compareRoleIds.length > 1 && (
-                                    <button className="remove-slot-btn" onClick={() => removeCompareSlot(idx)} title="Remove">
+                                    <button
+                                        type="button"
+                                        className="remove-slot-btn"
+                                        onClick={() => removeCompareSlot(idx)}
+                                        title="Remove"
+                                        aria-label="Remove compare role"
+                                    >
                                         <DismissCircleRegular />
                                     </button>
                                 )}
