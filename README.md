@@ -10,6 +10,7 @@ Tools for Power Platform ToolBox (PPTB) - a comprehensive toolkit for working wi
         - [Entity Field Catalog](#entity-field-catalog)
         - [ERD Generator](#erd-generator)
         - [PCF Builder](#pcf-builder)
+        - [Security Role Comparator](#security-role-comparator)
         - [Solution Dependency Analyzer](#solution-dependency-analyzer)
         - [View Layout Copier](#view-layout-copier)
     - [Contributing](#contributing)
@@ -165,6 +166,30 @@ Build and manage Power Apps Component Framework (PCF) custom controls. **React-b
 - Manage PCF projects within PPTB
 - Build and test PCF controls using integrated commands
 - Package PCF controls into solutions for deployment
+
+### [Security Role Comparator](./tools/security-role-comparator)
+
+Tool README: [here](./tools/security-role-comparator/README.md)
+
+Compare one security role against up to 5 other roles side by side in the same Dataverse environment. Exclusively for PPTB.
+
+**Key Features:**
+
+- **React + TypeScript**: Modern component-based architecture with Vite build system
+- **PPTB-Only Integration**: Designed exclusively for Power Platform ToolBox
+- **Side-by-Side Comparison**: Select a base role and up to 5 comparison roles
+- **Depth Visualization**: Four filled/empty dots represent None → User → Business Unit → Parent-Child BU → Organization privilege levels
+- **Difference Highlighting**: Cells that differ from the base role are highlighted in amber
+- **Differences Only Filter**: Hide rows where all compared roles share the same privilege depth
+- **Entity Search**: Filter by entity name or operation (Create, Read, Write, Delete, and more)
+- **Dark Mode**: Follows the PPTB host theme automatically
+
+**Use Cases:**
+
+- Audit and compare security role configurations across roles
+- Identify privilege discrepancies between roles quickly
+- Validate that roles follow least-privilege principles
+- Document and review role differences for compliance or governance
 
 ### [Solution Dependency Analyzer](./tools/solution-dependency-analyzer)
 
