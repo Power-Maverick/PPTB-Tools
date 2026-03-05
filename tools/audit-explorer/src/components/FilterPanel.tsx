@@ -16,20 +16,44 @@ const useStyles = makeStyles({
     root: {
         display: "flex",
         flexDirection: "column",
-        gap: tokens.spacingVerticalS,
+        gap: tokens.spacingVerticalXS,
     },
-    row: {
+    // Single compact horizontal bar: date inputs + limit + checkboxes + fetchxml toggle
+    controlRow: {
         display: "flex",
-        gap: tokens.spacingHorizontalS,
+        flexDirection: "row",
         alignItems: "flex-end",
+        gap: tokens.spacingHorizontalM,
+        flexWrap: "wrap",
     },
-    field: {
-        flex: 1,
+    dateField: {
+        width: "140px",
+        flexShrink: 0,
+    },
+    limitField: {
+        width: "80px",
+        flexShrink: 0,
+    },
+    separator: {
+        width: "1px",
+        alignSelf: "stretch",
+        backgroundColor: tokens.colorNeutralStroke2,
+        flexShrink: 0,
+        marginBottom: "2px",
     },
     actionsGroup: {
         display: "flex",
+        flexDirection: "row",
         flexWrap: "wrap",
+        alignItems: "center",
         gap: tokens.spacingHorizontalXS,
+        flexShrink: 0,
+    },
+    actionsLabel: {
+        fontSize: tokens.fontSizeBase200,
+        color: tokens.colorNeutralForeground3,
+        whiteSpace: "nowrap",
+        paddingBottom: "6px",
     },
     toggle: {
         display: "flex",
@@ -39,18 +63,13 @@ const useStyles = makeStyles({
         userSelect: "none",
         color: tokens.colorNeutralForeground2,
         fontSize: tokens.fontSizeBase200,
-        marginTop: tokens.spacingVerticalXXS,
+        whiteSpace: "nowrap",
+        paddingBottom: "6px",
+        flexShrink: 0,
     },
     xmlArea: {
         fontFamily: "Consolas, 'Courier New', monospace",
         fontSize: tokens.fontSizeBase200,
-    },
-    sectionLabel: {
-        fontWeight: tokens.fontWeightSemibold,
-        fontSize: tokens.fontSizeBase200,
-        color: tokens.colorNeutralForeground2,
-        textTransform: "uppercase",
-        letterSpacing: "0.05em",
     },
 });
 
@@ -87,25 +106,24 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
 
     return (
         <div className={styles.root}>
-            <Label className={styles.sectionLabel}>Filters</Label>
-
-            {/* Date range */}
-            <div className={styles.row}>
-                <Field label="Date from" className={styles.field}>
+            {/* Single compact row: date inputs + limit + action checkboxes + fetchxml toggle */}
+            <div className={styles.controlRow}>
+                {/* Date range + limit */}
+                <Field label="Date from" className={styles.dateField}>
                     <Input
                         type="date"
                         value={filters.dateFrom}
                         onChange={(_e, d) => updateField("dateFrom", d.value)}
                     />
                 </Field>
-                <Field label="Date to" className={styles.field}>
+                <Field label="Date to" className={styles.dateField}>
                     <Input
                         type="date"
                         value={filters.dateTo}
                         onChange={(_e, d) => updateField("dateTo", d.value)}
                     />
                 </Field>
-                <Field label="Limit" className={styles.field}>
+                <Field label="Limit" className={styles.limitField}>
                     <Input
                         type="number"
                         value={String(filters.topCount)}
@@ -123,12 +141,12 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
                         ))}
                     </datalist>
                 </Field>
-            </div>
 
-            {/* Action type checkboxes */}
-            <div>
-                <Label className={styles.sectionLabel}>Action types</Label>
+                <div className={styles.separator} />
+
+                {/* Action type checkboxes inline */}
                 <div className={styles.actionsGroup}>
+                    <Label className={styles.actionsLabel}>Actions:</Label>
                     {FILTERABLE_ACTIONS.map((a) => (
                         <Checkbox
                             key={a.value}
@@ -138,28 +156,30 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
                         />
                     ))}
                 </div>
+
+                <div className={styles.separator} />
+
+                {/* FetchXML toggle */}
+                <div
+                    className={styles.toggle}
+                    onClick={() => setShowFetchXml((v) => !v)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") setShowFetchXml((v) => !v);
+                    }}
+                    aria-expanded={showFetchXml}
+                >
+                    {showFetchXml ? <ChevronUp20Regular /> : <ChevronDown20Regular />}
+                    FetchXML filter
+                </div>
             </div>
 
-            {/* FetchXML record filter toggle */}
-            <div
-                className={styles.toggle}
-                onClick={() => setShowFetchXml((v) => !v)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") setShowFetchXml((v) => !v);
-                }}
-                aria-expanded={showFetchXml}
-            >
-                {showFetchXml ? <ChevronUp20Regular /> : <ChevronDown20Regular />}
-                FetchXML record filter (optional)
-            </div>
-
+            {/* FetchXML textarea — shown below the control row when expanded */}
             {showFetchXml && (
                 <div>
                     <Field
-                        hint={`Provide a FetchXML query that returns records of the selected entity.
-Audit history will be restricted to the matching records.`}
+                        hint="Provide a FetchXML query returning records of the selected entity. Audit history will be restricted to those records."
                     >
                         <Textarea
                             className={styles.xmlArea}
@@ -171,7 +191,7 @@ Audit history will be restricted to the matching records.`}
     </filter>
   </entity>
 </fetch>`}
-                            rows={6}
+                            rows={4}
                             value={filters.fetchXml}
                             onChange={(_e, d) => updateField("fetchXml", d.value)}
                         />
@@ -181,7 +201,7 @@ Audit history will be restricted to the matching records.`}
                             size="small"
                             appearance="subtle"
                             onClick={() => updateField("fetchXml", "")}
-                            style={{ marginTop: 4 }}
+                            style={{ marginTop: "4px" }}
                         >
                             Clear
                         </Button>

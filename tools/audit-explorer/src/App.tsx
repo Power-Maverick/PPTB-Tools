@@ -38,21 +38,17 @@ const useStyles = makeStyles({
     topPanel: {
         display: "flex",
         flexDirection: "row",
-        alignItems: "flex-start",
+        alignItems: "center",
         gap: tokens.spacingHorizontalM,
         backgroundColor: tokens.colorNeutralBackground1,
         borderRadius: tokens.borderRadiusMedium,
-        padding: tokens.spacingHorizontalM,
+        padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
         boxShadow: tokens.shadow2,
         flexShrink: 0,
     },
     entityCol: {
-        width: "260px",
+        width: "240px",
         flexShrink: 0,
-        alignSelf: "stretch",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "flex-start",
     },
     filterCol: {
         flex: 1,
@@ -60,9 +56,8 @@ const useStyles = makeStyles({
     },
     actionButtons: {
         display: "flex",
-        flexDirection: "column",
-        gap: tokens.spacingVerticalS,
-        alignSelf: "flex-end",
+        flexDirection: "row",
+        gap: tokens.spacingHorizontalS,
         flexShrink: 0,
     },
     // ── Bottom audit history panel ───────────────────────────────
@@ -264,8 +259,6 @@ export default function App() {
                 <div className={styles.filterCol}>
                     <FilterPanel filters={filters} onChange={setFilters} />
                 </div>
-
-                <Divider vertical style={{ alignSelf: "stretch" }} />
 
                 <div className={styles.actionButtons}>
                     <Button
