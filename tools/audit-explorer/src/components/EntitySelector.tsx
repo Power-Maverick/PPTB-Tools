@@ -69,7 +69,7 @@ export function EntitySelector({ entities, selectedEntity, loading, onSelect }: 
                             </Option>
                         ))}
                     </Combobox>
-                    <Text className={styles.hint}>{entities.length} entities available</Text>
+                    <Text className={styles.hint}>{entities.length} audit-enabled entities</Text>
                 </>
             )}
         </div>

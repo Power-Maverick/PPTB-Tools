@@ -5,6 +5,7 @@ export interface DataverseEntity {
     primaryIdAttribute: string;
     primaryNameAttribute: string;
     objectTypeCode: number;
+    isAuditEnabled: boolean;
 }
 
 /** A single field-level change inside an audit entry */

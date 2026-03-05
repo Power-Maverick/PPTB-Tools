@@ -84,15 +84,21 @@ export class AuditClient {
                         ?.LocalizedLabels?.[0]?.Label ??
                     String(meta.LogicalName ?? "");
 
+                // IsAuditEnabled is a BooleanManagedProperty – the runtime value lives in .Value
+                const auditProp = meta.IsAuditEnabled as { Value?: boolean } | boolean | null | undefined;
+                const isAuditEnabled =
+                    typeof auditProp === "boolean" ? auditProp : (auditProp?.Value ?? false);
+
                 return {
                     logicalName: String(meta.LogicalName ?? ""),
                     displayName,
                     primaryIdAttribute: String(meta.PrimaryIdAttribute ?? ""),
                     primaryNameAttribute: String(meta.PrimaryNameAttribute ?? "name"),
                     objectTypeCode: Number(meta.ObjectTypeCode ?? 0),
+                    isAuditEnabled,
                 };
             })
-            .filter((e: DataverseEntity) => e.logicalName && e.objectTypeCode > 0)
+            .filter((e: DataverseEntity) => e.logicalName && e.objectTypeCode > 0 && e.isAuditEnabled)
             .sort((a: DataverseEntity, b: DataverseEntity) => a.displayName.localeCompare(b.displayName));
     }
 
