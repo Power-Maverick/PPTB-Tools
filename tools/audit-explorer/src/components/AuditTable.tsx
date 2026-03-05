@@ -168,15 +168,15 @@ export function AuditTable({ entries, loading }: AuditTableProps) {
                         <Body1>No audit records found. Select an entity and click "Load Audit History".</Body1>
                     </div>
                 ) : (
-                    <Table size="small" noNativeElements>
+                    <Table size="small" noNativeElements style={{ width: "100%", tableLayout: "fixed" }}>
                         <TableHeader>
                             <TableRow className={styles.headerRow}>
-                                <TableHeaderCell className={styles.headerCell} style={{ width: 24 }} />
-                                <TableHeaderCell className={styles.headerCell} style={{ width: 160 }}>Date / Time</TableHeaderCell>
-                                <TableHeaderCell className={styles.headerCell} style={{ width: 160 }}>Changed By</TableHeaderCell>
-                                <TableHeaderCell className={styles.headerCell} style={{ width: 90 }}>Action</TableHeaderCell>
-                                <TableHeaderCell className={styles.headerCell}>Record ID</TableHeaderCell>
-                                <TableHeaderCell className={styles.headerCell} style={{ width: 80 }}>Fields</TableHeaderCell>
+                                <TableHeaderCell className={styles.headerCell} style={{ width: "5%", minWidth: "36px" }} />
+                                <TableHeaderCell className={styles.headerCell} style={{ width: "15%", minWidth: "120px" }}>Date / Time</TableHeaderCell>
+                                <TableHeaderCell className={styles.headerCell} style={{ width: "30%", minWidth: "140px" }}>Changed By</TableHeaderCell>
+                                <TableHeaderCell className={styles.headerCell} style={{ width: "10%", minWidth: "80px" }}>Action</TableHeaderCell>
+                                <TableHeaderCell className={styles.headerCell} style={{ width: "30%", minWidth: "140px" }}>Record ID</TableHeaderCell>
+                                <TableHeaderCell className={styles.headerCell} style={{ width: "10%", minWidth: "60px" }}>Fields</TableHeaderCell>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
