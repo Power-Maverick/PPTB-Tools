@@ -3,6 +3,16 @@ import { ArrowDownload20Regular, ArrowSync20Regular, ChevronDown20Regular, Chevr
 import { useState } from "react";
 import { AuditFilters, DataverseEntity } from "../models/interfaces";
 
+/**
+ * Format a Date as a datetime-local input value (YYYY-MM-DDTHH:mm) in **UTC**.
+ * Dataverse FetchXML treats unzoned datetime strings as UTC, so we use UTC here
+ * to ensure the filter value matches what is stored in Dataverse.
+ */
+function toDateTimeLocal(d: Date): string {
+    // toISOString() returns "YYYY-MM-DDTHH:mm:ss.mmmZ"; take the first 16 chars
+    return d.toISOString().slice(0, 16);
+}
+
 const useStyles = makeStyles({
     // Outer wrapper: the card itself
     card: {
@@ -22,7 +32,6 @@ const useStyles = makeStyles({
     },
     // Entity combobox — slightly wider so display names fit
     entityField: {
-        // width: "220px",
         flexShrink: 0,
     },
     combobox: {
@@ -30,13 +39,31 @@ const useStyles = makeStyles({
     },
     // Date inputs
     dateField: {
-        // width: "148px",
         flexShrink: 0,
     },
     // Record limit
     limitField: {
-        // width: "80px",
         flexShrink: 0,
+    },
+    // Search / filter inputs
+    searchField: {
+        flexShrink: 0,
+        minWidth: "160px",
+    },
+    // Quick time preset buttons row
+    quickTimeGroup: {
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: "2px",
+        paddingTop: "22px",
+        flexShrink: 0,
+    },
+    quickTimeLabel: {
+        fontSize: tokens.fontSizeBase200,
+        color: tokens.colorNeutralForeground3,
+        whiteSpace: "nowrap",
+        marginRight: "2px",
     },
     // Thin vertical separator
     sep: {
@@ -144,8 +171,16 @@ export function ControlBar({ entities, selectedEntity, loadingEntities, onSelect
         onSelectEntity(found ?? null);
     };
 
+    /** Apply a quick "last N minutes" time preset */
+    const applyQuickTime = (minutes: number) => {
+        const now = new Date();
+        const from = new Date(now.getTime() - minutes * 60 * 1000);
+        onFiltersChange({ ...filters, dateFrom: toDateTimeLocal(from), dateTo: toDateTimeLocal(now) });
+    };
+
     return (
         <div className={styles.card}>
+            {/* ── Row 1: entity · date range · quick presets · limit ── */}
             <div className={styles.row}>
                 {/* Entity combobox */}
                 <Field label="Entity" className={styles.entityField} hint={!loadingEntities ? `${entities.length} audit-enabled` : undefined}>
@@ -174,13 +209,24 @@ export function ControlBar({ entities, selectedEntity, loadingEntities, onSelect
 
                 {/* Date from */}
                 <Field label="Date from" className={styles.dateField}>
-                    <Input type="date" value={filters.dateFrom} onChange={(_e, d) => updateFilter("dateFrom", d.value)} />
+                    <Input type="datetime-local" value={filters.dateFrom} onChange={(_e, d) => updateFilter("dateFrom", d.value)} />
                 </Field>
 
                 {/* Date to */}
                 <Field label="Date to" className={styles.dateField}>
-                    <Input type="date" value={filters.dateTo} onChange={(_e, d) => updateFilter("dateTo", d.value)} />
+                    <Input type="datetime-local" value={filters.dateTo} onChange={(_e, d) => updateFilter("dateTo", d.value)} />
                 </Field>
+
+                {/* Quick time presets */}
+                <div className={styles.quickTimeGroup}>
+                    <Text className={styles.quickTimeLabel}>Quick:</Text>
+                    <Button size="small" appearance="subtle" onClick={() => applyQuickTime(30)}>30m</Button>
+                    <Button size="small" appearance="subtle" onClick={() => applyQuickTime(60)}>1h</Button>
+                    <Button size="small" appearance="subtle" onClick={() => applyQuickTime(120)}>2h</Button>
+                    {(filters.dateFrom || filters.dateTo) && (
+                        <Button size="small" appearance="subtle" onClick={() => onFiltersChange({ ...filters, dateFrom: "", dateTo: "" })}>✕</Button>
+                    )}
+                </div>
 
                 {/* Limit */}
                 <Field label="Limit" className={styles.limitField}>
@@ -202,7 +248,27 @@ export function ControlBar({ entities, selectedEntity, loadingEntities, onSelect
                     </datalist>
                 </Field>
             </div>
+
+            {/* ── Row 2: record search · changed field · actions · fetchxml toggle ── */}
             <div className={styles.row}>
+                {/* Record search: primary ID (GUID) or primary name */}
+                <Field label="Record ID / Name" className={styles.searchField} hint="GUID or name — filters server-side">
+                    <Input
+                        placeholder="Enter ID or name…"
+                        value={filters.recordSearch}
+                        onChange={(_e, d) => updateFilter("recordSearch", d.value)}
+                    />
+                </Field>
+
+                {/* Changed field filter: client-side, post-load */}
+                <Field label="Changed field" className={styles.searchField} hint="Filter rows by field name">
+                    <Input
+                        placeholder="e.g. statuscode"
+                        value={filters.changedFieldFilter}
+                        onChange={(_e, d) => updateFilter("changedFieldFilter", d.value)}
+                    />
+                </Field>
+
                 {/* Action checkboxes */}
                 <div className={styles.actionsGroup}>
                     <Text className={styles.actionsLabel}>Actions:</Text>
@@ -210,8 +276,6 @@ export function ControlBar({ entities, selectedEntity, loadingEntities, onSelect
                         <Checkbox key={a.value} label={a.label} checked={filters.selectedActions.includes(a.value)} onChange={(_e, d) => toggleAction(a.value, !!d.checked)} />
                     ))}
                 </div>
-
-                {/* <div className={styles.sep} /> */}
 
                 {/* FetchXML toggle */}
                 <div
@@ -231,9 +295,10 @@ export function ControlBar({ entities, selectedEntity, loadingEntities, onSelect
                     FetchXML
                 </div>
             </div>
-            <div className={styles.row}>
-                {/* FetchXML textarea — shown below the row when expanded */}
-                {showFetchXml && (
+
+            {/* ── Row 3: FetchXML textarea (shown when expanded) ── */}
+            {showFetchXml && (
+                <div className={styles.row}>
                     <div className={styles.fetchXmlArea}>
                         <Field hint="Provide a FetchXML query returning records of the selected entity. Audit history will be restricted to those records.">
                             <Textarea
@@ -257,10 +322,11 @@ export function ControlBar({ entities, selectedEntity, loadingEntities, onSelect
                             </Button>
                         )}
                     </div>
-                )}
-            </div>
+                </div>
+            )}
+
+            {/* ── Row 4: action buttons ── */}
             <div className={styles.row}>
-                {/* Action buttons */}
                 <div className={styles.buttonsGroup}>
                     <Button appearance="primary" disabled={!selectedEntity || loadingAudit} icon={loadingAudit ? <Spinner size="tiny" /> : <ArrowSync20Regular />} onClick={onLoad}>
                         {loadingAudit ? "Loading…" : "Load Audit History"}

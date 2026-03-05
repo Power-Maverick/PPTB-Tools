@@ -73,4 +73,8 @@ export interface AuditFilters {
     selectedActions: number[];
     fetchXml: string;
     topCount: number;
+    /** Primary record ID (GUID) or primary name — applied server-side at query time */
+    recordSearch: string;
+    /** Client-side: show only audit entries that touched this field (logical name substring match) */
+    changedFieldFilter: string;
 }

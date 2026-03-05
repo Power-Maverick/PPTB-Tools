@@ -88,6 +88,8 @@ const DEFAULT_FILTERS: AuditFilters = {
     selectedActions: [],
     fetchXml: "",
     topCount: 500,
+    recordSearch: "",
+    changedFieldFilter: "",
 };
 
 const auditClient = new AuditClient();
@@ -256,7 +258,7 @@ export default function App() {
                         </Text>
                     </div>
                 </div>
-                <AuditTable entries={auditEntries} loading={loadingAudit} />
+                <AuditTable entries={auditEntries} loading={loadingAudit} changedFieldFilter={filters.changedFieldFilter} />
             </div>
         </div>
     );

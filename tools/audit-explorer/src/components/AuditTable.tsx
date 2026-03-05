@@ -159,11 +159,23 @@ const columnSizingOptions: TableColumnSizingOptions = {
 interface AuditTableProps {
     entries: AuditEntry[];
     loading: boolean;
+    changedFieldFilter?: string;
 }
 
-export function AuditTable({ entries, loading }: AuditTableProps) {
+export function AuditTable({ entries, loading, changedFieldFilter }: AuditTableProps) {
     const styles = useStyles();
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+    // Apply client-side "changed field" filter
+    const displayedEntries = changedFieldFilter?.trim()
+        ? entries.filter((e) =>
+              e.changedFields.some(
+                  (f) =>
+                      f.logicalName.toLowerCase().includes(changedFieldFilter.toLowerCase()) ||
+                      f.displayName.toLowerCase().includes(changedFieldFilter.toLowerCase()),
+              ),
+          )
+        : entries;
     const { columnSizing_unstable, tableRef } = useTableFeatures({ columns: columnsDef, items: entries }, [useTableColumnSizing_unstable({ columnSizingOptions })]);
 
     const toggleRow = (id: string) => {
@@ -189,9 +201,13 @@ export function AuditTable({ entries, loading }: AuditTableProps) {
     return (
         <div className={styles.root}>
             <div className={styles.tableWrapper}>
-                {entries.length === 0 ? (
+                {displayedEntries.length === 0 ? (
                     <div className={styles.noData}>
-                        <Body1>No audit records found. Select an entity and click "Load Audit History".</Body1>
+                        <Body1>
+                            {changedFieldFilter?.trim() && entries.length > 0
+                                ? `No entries where field "${changedFieldFilter}" was changed.`
+                                : "No audit records found. Select an entity and click \"Load Audit History\"."}
+                        </Body1>
                     </div>
                 ) : (
                     <Table ref={tableRef} size="small" noNativeElements {...columnSizing_unstable.getTableProps()} style={{ width: "100%" }}>
@@ -220,7 +236,7 @@ export function AuditTable({ entries, loading }: AuditTableProps) {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {entries.map((entry) => {
+                            {displayedEntries.map((entry) => {
                                 const isExpanded = expandedRows.has(entry.auditId);
                                 const hasFields = entry.changedFields.length > 0;
                                 return (

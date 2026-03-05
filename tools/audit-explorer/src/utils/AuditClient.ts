@@ -1,5 +1,17 @@
 import { AUDIT_ACTIONS, AuditEntry, AuditFieldChange, AuditFilters, DataverseEntity, RawAuditRecord } from "../models/interfaces";
 
+const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Escape XML special characters so they are safe inside attribute values */
+function escapeXml(s: string): string {
+    return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
+}
+
 /**
  * Parse the changedata JSON blob from a Dataverse audit record.
  * Returns an array of field-level changes, or an empty array if not available.
@@ -116,6 +128,25 @@ export class AuditClient {
             }
         }
 
+        // Handle record search (GUID or primary name)
+        const term = filters.recordSearch?.trim();
+        if (term) {
+            let searchIds: string[];
+            if (GUID_RE.test(term)) {
+                // Direct GUID — treat as exact objectid match
+                searchIds = [term.toLowerCase()];
+            } else {
+                // Name search — pre-query by primaryNameAttribute (up to 50 matches)
+                searchIds = await this.getRecordIdsByName(entity, term);
+            }
+            if (searchIds.length === 0) return [];
+            // Intersect with any FetchXML-derived IDs
+            recordIds = recordIds
+                ? recordIds.filter((id) => searchIds.some((s) => s.toLowerCase() === id.toLowerCase()))
+                : searchIds;
+            if (recordIds.length === 0) return [];
+        }
+
         const auditRecords = await this.queryAuditTable(entity, filters, recordIds);
         return this.processAuditRecords(auditRecords, entity.logicalName);
     }
@@ -127,6 +158,31 @@ export class AuditClient {
         const result = await window.dataverseAPI.fetchXmlQuery(fetchXml, "primary");
         const records = result.value ?? [];
         return records.map((r: Record<string, unknown>) => String(r[primaryIdAttribute] ?? "")).filter(Boolean);
+    }
+
+    /**
+     * Search an entity's records by primary name attribute (case-insensitive contains).
+     * Returns up to 50 matching primary key values.
+     */
+    private async getRecordIdsByName(entity: DataverseEntity, name: string): Promise<string[]> {
+        const safeEntityName = escapeXml(entity.logicalName);
+        const safeIdAttr = escapeXml(entity.primaryIdAttribute);
+        const safeNameAttr = escapeXml(entity.primaryNameAttribute);
+        // Escape backslash first (the LIKE escape char), then LIKE wildcards (% and _),
+        // so the search is a literal substring match. Wrap in % for a contains search.
+        const safeName = escapeXml(name.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_"));
+
+        const fetchXml = `<fetch top="50" no-lock="true">
+  <entity name="${safeEntityName}">
+    <attribute name="${safeIdAttr}"/>
+    <filter>
+      <condition attribute="${safeNameAttr}" operator="like" value="%${safeName}%"/>
+    </filter>
+  </entity>
+</fetch>`;
+        const result = await window.dataverseAPI.fetchXmlQuery(fetchXml, "primary");
+        const records = result.value ?? [];
+        return records.map((r: Record<string, unknown>) => String(r[entity.primaryIdAttribute] ?? "")).filter(Boolean);
     }
 
     /**
