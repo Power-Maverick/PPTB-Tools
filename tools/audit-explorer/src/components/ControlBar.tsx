@@ -1,22 +1,5 @@
-import {
-    Button,
-    Checkbox,
-    Combobox,
-    Field,
-    Input,
-    Option,
-    Spinner,
-    Text,
-    Textarea,
-    makeStyles,
-    tokens,
-} from "@fluentui/react-components";
-import {
-    ArrowDownload20Regular,
-    ArrowSync20Regular,
-    ChevronDown20Regular,
-    ChevronUp20Regular,
-} from "@fluentui/react-icons";
+import { Button, Checkbox, Combobox, Field, Input, Option, Spinner, Text, Textarea, makeStyles, tokens } from "@fluentui/react-components";
+import { ArrowDownload20Regular, ArrowSync20Regular, ChevronDown20Regular, ChevronUp20Regular } from "@fluentui/react-icons";
 import { useState } from "react";
 import { AuditFilters, DataverseEntity } from "../models/interfaces";
 
@@ -33,13 +16,13 @@ const useStyles = makeStyles({
     row: {
         display: "flex",
         flexDirection: "row",
-        alignItems: "flex-end",
+        alignItems: "flex-start",
         gap: tokens.spacingHorizontalM,
         flexWrap: "wrap",
     },
     // Entity combobox — slightly wider so display names fit
     entityField: {
-        width: "220px",
+        // width: "220px",
         flexShrink: 0,
     },
     combobox: {
@@ -47,12 +30,12 @@ const useStyles = makeStyles({
     },
     // Date inputs
     dateField: {
-        width: "148px",
+        // width: "148px",
         flexShrink: 0,
     },
     // Record limit
     limitField: {
-        width: "80px",
+        // width: "80px",
         flexShrink: 0,
     },
     // Thin vertical separator
@@ -139,18 +122,7 @@ interface ControlBarProps {
     onExport: () => void;
 }
 
-export function ControlBar({
-    entities,
-    selectedEntity,
-    loadingEntities,
-    onSelectEntity,
-    filters,
-    onFiltersChange,
-    loadingAudit,
-    canExport,
-    onLoad,
-    onExport,
-}: ControlBarProps) {
+export function ControlBar({ entities, selectedEntity, loadingEntities, onSelectEntity, filters, onFiltersChange, loadingAudit, canExport, onLoad, onExport }: ControlBarProps) {
     const styles = useStyles();
     const [showFetchXml, setShowFetchXml] = useState(false);
 
@@ -159,9 +131,7 @@ export function ControlBar({
     };
 
     const toggleAction = (actionValue: number, checked: boolean) => {
-        const next = checked
-            ? [...filters.selectedActions, actionValue]
-            : filters.selectedActions.filter((a) => a !== actionValue);
+        const next = checked ? [...filters.selectedActions, actionValue] : filters.selectedActions.filter((a) => a !== actionValue);
         updateFilter("selectedActions", next);
     };
 
@@ -177,13 +147,8 @@ export function ControlBar({
     return (
         <div className={styles.card}>
             <div className={styles.row}>
-
-                {/* ── Entity combobox ─────────────────────────────── */}
-                <Field
-                    label="Entity"
-                    className={styles.entityField}
-                    hint={!loadingEntities ? `${entities.length} audit-enabled` : undefined}
-                >
+                {/* Entity combobox */}
+                <Field label="Entity" className={styles.entityField} hint={!loadingEntities ? `${entities.length} audit-enabled` : undefined}>
                     {loadingEntities ? (
                         <Spinner size="tiny" label="Loading…" />
                     ) : (
@@ -207,27 +172,17 @@ export function ControlBar({
                     )}
                 </Field>
 
-                <div className={styles.sep} />
-
-                {/* ── Date from ───────────────────────────────────── */}
+                {/* Date from */}
                 <Field label="Date from" className={styles.dateField}>
-                    <Input
-                        type="date"
-                        value={filters.dateFrom}
-                        onChange={(_e, d) => updateFilter("dateFrom", d.value)}
-                    />
+                    <Input type="date" value={filters.dateFrom} onChange={(_e, d) => updateFilter("dateFrom", d.value)} />
                 </Field>
 
-                {/* ── Date to ─────────────────────────────────────── */}
+                {/* Date to */}
                 <Field label="Date to" className={styles.dateField}>
-                    <Input
-                        type="date"
-                        value={filters.dateTo}
-                        onChange={(_e, d) => updateFilter("dateTo", d.value)}
-                    />
+                    <Input type="date" value={filters.dateTo} onChange={(_e, d) => updateFilter("dateTo", d.value)} />
                 </Field>
 
-                {/* ── Limit ───────────────────────────────────────── */}
+                {/* Limit */}
                 <Field label="Limit" className={styles.limitField}>
                     <Input
                         type="number"
@@ -241,28 +196,24 @@ export function ControlBar({
                         }}
                     />
                     <datalist id="top-options">
-                        {TOP_OPTIONS.map((v) => <option key={v} value={v} />)}
+                        {TOP_OPTIONS.map((v) => (
+                            <option key={v} value={v} />
+                        ))}
                     </datalist>
                 </Field>
-
-                <div className={styles.sep} />
-
-                {/* ── Action checkboxes ────────────────────────────── */}
+            </div>
+            <div className={styles.row}>
+                {/* Action checkboxes */}
                 <div className={styles.actionsGroup}>
                     <Text className={styles.actionsLabel}>Actions:</Text>
                     {FILTERABLE_ACTIONS.map((a) => (
-                        <Checkbox
-                            key={a.value}
-                            label={a.label}
-                            checked={filters.selectedActions.includes(a.value)}
-                            onChange={(_e, d) => toggleAction(a.value, !!d.checked)}
-                        />
+                        <Checkbox key={a.value} label={a.label} checked={filters.selectedActions.includes(a.value)} onChange={(_e, d) => toggleAction(a.value, !!d.checked)} />
                     ))}
                 </div>
 
-                <div className={styles.sep} />
+                {/* <div className={styles.sep} /> */}
 
-                {/* ── FetchXML toggle ──────────────────────────────── */}
+                {/* FetchXML toggle */}
                 <div
                     className={styles.fetchXmlToggle}
                     onClick={() => setShowFetchXml((v) => !v)}
@@ -279,40 +230,15 @@ export function ControlBar({
                     {showFetchXml ? <ChevronUp20Regular /> : <ChevronDown20Regular />}
                     FetchXML
                 </div>
-
-                {/* Push buttons to the right */}
-                <div className={styles.spacer} />
-
-                {/* ── Action buttons ───────────────────────────────── */}
-                <div className={styles.buttonsGroup}>
-                    <Button
-                        appearance="primary"
-                        disabled={!selectedEntity || loadingAudit}
-                        icon={loadingAudit ? <Spinner size="tiny" /> : <ArrowSync20Regular />}
-                        onClick={onLoad}
-                    >
-                        {loadingAudit ? "Loading…" : "Load Audit History"}
-                    </Button>
-                    <Button
-                        appearance="secondary"
-                        icon={<ArrowDownload20Regular />}
-                        disabled={!canExport}
-                        onClick={onExport}
-                    >
-                        Export to Excel
-                    </Button>
-                </div>
             </div>
-
-            {/* FetchXML textarea — shown below the row when expanded */}
-            {showFetchXml && (
-                <div className={styles.fetchXmlArea}>
-                    <Field
-                        hint="Provide a FetchXML query returning records of the selected entity. Audit history will be restricted to those records."
-                    >
-                        <Textarea
-                            className={styles.xmlTextarea}
-                            placeholder={`<fetch top="50">
+            <div className={styles.row}>
+                {/* FetchXML textarea — shown below the row when expanded */}
+                {showFetchXml && (
+                    <div className={styles.fetchXmlArea}>
+                        <Field hint="Provide a FetchXML query returning records of the selected entity. Audit history will be restricted to those records.">
+                            <Textarea
+                                className={styles.xmlTextarea}
+                                placeholder={`<fetch top="50">
   <entity name="account">
     <attribute name="accountid"/>
     <filter>
@@ -320,23 +246,30 @@ export function ControlBar({
     </filter>
   </entity>
 </fetch>`}
-                            rows={4}
-                            value={filters.fetchXml}
-                            onChange={(_e, d) => updateFilter("fetchXml", d.value)}
-                        />
-                    </Field>
-                    {filters.fetchXml.trim() && (
-                        <Button
-                            size="small"
-                            appearance="subtle"
-                            onClick={() => updateFilter("fetchXml", "")}
-                            style={{ marginTop: "4px" }}
-                        >
-                            Clear
-                        </Button>
-                    )}
+                                rows={4}
+                                value={filters.fetchXml}
+                                onChange={(_e, d) => updateFilter("fetchXml", d.value)}
+                            />
+                        </Field>
+                        {filters.fetchXml.trim() && (
+                            <Button size="small" appearance="subtle" onClick={() => updateFilter("fetchXml", "")} style={{ marginTop: "4px" }}>
+                                Clear
+                            </Button>
+                        )}
+                    </div>
+                )}
+            </div>
+            <div className={styles.row}>
+                {/* Action buttons */}
+                <div className={styles.buttonsGroup}>
+                    <Button appearance="primary" disabled={!selectedEntity || loadingAudit} icon={loadingAudit ? <Spinner size="tiny" /> : <ArrowSync20Regular />} onClick={onLoad}>
+                        {loadingAudit ? "Loading…" : "Load Audit History"}
+                    </Button>
+                    <Button appearance="secondary" icon={<ArrowDownload20Regular />} disabled={!canExport} onClick={onExport}>
+                        Export to Excel
+                    </Button>
                 </div>
-            )}
+            </div>
         </div>
     );
 }
