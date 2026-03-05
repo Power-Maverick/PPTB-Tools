@@ -14,6 +14,7 @@ body:
               - Entity Field Catalog
               - ERD Generator
               - PCF Builder
+              - Security Role Comparator
               - Solution Dependency Analyzer
               - View Layout Copier
           default: 0
