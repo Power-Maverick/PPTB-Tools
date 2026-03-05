@@ -1,7 +1,6 @@
 import {
     Badge,
     Button,
-    Divider,
     MessageBar,
     MessageBarActions,
     MessageBarBody,
@@ -10,11 +9,9 @@ import {
     makeStyles,
     tokens,
 } from "@fluentui/react-components";
-import { ArrowDownload20Regular, ArrowSync20Regular } from "@fluentui/react-icons";
 import { useEffect, useState } from "react";
 import { AuditTable } from "./components/AuditTable";
-import { EntitySelector } from "./components/EntitySelector";
-import { FilterPanel } from "./components/FilterPanel";
+import { ControlBar } from "./components/ControlBar";
 import { AuditEntry, AuditFilters, DataverseEntity } from "./models/interfaces";
 import "./styles/App.css";
 import { AuditClient } from "./utils/AuditClient";
@@ -32,32 +29,6 @@ const useStyles = makeStyles({
         paddingTop: tokens.spacingVerticalS,
     },
     errorBar: {
-        flexShrink: 0,
-    },
-    // ── Top controls strip ──────────────────────────────────────
-    topPanel: {
-        display: "flex",
-        flexDirection: "row",
-        alignItems: "center",
-        gap: tokens.spacingHorizontalM,
-        backgroundColor: tokens.colorNeutralBackground1,
-        borderRadius: tokens.borderRadiusMedium,
-        padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
-        boxShadow: tokens.shadow2,
-        flexShrink: 0,
-    },
-    entityCol: {
-        width: "240px",
-        flexShrink: 0,
-    },
-    filterCol: {
-        flex: 1,
-        minWidth: 0,
-    },
-    actionButtons: {
-        display: "flex",
-        flexDirection: "row",
-        gap: tokens.spacingHorizontalS,
         flexShrink: 0,
     },
     // ── Bottom audit history panel ───────────────────────────────
@@ -243,42 +214,19 @@ export default function App() {
                 </div>
             )}
 
-            {/* Top controls strip: entity selector + filters + action buttons */}
-            <div className={styles.topPanel}>
-                <div className={styles.entityCol}>
-                    <EntitySelector
-                        entities={entities}
-                        selectedEntity={selectedEntity}
-                        loading={loadingEntities}
-                        onSelect={setSelectedEntity}
-                    />
-                </div>
-
-                <Divider vertical style={{ alignSelf: "stretch" }} />
-
-                <div className={styles.filterCol}>
-                    <FilterPanel filters={filters} onChange={setFilters} />
-                </div>
-
-                <div className={styles.actionButtons}>
-                    <Button
-                        appearance="primary"
-                        disabled={!selectedEntity || loadingAudit}
-                        icon={loadingAudit ? <Spinner size="tiny" /> : <ArrowSync20Regular />}
-                        onClick={handleLoadAudit}
-                    >
-                        {loadingAudit ? "Loading…" : "Load Audit History"}
-                    </Button>
-                    <Button
-                        appearance="secondary"
-                        icon={<ArrowDownload20Regular />}
-                        disabled={auditEntries.length === 0}
-                        onClick={handleExport}
-                    >
-                        Export to Excel
-                    </Button>
-                </div>
-            </div>
+            {/* Unified control bar: entity selector + filters + action buttons */}
+            <ControlBar
+                entities={entities}
+                selectedEntity={selectedEntity}
+                loadingEntities={loadingEntities}
+                onSelectEntity={setSelectedEntity}
+                filters={filters}
+                onFiltersChange={setFilters}
+                loadingAudit={loadingAudit}
+                canExport={auditEntries.length > 0}
+                onLoad={handleLoadAudit}
+                onExport={handleExport}
+            />
 
             {/* Bottom section: audit history table (takes remaining 70-80% of space) */}
             <div className={styles.bottomPanel}>
