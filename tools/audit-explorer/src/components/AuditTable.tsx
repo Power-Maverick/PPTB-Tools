@@ -6,12 +6,18 @@ import {
     Table,
     TableBody,
     TableCell,
+    TableColumnDefinition,
+    TableColumnSizingOptions,
     TableHeader,
     TableHeaderCell,
+    TableResizeHandle,
     TableRow,
     Text,
+    createTableColumn,
     makeStyles,
     tokens,
+    useTableColumnSizing_unstable,
+    useTableFeatures,
 } from "@fluentui/react-components";
 import { ChevronDown16Regular, ChevronRight16Regular } from "@fluentui/react-icons";
 import { useState } from "react";
@@ -42,6 +48,7 @@ const useStyles = makeStyles({
         fontWeight: tokens.fontWeightSemibold,
         fontSize: tokens.fontSizeBase200,
         whiteSpace: "nowrap",
+        padding: `0px 0px 0px ${tokens.spacingHorizontalS}`,
     },
     dataRow: {
         cursor: "pointer",
@@ -131,6 +138,24 @@ function actionColor(action: number): ActionColor {
     return "informative";
 }
 
+const columnsDef: TableColumnDefinition<AuditEntry>[] = [
+    createTableColumn<AuditEntry>({ columnId: "expand", renderHeaderCell: () => null, renderCell: () => null }),
+    createTableColumn<AuditEntry>({ columnId: "dateTime", renderHeaderCell: () => "Date / Time", renderCell: (item) => item.createdOn }),
+    createTableColumn<AuditEntry>({ columnId: "changedBy", renderHeaderCell: () => "Changed By", renderCell: (item) => item.userName }),
+    createTableColumn<AuditEntry>({ columnId: "action", renderHeaderCell: () => "Action", renderCell: (item) => item.actionLabel }),
+    createTableColumn<AuditEntry>({ columnId: "recordId", renderHeaderCell: () => "Record ID", renderCell: (item) => item.recordId }),
+    createTableColumn<AuditEntry>({ columnId: "fields", renderHeaderCell: () => "Fields", renderCell: (item) => item.changedFields.length }),
+];
+
+const columnSizingOptions: TableColumnSizingOptions = {
+    expand: { defaultWidth: 45, minWidth: 36, idealWidth: 45 },
+    dateTime: { defaultWidth: 150, minWidth: 140 },
+    changedBy: { defaultWidth: 270, minWidth: 140 },
+    action: { defaultWidth: 90, minWidth: 80 },
+    recordId: { defaultWidth: 270, minWidth: 140 },
+    fields: { defaultWidth: 75, minWidth: 60 },
+};
+
 interface AuditTableProps {
     entries: AuditEntry[];
     loading: boolean;
@@ -139,6 +164,7 @@ interface AuditTableProps {
 export function AuditTable({ entries, loading }: AuditTableProps) {
     const styles = useStyles();
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+    const { columnSizing_unstable, tableRef } = useTableFeatures({ columns: columnsDef, items: entries }, [useTableColumnSizing_unstable({ columnSizingOptions })]);
 
     const toggleRow = (id: string) => {
         setExpandedRows((prev) => {
@@ -168,15 +194,29 @@ export function AuditTable({ entries, loading }: AuditTableProps) {
                         <Body1>No audit records found. Select an entity and click "Load Audit History".</Body1>
                     </div>
                 ) : (
-                    <Table size="small" noNativeElements style={{ width: "100%", tableLayout: "fixed" }}>
+                    <Table ref={tableRef} size="small" noNativeElements {...columnSizing_unstable.getTableProps()} style={{ width: "100%" }}>
                         <TableHeader>
                             <TableRow className={styles.headerRow}>
-                                <TableHeaderCell className={styles.headerCell} style={{ width: "5%", minWidth: "36px" }} />
-                                <TableHeaderCell className={styles.headerCell} style={{ width: "15%", minWidth: "120px" }}>Date / Time</TableHeaderCell>
-                                <TableHeaderCell className={styles.headerCell} style={{ width: "30%", minWidth: "140px" }}>Changed By</TableHeaderCell>
-                                <TableHeaderCell className={styles.headerCell} style={{ width: "10%", minWidth: "80px" }}>Action</TableHeaderCell>
-                                <TableHeaderCell className={styles.headerCell} style={{ width: "30%", minWidth: "140px" }}>Record ID</TableHeaderCell>
-                                <TableHeaderCell className={styles.headerCell} style={{ width: "10%", minWidth: "60px" }}>Fields</TableHeaderCell>
+                                <TableHeaderCell className={styles.headerCell} {...columnSizing_unstable.getTableHeaderCellProps("expand")} />
+                                <TableHeaderCell className={styles.headerCell} {...columnSizing_unstable.getTableHeaderCellProps("dateTime")}>
+                                    Date / Time
+                                    <TableResizeHandle />
+                                </TableHeaderCell>
+                                <TableHeaderCell className={styles.headerCell} {...columnSizing_unstable.getTableHeaderCellProps("changedBy")}>
+                                    Changed By
+                                    <TableResizeHandle />
+                                </TableHeaderCell>
+                                <TableHeaderCell className={styles.headerCell} {...columnSizing_unstable.getTableHeaderCellProps("action")}>
+                                    Action
+                                    <TableResizeHandle />
+                                </TableHeaderCell>
+                                <TableHeaderCell className={styles.headerCell} {...columnSizing_unstable.getTableHeaderCellProps("recordId")}>
+                                    Record ID
+                                    <TableResizeHandle />
+                                </TableHeaderCell>
+                                <TableHeaderCell className={styles.headerCell} {...columnSizing_unstable.getTableHeaderCellProps("fields")}>
+                                    Fields
+                                </TableHeaderCell>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -191,37 +231,24 @@ export function AuditTable({ entries, loading }: AuditTableProps) {
                                             onClick={() => hasFields && toggleRow(entry.auditId)}
                                             aria-expanded={isExpanded}
                                         >
-                                            <TableCell>
-                                                {hasFields ? (
-                                                    isExpanded ? (
-                                                        <ChevronDown16Regular className={styles.expandIcon} />
-                                                    ) : (
-                                                        <ChevronRight16Regular className={styles.expandIcon} />
-                                                    )
-                                                ) : null}
+                                            <TableCell {...columnSizing_unstable.getTableCellProps("expand")}>
+                                                {hasFields ? isExpanded ? <ChevronDown16Regular className={styles.expandIcon} /> : <ChevronRight16Regular className={styles.expandIcon} /> : null}
                                             </TableCell>
-                                            <TableCell>
-                                                <Caption1 className={styles.dateCell}>
-                                                    {entry.createdOn ? new Date(entry.createdOn).toLocaleString() : "—"}
-                                                </Caption1>
+                                            <TableCell {...columnSizing_unstable.getTableCellProps("dateTime")}>
+                                                <Caption1 className={styles.dateCell}>{entry.createdOn ? new Date(entry.createdOn).toLocaleString() : "—"}</Caption1>
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell {...columnSizing_unstable.getTableCellProps("changedBy")}>
                                                 <Text className={styles.userCell}>{entry.userName}</Text>
                                             </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    className={styles.actionBadge}
-                                                    color={actionColor(entry.action)}
-                                                    appearance="tint"
-                                                    size="small"
-                                                >
+                                            <TableCell {...columnSizing_unstable.getTableCellProps("action")}>
+                                                <Badge className={styles.actionBadge} color={actionColor(entry.action)} appearance="tint" size="small">
                                                     {entry.actionLabel}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell {...columnSizing_unstable.getTableCellProps("recordId")}>
                                                 <Caption1 className={styles.recordIdCell}>{entry.recordId || "—"}</Caption1>
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell {...columnSizing_unstable.getTableCellProps("fields")}>
                                                 <Caption1>{entry.changedFields.length > 0 ? entry.changedFields.length : "—"}</Caption1>
                                             </TableCell>
                                         </TableRow>
@@ -232,9 +259,15 @@ export function AuditTable({ entries, loading }: AuditTableProps) {
                                                     <table className={styles.detailTable}>
                                                         <thead>
                                                             <tr>
-                                                                <th className={styles.detailHeaderCell} style={{ width: "30%" }}>Field</th>
-                                                                <th className={styles.detailHeaderCell} style={{ width: "35%" }}>Old Value</th>
-                                                                <th className={styles.detailHeaderCell} style={{ width: "35%" }}>New Value</th>
+                                                                <th className={styles.detailHeaderCell} style={{ width: "30%" }}>
+                                                                    Field
+                                                                </th>
+                                                                <th className={styles.detailHeaderCell} style={{ width: "35%" }}>
+                                                                    Old Value
+                                                                </th>
+                                                                <th className={styles.detailHeaderCell} style={{ width: "35%" }}>
+                                                                    New Value
+                                                                </th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
