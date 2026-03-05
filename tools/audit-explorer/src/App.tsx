@@ -27,44 +27,46 @@ const useStyles = makeStyles({
         height: "100vh",
         overflow: "hidden",
         backgroundColor: tokens.colorNeutralBackground2,
+        gap: tokens.spacingVerticalS,
+        padding: tokens.spacingHorizontalM,
+        paddingTop: tokens.spacingVerticalS,
     },
     errorBar: {
-        margin: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalM}`,
-    },
-    layout: {
-        display: "flex",
-        flex: 1,
-        gap: tokens.spacingHorizontalM,
-        padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
-        overflow: "hidden",
-        minHeight: 0,
-    },
-    sidebar: {
-        display: "flex",
-        flexDirection: "column",
-        gap: tokens.spacingVerticalM,
-        width: "300px",
         flexShrink: 0,
-        overflowY: "auto",
     },
-    sidebarCard: {
+    // ── Top controls strip ──────────────────────────────────────
+    topPanel: {
         display: "flex",
-        flexDirection: "column",
-        gap: tokens.spacingVerticalS,
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: tokens.spacingHorizontalM,
         backgroundColor: tokens.colorNeutralBackground1,
         borderRadius: tokens.borderRadiusMedium,
         padding: tokens.spacingHorizontalM,
         boxShadow: tokens.shadow2,
+        flexShrink: 0,
     },
-    mainPanel: {
+    entityCol: {
+        width: "260px",
+        flexShrink: 0,
+        alignSelf: "stretch",
         display: "flex",
         flexDirection: "column",
+        justifyContent: "flex-start",
+    },
+    filterCol: {
         flex: 1,
-        gap: tokens.spacingVerticalS,
-        overflow: "hidden",
         minWidth: 0,
     },
-    mainCard: {
+    actionButtons: {
+        display: "flex",
+        flexDirection: "column",
+        gap: tokens.spacingVerticalS,
+        alignSelf: "flex-end",
+        flexShrink: 0,
+    },
+    // ── Bottom audit history panel ───────────────────────────────
+    bottomPanel: {
         display: "flex",
         flexDirection: "column",
         flex: 1,
@@ -73,34 +75,7 @@ const useStyles = makeStyles({
         padding: tokens.spacingHorizontalM,
         boxShadow: tokens.shadow2,
         overflow: "hidden",
-    },
-    statusBar: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: tokens.spacingHorizontalS,
-        padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalM}`,
-        backgroundColor: tokens.colorNeutralBackground1,
-        borderRadius: tokens.borderRadiusMedium,
-        boxShadow: tokens.shadow2,
-        flexShrink: 0,
-    },
-    statusLeft: {
-        display: "flex",
-        alignItems: "center",
-        gap: tokens.spacingHorizontalS,
-    },
-    statusRight: {
-        display: "flex",
-        alignItems: "center",
-        gap: tokens.spacingHorizontalS,
-    },
-    connectionDot: {
-        width: "8px",
-        height: "8px",
-        borderRadius: "50%",
-        backgroundColor: tokens.colorStatusSuccessForeground1,
-        flexShrink: 0,
+        minHeight: 0,
     },
     tableHeader: {
         display: "flex",
@@ -109,27 +84,35 @@ const useStyles = makeStyles({
         marginBottom: tokens.spacingVerticalS,
         flexShrink: 0,
     },
+    tableHeaderLeft: {
+        display: "flex",
+        alignItems: "center",
+        gap: tokens.spacingHorizontalS,
+    },
+    tableHeaderRight: {
+        display: "flex",
+        alignItems: "center",
+        gap: tokens.spacingHorizontalS,
+    },
     tableTitle: {
         fontWeight: tokens.fontWeightSemibold,
         color: tokens.colorNeutralForeground1,
     },
-    loadButton: {
-        width: "100%",
-    },
-    notReady: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flex: 1,
-        color: tokens.colorNeutralForeground3,
-        flexDirection: "column",
-        gap: tokens.spacingVerticalS,
+    connectionDot: {
+        width: "8px",
+        height: "8px",
+        borderRadius: "50%",
+        backgroundColor: tokens.colorStatusSuccessForeground1,
+        flexShrink: 0,
     },
     initSpinner: {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         flex: 1,
+    },
+    subtleText: {
+        color: tokens.colorNeutralForeground3,
     },
 });
 
@@ -265,81 +248,74 @@ export default function App() {
                 </div>
             )}
 
-            {/* Main layout */}
-            <div className={styles.layout}>
-                {/* Sidebar */}
-                <div className={styles.sidebar}>
-                    <div className={styles.sidebarCard}>
-                        <EntitySelector
-                            entities={entities}
-                            selectedEntity={selectedEntity}
-                            loading={loadingEntities}
-                            onSelect={setSelectedEntity}
-                        />
-                    </div>
+            {/* Top controls strip: entity selector + filters + action buttons */}
+            <div className={styles.topPanel}>
+                <div className={styles.entityCol}>
+                    <EntitySelector
+                        entities={entities}
+                        selectedEntity={selectedEntity}
+                        loading={loadingEntities}
+                        onSelect={setSelectedEntity}
+                    />
+                </div>
 
-                    <div className={styles.sidebarCard}>
-                        <FilterPanel filters={filters} onChange={setFilters} />
-                    </div>
+                <Divider vertical style={{ alignSelf: "stretch" }} />
 
+                <div className={styles.filterCol}>
+                    <FilterPanel filters={filters} onChange={setFilters} />
+                </div>
+
+                <Divider vertical style={{ alignSelf: "stretch" }} />
+
+                <div className={styles.actionButtons}>
                     <Button
                         appearance="primary"
-                        className={styles.loadButton}
                         disabled={!selectedEntity || loadingAudit}
                         icon={loadingAudit ? <Spinner size="tiny" /> : <ArrowSync20Regular />}
                         onClick={handleLoadAudit}
                     >
                         {loadingAudit ? "Loading…" : "Load Audit History"}
                     </Button>
+                    <Button
+                        appearance="secondary"
+                        icon={<ArrowDownload20Regular />}
+                        disabled={auditEntries.length === 0}
+                        onClick={handleExport}
+                    >
+                        Export to Excel
+                    </Button>
                 </div>
+            </div>
 
-                <Divider vertical style={{ height: "100%" }} />
-
-                {/* Main audit table panel */}
-                <div className={styles.mainPanel}>
-                    <div className={styles.mainCard}>
-                        <div className={styles.tableHeader}>
-                            <Text className={styles.tableTitle}>
-                                {lastLoadedEntity ? `Audit History — ${lastLoadedEntity}` : "Audit History"}
-                            </Text>
-                            {auditEntries.length > 0 && (
-                                <Badge appearance="tint" color="informative">
-                                    {auditEntries.length} record{auditEntries.length !== 1 ? "s" : ""}
-                                </Badge>
-                            )}
-                        </div>
-                        <AuditTable entries={auditEntries} loading={loadingAudit} />
+            {/* Bottom section: audit history table (takes remaining 70-80% of space) */}
+            <div className={styles.bottomPanel}>
+                <div className={styles.tableHeader}>
+                    <div className={styles.tableHeaderLeft}>
+                        <Text className={styles.tableTitle}>
+                            {lastLoadedEntity ? `Audit History — ${lastLoadedEntity}` : "Audit History"}
+                        </Text>
+                        {auditEntries.length > 0 && (
+                            <Badge appearance="tint" color="informative">
+                                {auditEntries.length} record{auditEntries.length !== 1 ? "s" : ""}
+                            </Badge>
+                        )}
                     </div>
-
-                    {/* Status / export bar */}
-                    <div className={styles.statusBar}>
-                        <div className={styles.statusLeft}>
-                            <div className={styles.connectionDot} />
-                            <Text size={200}>{connectionName || "PPTB Connected"}</Text>
-                        </div>
-                        <div className={styles.statusRight}>
-                            {auditEntries.length > 0 && (() => {
-                                const totalFieldChanges = auditEntries.reduce((s, e) => s + e.changedFields.length, 0);
-                                return (
-                                    <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
-                                        {auditEntries.length} audit record{auditEntries.length !== 1 ? "s" : ""}
-                                        {" · "}
-                                        {totalFieldChanges} field change{totalFieldChanges !== 1 ? "s" : ""}
-                                    </Text>
-                                );
-                            })()}
-                            <Button
-                                appearance="secondary"
-                                icon={<ArrowDownload20Regular />}
-                                disabled={auditEntries.length === 0}
-                                onClick={handleExport}
-                                size="small"
-                            >
-                                Export to Excel
-                            </Button>
-                        </div>
+                    <div className={styles.tableHeaderRight}>
+                        {auditEntries.length > 0 && (() => {
+                            const totalFieldChanges = auditEntries.reduce((s, e) => s + e.changedFields.length, 0);
+                            return (
+                                <Text size={200} className={styles.subtleText}>
+                                    {totalFieldChanges} field change{totalFieldChanges !== 1 ? "s" : ""}
+                                </Text>
+                            );
+                        })()}
+                        <div className={styles.connectionDot} />
+                        <Text size={200} className={styles.subtleText}>
+                            {connectionName || "PPTB Connected"}
+                        </Text>
                     </div>
                 </div>
+                <AuditTable entries={auditEntries} loading={loadingAudit} />
             </div>
         </div>
     );
