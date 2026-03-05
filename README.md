@@ -5,6 +5,7 @@ Tools for Power Platform ToolBox (PPTB) - a comprehensive toolkit for working wi
 - [Power Platform ToolBox (PPTB) Tools](#power-platform-toolbox-pptb-tools)
     - [Overview](#overview)
     - [Tools](#tools)
+        - [Audit Explorer](#audit-explorer)
         - [Data Migrator](#data-migrator)
         - [Dataverse Trace Analyzer](#dataverse-trace-analyzer)
         - [Entity Field Catalog](#entity-field-catalog)
@@ -21,6 +22,31 @@ Tools for Power Platform ToolBox (PPTB) - a comprehensive toolkit for working wi
 This is a monorepo containing various tools designed primarily for Power Platform ToolBox (PPTB), with additional support for Dataverse DevTools (DVDT) VS Code extension.
 
 ## Tools
+
+### [Audit Explorer](./tools/audit-explorer)
+
+Tool README: [here](./tools/audit-explorer/README.md)
+
+Explore and export audit history from Dataverse entities. Exclusively for PPTB.
+
+**Key Features:**
+
+- **React + TypeScript**: Modern component-based architecture with Vite build system
+- **PPTB-Only Integration**: Designed exclusively for Power Platform ToolBox (uses @pptb/types v1.0.17)
+- **Modern Minimalist UI**: Clean design with no header and optimized to avoid excessive scrolling and whitespace
+- **Entity Selection**: Browse and search all entities in the connected Dataverse environment
+- **Flexible Filtering**: Filter by date range, action type (Create/Update/Delete), and record limit
+- **FetchXML Record Filter**: Optionally restrict audit history to specific records using FetchXML
+- **Field-Level Changes**: Expand audit entries to view old and new values for each changed field
+- **Excel Export**: Export with two worksheets – Audit Summary and Field Changes
+
+**Use Cases:**
+
+- Investigate who changed what and when for compliance auditing
+- Track field-level changes on critical records
+- Export audit history for reporting or analysis in Excel
+- Filter to specific records using FetchXML to narrow down audit data
+- Identify unauthorized or unexpected changes in your environment
 
 ### [Data Migrator](./tools/data-migrator)
 
