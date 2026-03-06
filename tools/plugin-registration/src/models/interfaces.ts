@@ -8,6 +8,8 @@ export interface PluginAssembly {
     isolationmode: number; // 1=None, 2=Sandbox
     description: string;
     content?: string; // base64 encoded assembly
+    createdon?: string;
+    modifiedon?: string;
 }
 
 export interface PluginType {
@@ -20,6 +22,8 @@ export interface PluginType {
     workflowactivitygroupname: string;
     pluginassemblyid: string;
     assemblyname: string;
+    createdon?: string;
+    modifiedon?: string;
 }
 
 export interface SdkMessage {

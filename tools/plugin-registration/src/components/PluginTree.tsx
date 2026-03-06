@@ -1,4 +1,4 @@
-import type { TreeNode } from "../models/interfaces";
+import type { TreeNode, TreeNodeType, ProcessingStep } from "../models/interfaces";
 
 interface PluginTreeProps {
     nodes: TreeNode[];
@@ -7,12 +7,33 @@ interface PluginTreeProps {
     onToggleExpand: (nodeId: string) => void;
 }
 
-const NODE_ICONS: Record<string, string> = {
-    assembly: "🔧",
-    plugintype: "⚙️",
-    step: "📋",
-    image: "🖼️",
-};
+function getTypeLabel(type: TreeNodeType): string {
+    switch (type) {
+        case "assembly": return "Assembly";
+        case "plugintype": return "Plugin";
+        case "step": return "Step";
+        case "image": return "Image";
+    }
+}
+
+function getIconClass(node: TreeNode): string {
+    if (node.type === "assembly") return "node-icon node-icon-assembly";
+    if (node.type === "plugintype") {
+        return node.isWorkflowActivity ? "node-icon node-icon-workflow" : "node-icon node-icon-plugin";
+    }
+    if (node.type === "step") {
+        const step = node.data as ProcessingStep;
+        return step.statecode === 0 ? "node-icon node-icon-step-enabled" : "node-icon node-icon-step-disabled";
+    }
+    return "node-icon node-icon-image";
+}
+
+function getIconText(node: TreeNode): string {
+    if (node.type === "assembly") return "A";
+    if (node.type === "plugintype") return node.isWorkflowActivity ? "W" : "P";
+    if (node.type === "step") return "S";
+    return "I";
+}
 
 interface FlatNodeProps {
     node: TreeNode;
@@ -23,30 +44,39 @@ interface FlatNodeProps {
 }
 
 function FlatNode({ node, depth, selectedId, onSelectNode, onToggleExpand }: FlatNodeProps) {
-    const hasChildren = node.children && node.children.length > 0;
+    const canHaveChildren = node.type !== "image";
     const isSelected = node.id === selectedId;
-    const icon = NODE_ICONS[node.type] ?? "•";
+    const typeLabel = getTypeLabel(node.type);
 
-    const handleClick = () => {
+    const handleToggleClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onToggleExpand(node.id);
+    };
+
+    const handleSelectClick = () => {
         onSelectNode(node);
-        if (hasChildren) {
-            onToggleExpand(node.id);
-        }
     };
 
     return (
         <>
             <div
                 className={`tree-node${isSelected ? " selected" : ""}`}
-                style={{ paddingLeft: `${8 + depth * 16}px` }}
-                onClick={handleClick}
+                style={{ paddingLeft: `${4 + depth * 18}px` }}
+                onClick={handleSelectClick}
                 role="treeitem"
                 aria-selected={isSelected}
             >
-                <span className="tree-node-toggle">
-                    {hasChildren ? (node.isExpanded ? "▾" : "▸") : ""}
+                <span
+                    className="tree-node-toggle"
+                    onClick={handleToggleClick}
+                    aria-label={node.isExpanded ? "Collapse" : "Expand"}
+                >
+                    {canHaveChildren ? (node.isExpanded ? "▾" : "▸") : ""}
                 </span>
-                <span className="tree-node-icon">{icon}</span>
+                <span className={getIconClass(node)} title={typeLabel}>
+                    {getIconText(node)}
+                </span>
+                <span className="tree-node-type">({typeLabel})</span>
                 <span className="tree-node-label" title={node.name}>{node.name}</span>
             </div>
             {node.isExpanded && node.children?.map((child) => (
@@ -65,7 +95,7 @@ function FlatNode({ node, depth, selectedId, onSelectNode, onToggleExpand }: Fla
 
 export function PluginTree({ nodes, selectedId, onSelectNode, onToggleExpand }: PluginTreeProps) {
     if (nodes.length === 0) {
-        return <div className="empty-tree">No assemblies found.</div>;
+        return <div className="empty-tree">No assemblies found. Click Register → New Assembly to add one.</div>;
     }
     return (
         <div className="tree-container" role="tree">
@@ -82,3 +112,4 @@ export function PluginTree({ nodes, selectedId, onSelectNode, onToggleExpand }: 
         </div>
     );
 }
+

@@ -11,7 +11,7 @@ export class DataverseClient {
     async fetchAssemblies(): Promise<PluginAssembly[]> {
         try {
             const response = await window.dataverseAPI.queryData(
-                "pluginassemblies?$select=pluginassemblyid,name,version,culture,publickeytoken,sourcetype,isolationmode,description&$orderby=name",
+                "pluginassemblies?$select=pluginassemblyid,name,version,culture,publickeytoken,sourcetype,isolationmode,description,createdon,modifiedon&$orderby=name",
                 "primary",
             );
             return (response.value as Record<string, unknown>[]).map((a) => ({
@@ -23,6 +23,8 @@ export class DataverseClient {
                 sourcetype: a["sourcetype"] as number,
                 isolationmode: a["isolationmode"] as number,
                 description: (a["description"] as string) ?? "",
+                createdon: a["createdon"] as string | undefined,
+                modifiedon: a["modifiedon"] as string | undefined,
             }));
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
@@ -33,7 +35,7 @@ export class DataverseClient {
     async fetchPluginTypes(assemblyId: string): Promise<PluginType[]> {
         try {
             const response = await window.dataverseAPI.queryData(
-                `plugintypes?$select=plugintypeid,name,typename,friendlyname,description,isworkflowactivity,workflowactivitygroupname&$filter=_pluginassemblyid_value eq '${assemblyId}'&$orderby=typename`,
+                `plugintypes?$select=plugintypeid,name,typename,friendlyname,description,isworkflowactivity,workflowactivitygroupname,createdon,modifiedon&$filter=_pluginassemblyid_value eq '${assemblyId}'&$orderby=typename`,
                 "primary",
             );
             return (response.value as Record<string, unknown>[]).map((t) => ({
@@ -46,6 +48,8 @@ export class DataverseClient {
                 workflowactivitygroupname: (t["workflowactivitygroupname"] as string) ?? "",
                 pluginassemblyid: assemblyId,
                 assemblyname: "",
+                createdon: t["createdon"] as string | undefined,
+                modifiedon: t["modifiedon"] as string | undefined,
             }));
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
@@ -167,14 +171,16 @@ export class DataverseClient {
 
     async updateAssembly(
         assemblyId: string,
-        content: string,
         description: string,
+        content?: string,
     ): Promise<void> {
         try {
+            const payload: Record<string, unknown> = { description };
+            if (content) payload["content"] = content;
             await window.dataverseAPI.update(
                 "pluginassembly",
                 assemblyId,
-                { content, description },
+                payload,
                 "primary",
             );
         } catch (error: unknown) {

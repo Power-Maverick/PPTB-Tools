@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import type { TreeNode, PluginAssembly, PluginType, ProcessingStep, StepImage } from "./models/interfaces";
 import { DataverseClient } from "./utils/DataverseClient";
 import { PluginTree } from "./components/PluginTree";
@@ -9,6 +9,7 @@ import { ImageDetails } from "./components/ImageDetails";
 import { RegisterAssemblyDialog } from "./components/RegisterAssemblyDialog";
 import { RegisterStepDialog } from "./components/RegisterStepDialog";
 import { RegisterImageDialog } from "./components/RegisterImageDialog";
+import { BottomGrid } from "./components/BottomGrid";
 
 const client = new DataverseClient();
 
@@ -76,6 +77,10 @@ export default function App() {
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
 
+    // Register dropdown
+    const [showRegisterDropdown, setShowRegisterDropdown] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
     // Dialog state
     const [showRegisterAssembly, setShowRegisterAssembly] = useState(false);
     const [showUpdateAssembly, setShowUpdateAssembly] = useState(false);
@@ -83,6 +88,17 @@ export default function App() {
     const [showUpdateStep, setShowUpdateStep] = useState(false);
     const [showRegisterImage, setShowRegisterImage] = useState(false);
     const [showUpdateImage, setShowUpdateImage] = useState(false);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClick = (e: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+                setShowRegisterDropdown(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, []);
 
     // Environment check
     useEffect(() => {
@@ -103,9 +119,10 @@ export default function App() {
             setPluginTypes(new Map());
             setSteps(new Map());
             setImages(new Map());
+            setSelectedNode(null);
+            setExpandedIds(new Set());
         } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            setError(msg);
+            setError(err instanceof Error ? err.message : String(err));
         } finally {
             setLoading(false);
         }
@@ -117,49 +134,74 @@ export default function App() {
         }
     }, [isPPTB, loadAssemblies]);
 
+    // Load children data when a node is selected (for bottom grid)
+    const handleSelectNode = useCallback(async (node: TreeNode) => {
+        setSelectedNode(node);
+        const loadErr = (err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (window.toolboxAPI) {
+                void window.toolboxAPI.utils.showNotification({ title: "Error", body: msg, type: "error" });
+            }
+        };
+        if (node.type === "assembly") {
+            const asmId = node.id;
+            if (!pluginTypes.has(asmId)) {
+                try {
+                    const types = await client.fetchPluginTypes(asmId);
+                    setPluginTypes((prev: Map<string, PluginType[]>) => new Map(prev).set(asmId, types));
+                } catch (err) { loadErr(err); }
+            }
+        } else if (node.type === "plugintype") {
+            const ptId = node.id;
+            if (!steps.has(ptId)) {
+                try {
+                    const s = await client.fetchSteps(ptId);
+                    setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
+                } catch (err) { loadErr(err); }
+            }
+        } else if (node.type === "step") {
+            const stepId = node.id;
+            if (!images.has(stepId)) {
+                try {
+                    const imgs = await client.fetchImages(stepId);
+                    setImages((prev: Map<string, StepImage[]>) => new Map(prev).set(stepId, imgs));
+                } catch (err) { loadErr(err); }
+            }
+        }
+    }, [pluginTypes, steps, images]);
+
     const handleToggleExpand = useCallback(async (nodeId: string) => {
-        setExpandedIds((prev) => {
+        setExpandedIds((prev: Set<string>) => {
             const next = new Set(prev);
-            if (next.has(nodeId)) { next.delete(nodeId); }
-            else { next.add(nodeId); }
+            if (next.has(nodeId)) { next.delete(nodeId); } else { next.add(nodeId); }
             return next;
         });
 
-        // Lazy-load children
-        const asm = assemblies.find((a) => a.pluginassemblyid === nodeId);
+        // Lazy-load children on expand
+        const asm = assemblies.find((a: PluginAssembly) => a.pluginassemblyid === nodeId);
         if (asm && !pluginTypes.has(nodeId)) {
             try {
                 const types = await client.fetchPluginTypes(nodeId);
-                setPluginTypes((prev) => new Map(prev).set(nodeId, types));
-            } catch (err: unknown) {
-                console.error(err);
-            }
+                setPluginTypes((prev: Map<string, PluginType[]>) => new Map(prev).set(nodeId, types));
+            } catch (err) { console.error(err); }
         }
-
-        // Find plugin type
         for (const [, pts] of pluginTypes) {
-            const pt = pts.find((p) => p.plugintypeid === nodeId);
+            const pt = pts.find((p: PluginType) => p.plugintypeid === nodeId);
             if (pt && !steps.has(nodeId)) {
                 try {
                     const s = await client.fetchSteps(nodeId);
-                    setSteps((prev) => new Map(prev).set(nodeId, s));
-                } catch (err: unknown) {
-                    console.error(err);
-                }
+                    setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(nodeId, s));
+                } catch (err) { console.error(err); }
                 break;
             }
         }
-
-        // Find step
         for (const [, ss] of steps) {
-            const step = ss.find((s) => s.sdkmessageprocessingstepid === nodeId);
+            const step = ss.find((s: ProcessingStep) => s.sdkmessageprocessingstepid === nodeId);
             if (step && !images.has(nodeId)) {
                 try {
                     const imgs = await client.fetchImages(nodeId);
-                    setImages((prev) => new Map(prev).set(nodeId, imgs));
-                } catch (err: unknown) {
-                    console.error(err);
-                }
+                    setImages((prev: Map<string, StepImage[]>) => new Map(prev).set(nodeId, imgs));
+                } catch (err) { console.error(err); }
                 break;
             }
         }
@@ -171,7 +213,7 @@ export default function App() {
         }
     };
 
-    // --- Assembly actions ---
+    // ── Assembly actions ──
     const handleRegisterAssembly = async (content: string, name: string, isolationMode: number, description: string) => {
         await client.registerAssembly(content, name, isolationMode, description);
         notify("Assembly registered successfully.");
@@ -179,13 +221,25 @@ export default function App() {
         void loadAssemblies();
     };
 
-    const handleUpdateAssembly = async (content: string, name: string, _isolationMode: number, description: string) => {
+    const handleUpdateAssembly = async (content: string, _name: string, _isolationMode: number, description: string) => {
         if (selectedNode?.type !== "assembly") return;
         const asm = selectedNode.data as PluginAssembly;
-        await client.updateAssembly(asm.pluginassemblyid, content, description);
-        notify(`Assembly "${name}" updated.`);
+        await client.updateAssembly(asm.pluginassemblyid, description, content);
+        notify("Assembly updated.");
         setShowUpdateAssembly(false);
         void loadAssemblies();
+    };
+
+    const handleSaveAssemblyDescription = async (description: string) => {
+        if (selectedNode?.type !== "assembly") return;
+        const asm = selectedNode.data as PluginAssembly;
+        try {
+            await client.updateAssembly(asm.pluginassemblyid, description);
+            notify("Assembly description saved.");
+            void loadAssemblies();
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+        }
     };
 
     const handleUnregisterAssembly = async () => {
@@ -198,12 +252,11 @@ export default function App() {
             setSelectedNode(null);
             void loadAssemblies();
         } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            notify(msg, "error");
+            notify(err instanceof Error ? err.message : String(err), "error");
         }
     };
 
-    // --- Step actions ---
+    // ── Step actions ──
     const getSelectedPluginType = (): PluginType | null => {
         if (selectedNode?.type === "plugintype") return selectedNode.data as PluginType;
         return null;
@@ -213,10 +266,9 @@ export default function App() {
         await client.registerStep(stepData);
         notify("Step registered successfully.");
         setShowRegisterStep(false);
-        // Refresh steps for the plugin type
         const ptId = stepData.pluginTypeId;
         const s = await client.fetchSteps(ptId);
-        setSteps((prev) => new Map(prev).set(ptId, s));
+        setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
     };
 
     const handleUpdateStep = async (stepData: Partial<ProcessingStep> & { messageId: string; filterId?: string; pluginTypeId: string }) => {
@@ -228,7 +280,23 @@ export default function App() {
         const ptId = step.plugintypeid ?? stepData.pluginTypeId;
         if (ptId) {
             const s = await client.fetchSteps(ptId);
-            setSteps((prev) => new Map(prev).set(ptId, s));
+            setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
+        }
+    };
+
+    const handleSaveStepDescription = async (description: string) => {
+        if (selectedNode?.type !== "step") return;
+        const step = selectedNode.data as ProcessingStep;
+        try {
+            await client.updateStep(step.sdkmessageprocessingstepid, { description });
+            notify("Step description saved.");
+            const ptId = step.plugintypeid;
+            if (ptId) {
+                const s = await client.fetchSteps(ptId);
+                setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
+            }
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
         }
     };
 
@@ -243,11 +311,10 @@ export default function App() {
             const ptId = step.plugintypeid;
             if (ptId) {
                 const s = await client.fetchSteps(ptId);
-                setSteps((prev) => new Map(prev).set(ptId, s));
+                setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
             }
         } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            notify(msg, "error");
+            notify(err instanceof Error ? err.message : String(err), "error");
         }
     };
 
@@ -260,12 +327,9 @@ export default function App() {
             const ptId = step.plugintypeid;
             if (ptId) {
                 const s = await client.fetchSteps(ptId);
-                setSteps((prev) => new Map(prev).set(ptId, s));
+                setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
             }
-        } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            notify(msg, "error");
-        }
+        } catch (err: unknown) { notify(err instanceof Error ? err.message : String(err), "error"); }
     };
 
     const handleDisableStep = async () => {
@@ -277,21 +341,18 @@ export default function App() {
             const ptId = step.plugintypeid;
             if (ptId) {
                 const s = await client.fetchSteps(ptId);
-                setSteps((prev) => new Map(prev).set(ptId, s));
+                setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
             }
-        } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            notify(msg, "error");
-        }
+        } catch (err: unknown) { notify(err instanceof Error ? err.message : String(err), "error"); }
     };
 
-    // --- Image actions ---
+    // ── Image actions ──
     const handleRegisterImage = async (imageData: Partial<StepImage> & { stepId: string }) => {
         await client.registerImage(imageData);
         notify("Image registered.");
         setShowRegisterImage(false);
         const imgs = await client.fetchImages(imageData.stepId);
-        setImages((prev) => new Map(prev).set(imageData.stepId, imgs));
+        setImages((prev: Map<string, StepImage[]>) => new Map(prev).set(imageData.stepId, imgs));
     };
 
     const handleUpdateImage = async (imageData: Partial<StepImage> & { stepId: string }) => {
@@ -301,7 +362,20 @@ export default function App() {
         notify("Image updated.");
         setShowUpdateImage(false);
         const imgs = await client.fetchImages(imageData.stepId);
-        setImages((prev) => new Map(prev).set(imageData.stepId, imgs));
+        setImages((prev: Map<string, StepImage[]>) => new Map(prev).set(imageData.stepId, imgs));
+    };
+
+    const handleSaveImageDescription = async (description: string) => {
+        if (selectedNode?.type !== "image") return;
+        const img = selectedNode.data as StepImage;
+        try {
+            await client.updateImage(img.sdkmessageprocessingstepimageid, { description });
+            notify("Image description saved.");
+            const imgs = await client.fetchImages(img.sdkmessageprocessingstepid);
+            setImages((prev: Map<string, StepImage[]>) => new Map(prev).set(img.sdkmessageprocessingstepid, imgs));
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+        }
     };
 
     const handleUnregisterImage = async () => {
@@ -312,18 +386,66 @@ export default function App() {
             await client.deleteImage(img.sdkmessageprocessingstepimageid);
             notify("Image unregistered.");
             setSelectedNode(null);
-            const stepId = img.sdkmessageprocessingstepid;
-            const imgs = await client.fetchImages(stepId);
-            setImages((prev) => new Map(prev).set(stepId, imgs));
+            const imgs = await client.fetchImages(img.sdkmessageprocessingstepid);
+            setImages((prev: Map<string, StepImage[]>) => new Map(prev).set(img.sdkmessageprocessingstepid, imgs));
         } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            notify(msg, "error");
+            notify(err instanceof Error ? err.message : String(err), "error");
         }
     };
 
+    // ── Computed selection state ──
+    const selectedAssembly = selectedNode?.type === "assembly" ? (selectedNode.data as PluginAssembly) : null;
+    const selectedPluginType = getSelectedPluginType();
+    const selectedStep = selectedNode?.type === "step" ? (selectedNode.data as ProcessingStep) : null;
+    const selectedImage = selectedNode?.type === "image" ? (selectedNode.data as StepImage) : null;
+
+    const stepPluginType: PluginType | null = (() => {
+        if (selectedNode?.type === "step") {
+            const step = selectedNode.data as ProcessingStep;
+            for (const [, pts] of pluginTypes) {
+                const pt = pts.find((p) => p.plugintypeid === step.plugintypeid);
+                if (pt) return pt;
+            }
+        }
+        return null;
+    })();
+
+    // Context-sensitive toolbar state
+    const canUpdate = !!(selectedAssembly || selectedStep || selectedImage);
+    const canUnregister = !!(selectedAssembly || selectedStep || selectedImage);
+    const canRegisterStep = !!(selectedPluginType && !selectedPluginType.isworkflowactivity);
+    const canRegisterImage = !!selectedStep;
+    const isStepSelected = !!selectedStep;
+    const stepIsEnabled = selectedStep?.statecode === 0;
+
+    const handleUpdateSelected = () => {
+        if (selectedAssembly) setShowUpdateAssembly(true);
+        else if (selectedStep) setShowUpdateStep(true);
+        else if (selectedImage) setShowUpdateImage(true);
+    };
+
+    const handleUnregisterSelected = () => {
+        if (selectedAssembly) void handleUnregisterAssembly();
+        else if (selectedStep) void handleUnregisterStep();
+        else if (selectedImage) void handleUnregisterImage();
+    };
+
+    // Bottom grid data
+    const bottomGridMode = (() => {
+        if (!selectedNode) return "none" as const;
+        if (selectedNode.type === "assembly") return "plugins" as const;
+        if (selectedNode.type === "plugintype") return "steps" as const;
+        if (selectedNode.type === "step") return "images" as const;
+        return "none" as const;
+    })();
+
+    const bottomPluginTypes = selectedAssembly ? (pluginTypes.get(selectedAssembly.pluginassemblyid) ?? []) : [];
+    const bottomSteps = selectedPluginType ? (steps.get(selectedPluginType.plugintypeid) ?? []) : [];
+    const bottomImages = selectedStep ? (images.get(selectedStep.sdkmessageprocessingstepid) ?? []) : [];
+
     const treeNodes = buildTreeNodes(assemblies, pluginTypes, steps, images, expandedIds);
 
-    if (loading) {
+    if (loading && assemblies.length === 0) {
         return (
             <div className="loading-container">
                 <div className="loading-spinner" />
@@ -340,91 +462,159 @@ export default function App() {
         );
     }
 
-    const selectedAssembly = selectedNode?.type === "assembly" ? (selectedNode.data as PluginAssembly) : null;
-    const selectedPluginType = getSelectedPluginType();
-    const selectedStep = selectedNode?.type === "step" ? (selectedNode.data as ProcessingStep) : null;
-    const selectedImage = selectedNode?.type === "image" ? (selectedNode.data as StepImage) : null;
-
-    // Find the plugin type for a selected step (for RegisterStepDialog)
-    const stepPluginType: PluginType | null = (() => {
-        if (selectedNode?.type === "step") {
-            const step = selectedNode.data as ProcessingStep;
-            for (const [, pts] of pluginTypes) {
-                const pt = pts.find((p) => p.plugintypeid === step.plugintypeid);
-                if (pt) return pt;
-            }
-        }
-        return null;
-    })();
-
     return (
-        <div className="layout">
-            {/* Left panel */}
-            <div className="left-panel">
-                <div className="toolbar">
-                    <span className="toolbar-title">Plugin Registration</span>
-                    <button className="btn-secondary" onClick={() => void loadAssemblies()} title="Refresh">
-                        🔄 Refresh
+        <div className="page-layout">
+            {/* Top toolbar */}
+            <div className="main-toolbar">
+                {/* Register dropdown */}
+                <div className="toolbar-group" ref={dropdownRef}>
+                    <button
+                        className="toolbar-btn"
+                        onClick={() => setShowRegisterDropdown((v) => !v)}
+                    >
+                        Register <span className="dropdown-arrow">▾</span>
                     </button>
-                    <button className="btn-primary" onClick={() => setShowRegisterAssembly(true)}>
-                        + Assembly
-                    </button>
-                    {(selectedPluginType && !selectedPluginType.isworkflowactivity) && (
-                        <button className="btn-primary" onClick={() => setShowRegisterStep(true)}>
-                            + Step
-                        </button>
+                    {showRegisterDropdown && (
+                        <div className="toolbar-dropdown">
+                            <div
+                                className="toolbar-dropdown-item"
+                                onClick={() => { setShowRegisterAssembly(true); setShowRegisterDropdown(false); }}
+                            >
+                                New Assembly
+                            </div>
+                            {canRegisterStep && (
+                                <div
+                                    className="toolbar-dropdown-item"
+                                    onClick={() => { setShowRegisterStep(true); setShowRegisterDropdown(false); }}
+                                >
+                                    New Step
+                                </div>
+                            )}
+                            {canRegisterImage && (
+                                <div
+                                    className="toolbar-dropdown-item"
+                                    onClick={() => { setShowRegisterImage(true); setShowRegisterDropdown(false); }}
+                                >
+                                    New Image
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
-                {error && (
-                    <div style={{ padding: "8px", color: "var(--button-danger-bg)", fontSize: 12 }}>
-                        ⚠️ {error}
-                    </div>
+
+                <div className="toolbar-separator" />
+
+                <div className="toolbar-group">
+                    <button className="toolbar-btn" onClick={handleUpdateSelected} disabled={!canUpdate}>
+                        Update
+                    </button>
+                    <button className="toolbar-btn danger" onClick={handleUnregisterSelected} disabled={!canUnregister}>
+                        Unregister
+                    </button>
+                </div>
+
+                <div className="toolbar-separator" />
+
+                <div className="toolbar-group">
+                    <button className="toolbar-btn" onClick={() => void loadAssemblies()} disabled={loading}>
+                        {loading ? "Refreshing…" : "Refresh"}
+                    </button>
+                </div>
+
+                {isStepSelected && (
+                    <>
+                        <div className="toolbar-separator" />
+                        <div className="toolbar-group">
+                            <button
+                                className="toolbar-btn"
+                                onClick={() => void handleEnableStep()}
+                                disabled={stepIsEnabled}
+                            >
+                                Enable
+                            </button>
+                            <button
+                                className="toolbar-btn"
+                                onClick={() => void handleDisableStep()}
+                                disabled={!stepIsEnabled}
+                            >
+                                Disable
+                            </button>
+                        </div>
+                    </>
                 )}
-                <PluginTree
-                    nodes={treeNodes}
-                    selectedId={selectedNode?.id ?? null}
-                    onSelectNode={setSelectedNode}
-                    onToggleExpand={(id) => void handleToggleExpand(id)}
-                />
             </div>
 
-            {/* Right panel */}
-            <div className="right-panel">
-                {!selectedNode && (
-                    <div className="details-placeholder">
-                        Select an item from the tree to see its details.
-                    </div>
-                )}
-                {selectedAssembly && (
-                    <AssemblyDetails
-                        assembly={selectedAssembly}
-                        onUpdate={() => setShowUpdateAssembly(true)}
-                        onUnregister={() => void handleUnregisterAssembly()}
+            {/* Page subtitle */}
+            <div className="page-subtitle">Registered Plugins &amp; Custom Workflow Activities</div>
+
+            {/* Error banner */}
+            {error && isPPTB && (
+                <div className="error-banner">⚠️ {error}</div>
+            )}
+
+            {/* Content area: tree + details */}
+            <div className="content-area">
+                {/* Left: tree */}
+                <div className="left-panel">
+                    <PluginTree
+                        nodes={treeNodes}
+                        selectedId={selectedNode?.id ?? null}
+                        onSelectNode={(node) => void handleSelectNode(node)}
+                        onToggleExpand={(id) => void handleToggleExpand(id)}
                     />
-                )}
-                {selectedPluginType && (
-                    <PluginTypeDetails
-                        pluginType={selectedPluginType}
-                        onRegisterStep={() => setShowRegisterStep(true)}
-                    />
-                )}
-                {selectedStep && (
-                    <StepDetails
-                        step={selectedStep}
-                        onRegisterImage={() => setShowRegisterImage(true)}
-                        onEnable={() => void handleEnableStep()}
-                        onDisable={() => void handleDisableStep()}
-                        onUnregister={() => void handleUnregisterStep()}
-                        onUpdate={() => setShowUpdateStep(true)}
-                    />
-                )}
-                {selectedImage && (
-                    <ImageDetails
-                        image={selectedImage}
-                        onUpdate={() => setShowUpdateImage(true)}
-                        onUnregister={() => void handleUnregisterImage()}
-                    />
-                )}
+                </div>
+
+                {/* Right: details */}
+                <div className="right-panel">
+                    {!selectedNode && (
+                        <div className="details-placeholder">
+                            Select an item from the tree to view its properties.
+                        </div>
+                    )}
+                    {selectedAssembly && (
+                        <AssemblyDetails
+                            assembly={selectedAssembly}
+                            onSave={(desc) => handleSaveAssemblyDescription(desc)}
+                            onUpdate={() => setShowUpdateAssembly(true)}
+                            onUnregister={() => void handleUnregisterAssembly()}
+                        />
+                    )}
+                    {selectedPluginType && (
+                        <PluginTypeDetails
+                            pluginType={selectedPluginType}
+                            onRegisterStep={() => setShowRegisterStep(true)}
+                        />
+                    )}
+                    {selectedStep && (
+                        <StepDetails
+                            step={selectedStep}
+                            onSave={(desc) => handleSaveStepDescription(desc)}
+                            onRegisterImage={() => setShowRegisterImage(true)}
+                            onEnable={() => void handleEnableStep()}
+                            onDisable={() => void handleDisableStep()}
+                            onUnregister={() => void handleUnregisterStep()}
+                            onUpdate={() => setShowUpdateStep(true)}
+                        />
+                    )}
+                    {selectedImage && (
+                        <ImageDetails
+                            image={selectedImage}
+                            onSave={(desc) => handleSaveImageDescription(desc)}
+                            onUpdate={() => setShowUpdateImage(true)}
+                            onUnregister={() => void handleUnregisterImage()}
+                        />
+                    )}
+                </div>
+            </div>
+
+            {/* Bottom grid */}
+            <div className="bottom-grid-section">
+                <BottomGrid
+                    mode={bottomGridMode}
+                    pluginTypes={bottomPluginTypes}
+                    steps={bottomSteps}
+                    images={bottomImages}
+                />
             </div>
 
             {/* Dialogs */}
