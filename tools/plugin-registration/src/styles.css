@@ -723,3 +723,133 @@ button:disabled {
     to { transform: rotate(360deg); }
 }
 
+/* ── Attribute Picker Dialog ── */
+.attr-picker-dialog {
+    width: 500px;
+}
+
+.attr-picker-body {
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.attr-picker-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.attr-picker-ctrl-btn {
+    padding: 3px 10px;
+    font-size: 11px;
+}
+
+.attr-picker-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.8;
+}
+
+.attr-picker-list {
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    max-height: 260px;
+    min-height: 80px;
+}
+
+.attr-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border-color);
+    user-select: none;
+}
+
+.attr-picker-item:last-child {
+    border-bottom: none;
+}
+
+.attr-picker-item:hover {
+    background-color: var(--bg-hover);
+}
+
+.attr-picker-item input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.attr-picker-logical {
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 11px;
+    color: var(--text-primary);
+}
+
+.attr-picker-display {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.attr-picker-empty {
+    padding: 16px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.attr-picker-list-placeholder {
+    padding: 16px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* ── Form input + Browse button ── */
+.form-row-with-browse {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.form-row-with-browse .form-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.btn-browse {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    background-color: var(--button-secondary-bg);
+    color: var(--button-secondary-text);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-browse:hover:not(:disabled) {
+    background-color: var(--button-secondary-hover);
+}
+
+.btn-browse:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.form-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 3px;
+}
+

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { PluginType, ProcessingStep, SdkMessage, SdkMessageFilter } from "../models/interfaces";
 import { DataverseClient } from "../utils/DataverseClient";
+import { AttributePickerDialog } from "./AttributePickerDialog";
 
 interface RegisterStepDialogProps {
     isOpen: boolean;
@@ -32,6 +33,8 @@ export function RegisterStepDialog({
     const [description, setDescription] = useState(existingStep?.description ?? "");
     const [filteringAttributes, setFilteringAttributes] = useState(existingStep?.filteringattributes ?? "");
     const [asyncAutoDelete, setAsyncAutoDelete] = useState(existingStep?.asyncautodelete ?? false);
+    const [impersonatingUserId, setImpersonatingUserId] = useState(existingStep?.impersonatinguserid ?? "");
+    const [showAttrPicker, setShowAttrPicker] = useState(false);
     const [saving, setSaving] = useState(false);
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [loadingFilters, setLoadingFilters] = useState(false);
@@ -69,6 +72,10 @@ export function RegisterStepDialog({
     if (!isOpen) return null;
 
     const selectedMessage = messages.find((m) => m.sdkmessageid === selectedMessageId);
+    const selectedFilter = filters.find((f) => f.sdkmessagefilterid === selectedFilterId);
+    const isUpdateMessage = selectedMessage?.name === "Update";
+    const entityName = selectedFilter?.primaryobjecttypecode ?? "";
+    const canBrowseAttrs = isUpdateMessage && !!entityName && entityName !== "none" && entityName !== "any";
 
     const handleSubmit = async () => {
         if (!selectedMessageId) return;
@@ -82,6 +89,7 @@ export function RegisterStepDialog({
                 stage,
                 filteringattributes: filteringAttributes,
                 asyncautodelete: asyncAutoDelete,
+                impersonatinguserid: impersonatingUserId.trim() || undefined,
                 messageId: selectedMessageId,
                 filterId: selectedFilterId || undefined,
                 pluginTypeId: pluginType.plugintypeid,
@@ -91,134 +99,171 @@ export function RegisterStepDialog({
         }
     };
 
+    const handleAttrPickerConfirm = (attrs: string[]) => {
+        setFilteringAttributes(attrs.join(","));
+        setShowAttrPicker(false);
+    };
+
     const title = isUpdate ? `Update Step: ${existingStep?.name ?? ""}` : "Register New Step";
 
     return (
-        <div className="dialog-overlay">
-            <div className="dialog">
-                <div className="dialog-header">
-                    <span className="dialog-title">{title}</span>
-                    <button className="dialog-close" onClick={onClose}>✕</button>
-                </div>
-                <div className="dialog-body">
-                    <div className="form-row">
-                        <label className="form-label">Plugin Type</label>
-                        <div className="form-read-only">{pluginType.typename}</div>
+        <>
+            <div className="dialog-overlay">
+                <div className="dialog">
+                    <div className="dialog-header">
+                        <span className="dialog-title">{title}</span>
+                        <button className="dialog-close" onClick={onClose}>✕</button>
                     </div>
-                    <div className="form-row">
-                        <label className="form-label">Message *</label>
-                        {loadingMessages ? (
-                            <div className="form-read-only">Loading messages…</div>
-                        ) : (
-                            <select
-                                className="form-select"
-                                value={selectedMessageId}
-                                onChange={(e) => setSelectedMessageId(e.target.value)}
-                            >
-                                <option value="">— Select Message —</option>
-                                {messages.map((m) => (
-                                    <option key={m.sdkmessageid} value={m.sdkmessageid}>{m.name}</option>
-                                ))}
-                            </select>
-                        )}
-                    </div>
-                    <div className="form-row">
-                        <label className="form-label">Primary Entity</label>
-                        {loadingFilters ? (
-                            <div className="form-read-only">Loading entities…</div>
-                        ) : (
-                            <select
-                                className="form-select"
-                                value={selectedFilterId}
-                                onChange={(e) => setSelectedFilterId(e.target.value)}
-                                disabled={!selectedMessageId}
-                            >
-                                <option value="">None (Global)</option>
-                                {filters.map((f) => (
-                                    <option key={f.sdkmessagefilterid} value={f.sdkmessagefilterid}>
-                                        {f.primaryobjecttypecode}
-                                    </option>
-                                ))}
-                            </select>
-                        )}
-                    </div>
-                    <div className="form-row">
-                        <label className="form-label">Name *</label>
-                        <input
-                            className="form-input"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                        />
-                    </div>
-                    <div className="form-row">
-                        <label className="form-label">Stage</label>
-                        <select className="form-select" value={stage} onChange={(e) => setStage(Number(e.target.value))}>
-                            <option value={10}>Pre-Validation</option>
-                            <option value={20}>Pre-Operation</option>
-                            <option value={40}>Post-Operation</option>
-                        </select>
-                    </div>
-                    <div className="form-row">
-                        <label className="form-label">Execution Mode</label>
-                        <select className="form-select" value={mode} onChange={(e) => setMode(Number(e.target.value))}>
-                            <option value={0}>Synchronous</option>
-                            <option value={1}>Asynchronous</option>
-                        </select>
-                    </div>
-                    <div className="form-row">
-                        <label className="form-label">Rank</label>
-                        <input
-                            type="number"
-                            className="form-input"
-                            value={rank}
-                            min={1}
-                            onChange={(e) => setRank(Number(e.target.value))}
-                        />
-                    </div>
-                    <div className="form-row">
-                        <label className="form-label">Description</label>
-                        <textarea
-                            className="form-textarea"
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                        />
-                    </div>
-                    {selectedMessage?.name === "Update" && (
+                    <div className="dialog-body">
                         <div className="form-row">
-                            <label className="form-label">Filtering Attributes (comma-separated)</label>
+                            <label className="form-label">Plugin Type</label>
+                            <div className="form-read-only">{pluginType.typename}</div>
+                        </div>
+                        <div className="form-row">
+                            <label className="form-label">Message *</label>
+                            {loadingMessages ? (
+                                <div className="form-read-only">Loading messages…</div>
+                            ) : (
+                                <select
+                                    className="form-select"
+                                    value={selectedMessageId}
+                                    onChange={(e) => setSelectedMessageId(e.target.value)}
+                                >
+                                    <option value="">— Select Message —</option>
+                                    {messages.map((m) => (
+                                        <option key={m.sdkmessageid} value={m.sdkmessageid}>{m.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+                        <div className="form-row">
+                            <label className="form-label">Primary Entity</label>
+                            {loadingFilters ? (
+                                <div className="form-read-only">Loading entities…</div>
+                            ) : (
+                                <select
+                                    className="form-select"
+                                    value={selectedFilterId}
+                                    onChange={(e) => setSelectedFilterId(e.target.value)}
+                                    disabled={!selectedMessageId}
+                                >
+                                    <option value="">None (Global)</option>
+                                    {filters.map((f) => (
+                                        <option key={f.sdkmessagefilterid} value={f.sdkmessagefilterid}>
+                                            {f.primaryobjecttypecode}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+                        <div className="form-row">
+                            <label className="form-label">Name *</label>
                             <input
                                 className="form-input"
-                                value={filteringAttributes}
-                                onChange={(e) => setFilteringAttributes(e.target.value)}
-                                placeholder="e.g. name,description"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
                             />
                         </div>
-                    )}
-                    {mode === 1 && (
-                        <div className="form-checkbox-row">
+                        <div className="form-row">
+                            <label className="form-label">Stage</label>
+                            <select className="form-select" value={stage} onChange={(e) => setStage(Number(e.target.value))}>
+                                <option value={10}>Pre-Validation</option>
+                                <option value={20}>Pre-Operation</option>
+                                <option value={40}>Post-Operation</option>
+                            </select>
+                        </div>
+                        <div className="form-row">
+                            <label className="form-label">Execution Mode</label>
+                            <select className="form-select" value={mode} onChange={(e) => setMode(Number(e.target.value))}>
+                                <option value={0}>Synchronous</option>
+                                <option value={1}>Asynchronous</option>
+                            </select>
+                        </div>
+                        <div className="form-row">
+                            <label className="form-label">Rank</label>
                             <input
-                                type="checkbox"
-                                id="asyncAutoDelete"
-                                checked={asyncAutoDelete}
-                                onChange={(e) => setAsyncAutoDelete(e.target.checked)}
+                                type="number"
+                                className="form-input"
+                                value={rank}
+                                min={1}
+                                onChange={(e) => setRank(Number(e.target.value))}
                             />
-                            <label htmlFor="asyncAutoDelete" className="form-label" style={{ marginBottom: 0 }}>
-                                Async Auto Delete
-                            </label>
                         </div>
-                    )}
-                </div>
-                <div className="dialog-footer">
-                    <button className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
-                    <button
-                        className="btn-primary"
-                        onClick={() => void handleSubmit()}
-                        disabled={saving || !selectedMessageId || !name}
-                    >
-                        {saving ? "Saving…" : isUpdate ? "Update" : "Register"}
-                    </button>
+                        <div className="form-row">
+                            <label className="form-label">Run in User's Context</label>
+                            <input
+                                className="form-input"
+                                value={impersonatingUserId}
+                                onChange={(e) => setImpersonatingUserId(e.target.value)}
+                                placeholder="User ID (GUID) — leave blank for calling user"
+                            />
+                        </div>
+                        <div className="form-row">
+                            <label className="form-label">Description</label>
+                            <textarea
+                                className="form-textarea"
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                            />
+                        </div>
+                        {isUpdateMessage && (
+                            <div className="form-row">
+                                <label className="form-label">Filtering Attributes</label>
+                                <div className="form-row-with-browse">
+                                    <input
+                                        className="form-input"
+                                        value={filteringAttributes}
+                                        onChange={(e) => setFilteringAttributes(e.target.value)}
+                                        placeholder="e.g. name,description (comma-separated)"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn-browse"
+                                        onClick={() => setShowAttrPicker(true)}
+                                        disabled={!canBrowseAttrs}
+                                        title={canBrowseAttrs ? "Browse attributes" : "Select a Primary Entity to browse attributes"}
+                                    >
+                                        Browse…
+                                    </button>
+                                </div>
+                                {!canBrowseAttrs && selectedMessageId && (
+                                    <div className="form-hint">Select a Primary Entity to browse and pick attributes.</div>
+                                )}
+                            </div>
+                        )}
+                        {mode === 1 && (
+                            <div className="form-checkbox-row">
+                                <input
+                                    type="checkbox"
+                                    id="asyncAutoDelete"
+                                    checked={asyncAutoDelete}
+                                    onChange={(e) => setAsyncAutoDelete(e.target.checked)}
+                                />
+                                <label htmlFor="asyncAutoDelete" className="form-label" style={{ marginBottom: 0 }}>
+                                    Async Auto Delete
+                                </label>
+                            </div>
+                        )}
+                    </div>
+                    <div className="dialog-footer">
+                        <button className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
+                        <button
+                            className="btn-primary"
+                            onClick={() => void handleSubmit()}
+                            disabled={saving || !selectedMessageId || !name}
+                        >
+                            {saving ? "Saving…" : isUpdate ? "Update" : "Register"}
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
+            <AttributePickerDialog
+                isOpen={showAttrPicker}
+                entityName={entityName}
+                selectedAttributes={filteringAttributes ? filteringAttributes.split(",").map((s) => s.trim()).filter(Boolean) : []}
+                onConfirm={handleAttrPickerConfirm}
+                onClose={() => setShowAttrPicker(false)}
+            />
+        </>
     );
 }

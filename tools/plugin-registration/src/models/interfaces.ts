@@ -56,6 +56,7 @@ export interface ProcessingStep {
     asyncautodelete: boolean;
     statecode: number; // 0=Enabled, 1=Disabled
     plugintypename?: string;
+    impersonatinguserid?: string; // GUID of user to impersonate; empty = calling user
 }
 
 export interface StepImage {

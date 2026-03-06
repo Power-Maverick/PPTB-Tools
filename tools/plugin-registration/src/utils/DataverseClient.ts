@@ -60,7 +60,7 @@ export class DataverseClient {
     async fetchSteps(pluginTypeId: string): Promise<ProcessingStep[]> {
         try {
             const response = await window.dataverseAPI.queryData(
-                `sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,description,rank,mode,stage,filteringattributes,asyncautodelete,statecode&$filter=_eventhandler_value eq '${pluginTypeId}'&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)&$orderby=name`,
+                `sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,description,rank,mode,stage,filteringattributes,asyncautodelete,statecode,_impersonatinguserid_value&$filter=_eventhandler_value eq '${pluginTypeId}'&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)&$orderby=name`,
                 "primary",
             );
             return (response.value as Record<string, unknown>[]).map((s) => {
@@ -81,6 +81,7 @@ export class DataverseClient {
                     asyncautodelete: (s["asyncautodelete"] as boolean) ?? false,
                     statecode: (s["statecode"] as number) ?? 0,
                     plugintypeid: pluginTypeId,
+                    impersonatinguserid: (s["_impersonatinguserid_value"] as string) ?? undefined,
                 };
             });
         } catch (error: unknown) {
@@ -141,6 +142,32 @@ export class DataverseClient {
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to fetch message filters: ${msg}`);
+        }
+    }
+
+    async fetchEntityAttributes(entityName: string): Promise<Array<{ logicalName: string; displayName: string }>> {
+        // Validate to prevent injection — entity logical names are alphanumeric + underscore
+        if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(entityName)) {
+            throw new Error(`Invalid entity name: "${entityName}"`);
+        }
+        try {
+            const response = await window.dataverseAPI.queryData(
+                `EntityDefinitions(LogicalName='${entityName}')/Attributes?$select=LogicalName,DisplayName,AttributeType&$orderby=LogicalName`,
+                "primary",
+            );
+            return (response.value as Record<string, unknown>[])
+                .filter((a) => (a["AttributeType"] as string) !== "Virtual")
+                .map((a) => {
+                    const dn = a["DisplayName"] as Record<string, unknown> | null;
+                    const label = (dn?.["UserLocalizedLabel"] as Record<string, unknown> | null)?.["Label"] as string | undefined;
+                    return {
+                        logicalName: (a["LogicalName"] as string) ?? "",
+                        displayName: label ?? "",
+                    };
+                });
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to fetch entity attributes: ${msg}`);
         }
     }
 
@@ -218,6 +245,9 @@ export class DataverseClient {
             if (stepData.filterId) {
                 payload["sdkmessagefilterid@odata.bind"] = `/sdkmessagefilters(${stepData.filterId})`;
             }
+            if (stepData.impersonatinguserid) {
+                payload["impersonatinguserid@odata.bind"] = `/systemusers(${stepData.impersonatinguserid})`;
+            }
             const result = await window.dataverseAPI.create(
                 "sdkmessageprocessingstep",
                 payload,
@@ -245,6 +275,9 @@ export class DataverseClient {
             if (stepData.asyncautodelete !== undefined) payload["asyncautodelete"] = stepData.asyncautodelete;
             if (stepData.messageId) payload["sdkmessageid@odata.bind"] = `/sdkmessages(${stepData.messageId})`;
             if (stepData.filterId) payload["sdkmessagefilterid@odata.bind"] = `/sdkmessagefilters(${stepData.filterId})`;
+            if (stepData.impersonatinguserid) {
+                payload["impersonatinguserid@odata.bind"] = `/systemusers(${stepData.impersonatinguserid})`;
+            }
             await window.dataverseAPI.update("sdkmessageprocessingstep", stepId, payload, "primary");
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
