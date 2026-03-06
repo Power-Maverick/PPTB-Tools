@@ -39,6 +39,7 @@ function buildTreeNodes(
                     data: step,
                     children: imageNodes,
                     isExpanded: expandedIds.has(step.sdkmessageprocessingstepid),
+                    childrenLoaded: images.has(step.sdkmessageprocessingstepid),
                 };
             });
             return {
@@ -49,6 +50,7 @@ function buildTreeNodes(
                 children: stepNodes,
                 isExpanded: expandedIds.has(pt.plugintypeid),
                 isWorkflowActivity: pt.isworkflowactivity,
+                childrenLoaded: steps.has(pt.plugintypeid),
             };
         });
         return {
@@ -58,6 +60,7 @@ function buildTreeNodes(
             data: asm,
             children: typeNodes,
             isExpanded: expandedIds.has(asm.pluginassemblyid),
+            childrenLoaded: pluginTypes.has(asm.pluginassemblyid),
         };
     });
 }

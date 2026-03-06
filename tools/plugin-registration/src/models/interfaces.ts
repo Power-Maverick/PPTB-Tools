@@ -79,6 +79,7 @@ export interface TreeNode {
     children?: TreeNode[];
     isExpanded?: boolean;
     isWorkflowActivity?: boolean;
+    childrenLoaded?: boolean; // true once children have been fetched (even if empty)
 }
 
 export interface RegistrationData {

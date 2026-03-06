@@ -44,9 +44,16 @@ interface FlatNodeProps {
 }
 
 function FlatNode({ node, depth, selectedId, onSelectNode, onToggleExpand }: FlatNodeProps) {
-    const canHaveChildren = node.type !== "image";
     const isSelected = node.id === selectedId;
     const typeLabel = getTypeLabel(node.type);
+
+    // Images never have children.
+    // For other node types: show toggle if children haven't been fetched yet (lazy load pending)
+    // OR children have been fetched and there is at least one child.
+    const canHaveChildren = node.type !== "image";
+    const showToggle = canHaveChildren && (
+        !node.childrenLoaded || (node.children?.length ?? 0) > 0
+    );
 
     const handleToggleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -68,10 +75,11 @@ function FlatNode({ node, depth, selectedId, onSelectNode, onToggleExpand }: Fla
             >
                 <span
                     className="tree-node-toggle"
-                    onClick={handleToggleClick}
-                    aria-label={node.isExpanded ? "Collapse" : "Expand"}
+                    onClick={showToggle ? handleToggleClick : undefined}
+                    aria-label={showToggle ? (node.isExpanded ? "Collapse" : "Expand") : undefined}
+                    style={{ cursor: showToggle ? "pointer" : "default" }}
                 >
-                    {canHaveChildren ? (node.isExpanded ? "▾" : "▸") : ""}
+                    {showToggle ? (node.isExpanded ? "▾" : "▸") : ""}
                 </span>
                 <span className={getIconClass(node)} title={typeLabel}>
                     {getIconText(node)}
