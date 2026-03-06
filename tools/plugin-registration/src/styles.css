@@ -239,7 +239,7 @@ button {
 
 .btn-danger {
     background-color: var(--button-danger-bg);
-    color: #ffffff;
+    color: var(--button-text);
 }
 
 .btn-danger:hover:not(:disabled) {

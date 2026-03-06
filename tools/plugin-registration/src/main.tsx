@@ -18,9 +18,10 @@ const resolveTheme = async () => {
     }
 };
 
-const themeEventHandler = (_event: any, payload: any) => {
-    if (payload.event !== "settings:updated") return;
-    const theme = (payload.data as { theme?: string }).theme;
+const themeEventHandler = (_event: unknown, payload: unknown) => {
+    const p = payload as { event?: string; data?: { theme?: string } };
+    if (p.event !== "settings:updated") return;
+    const theme = p.data?.theme;
     if (theme) {
         applyThemeClass(theme);
     } else {
