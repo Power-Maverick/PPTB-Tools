@@ -83,6 +83,12 @@ export interface TreeNode {
     childrenLoaded?: boolean; // true once children have been fetched (even if empty)
 }
 
+export interface SystemUser {
+    systemuserid: string;
+    fullname: string;
+    domainname: string;
+}
+
 export interface RegistrationData {
     assemblies: PluginAssembly[];
     pluginTypes: Map<string, PluginType[]>;   // key: assemblyId

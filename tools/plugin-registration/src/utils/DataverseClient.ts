@@ -171,6 +171,75 @@ export class DataverseClient {
         }
     }
 
+    async fetchSystemUsers(search: string): Promise<import("../models/interfaces").SystemUser[]> {
+        // Escape single quotes to prevent OData injection
+        const safeSearch = search.replace(/'/g, "''").substring(0, 100);
+        let filter = "isdisabled eq false";
+        if (safeSearch) {
+            filter += ` and contains(fullname,'${safeSearch}')`;
+        }
+        try {
+            const response = await window.dataverseAPI.queryData(
+                `systemusers?$select=systemuserid,fullname,domainname&$filter=${filter}&$orderby=fullname&$top=100`,
+                "primary",
+            );
+            return (response.value as Record<string, unknown>[]).map((u) => ({
+                systemuserid: u["systemuserid"] as string,
+                fullname: (u["fullname"] as string) ?? "",
+                domainname: (u["domainname"] as string) ?? "",
+            }));
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to fetch system users: ${msg}`);
+        }
+    }
+
+    async fetchSystemUserById(userId: string): Promise<import("../models/interfaces").SystemUser | null> {
+        // Validate GUID format to prevent injection
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+            return null;
+        }
+        try {
+            const response = await window.dataverseAPI.queryData(
+                `systemusers?$select=systemuserid,fullname,domainname&$filter=systemuserid eq '${userId}'&$top=1`,
+                "primary",
+            );
+            const values = response.value as Record<string, unknown>[];
+            if (values.length === 0) return null;
+            return {
+                systemuserid: values[0]["systemuserid"] as string,
+                fullname: (values[0]["fullname"] as string) ?? "",
+                domainname: (values[0]["domainname"] as string) ?? "",
+            };
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to fetch system user by ID: ${msg}`);
+        }
+    }
+
+    async fetchSystemUserByFullName(fullname: "SYSTEM"): Promise<import("../models/interfaces").SystemUser | null> {
+        // Validate even though TypeScript restricts to "SYSTEM" — belt-and-suspenders
+        if (!/^[A-Z]{1,50}$/.test(fullname)) {
+            throw new Error(`Invalid fullname: "${fullname}"`);
+        }
+        try {
+            const response = await window.dataverseAPI.queryData(
+                `systemusers?$select=systemuserid,fullname,domainname&$filter=fullname eq '${fullname}'&$top=1`,
+                "primary",
+            );
+            const values = response.value as Record<string, unknown>[];
+            if (values.length === 0) return null;
+            return {
+                systemuserid: values[0]["systemuserid"] as string,
+                fullname: (values[0]["fullname"] as string) ?? "",
+                domainname: (values[0]["domainname"] as string) ?? "",
+            };
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to fetch SYSTEM user: ${msg}`);
+        }
+    }
+
     async registerAssembly(
         content: string,
         name: string,
