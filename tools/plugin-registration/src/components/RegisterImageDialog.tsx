@@ -74,7 +74,7 @@ export function RegisterImageDialog({
     const canBrowseAttrs = !!entityName && entityName !== "none" && entityName !== "any";
 
     const handleSubmit = async () => {
-        if (!name || !entityAlias) return;
+        if (!name || (!isUpdate && !entityAlias)) return;
         setSaving(true);
         setSubmitError("");
         try {
@@ -124,13 +124,20 @@ export function RegisterImageDialog({
                             />
                         </div>
                         <div className="form-row">
-                            <label className="form-label">Entity Alias *</label>
-                            <input
-                                className="form-input"
-                                value={entityAlias}
-                                onChange={(e) => setEntityAlias(e.target.value)}
-                                placeholder="e.g. preImage"
-                            />
+                            <label className="form-label">Entity Alias{!isUpdate && " *"}</label>
+                            {isUpdate ? (
+                                <>
+                                    <div className="form-read-only">{entityAlias}</div>
+                                    <div className="form-hint">Entity alias cannot be changed after registration.</div>
+                                </>
+                            ) : (
+                                <input
+                                    className="form-input"
+                                    value={entityAlias}
+                                    onChange={(e) => setEntityAlias(e.target.value)}
+                                    placeholder="e.g. preImage"
+                                />
+                            )}
                         </div>
                         <div className="form-row">
                             <label className="form-label">Image Type</label>
@@ -205,7 +212,7 @@ export function RegisterImageDialog({
                         <button
                             className="btn-primary"
                             onClick={() => void handleSubmit()}
-                            disabled={saving || !name || !entityAlias}
+                            disabled={saving || !name || (!isUpdate && !entityAlias)}
                         >
                             {saving ? "Saving…" : isUpdate ? "Update" : "Register"}
                         </button>

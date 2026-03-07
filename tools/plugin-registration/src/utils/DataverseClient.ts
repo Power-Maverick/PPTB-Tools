@@ -418,9 +418,9 @@ export class DataverseClient {
         try {
             const payload: Record<string, unknown> = {};
             if (imageData.name !== undefined) payload["name"] = imageData.name;
-            if (imageData.entityalias !== undefined) payload["entityalias"] = imageData.entityalias;
-            // imagetype and messagepropertyname are set at creation time and cannot be changed via update
-            if (imageData.attributes !== undefined) payload["attributes"] = imageData.attributes;
+            // entityalias, imagetype and messagepropertyname are set at creation time and cannot be changed via update
+            // Send null (not empty string) when no specific attributes are set — null means "all attributes" in Dataverse
+            if (imageData.attributes !== undefined) payload["attributes"] = imageData.attributes || null;
             if (imageData.description !== undefined) payload["description"] = imageData.description;
             await window.dataverseAPI.update("sdkmessageprocessingstepimage", imageId, payload, "primary");
         } catch (error: unknown) {
