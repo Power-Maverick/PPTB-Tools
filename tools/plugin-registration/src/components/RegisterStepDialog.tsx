@@ -398,7 +398,7 @@ export function RegisterStepDialog({
                                 onChange={(e) => setDescription(e.target.value)}
                             />
                         </div>
-                        {isUpdateMessage && (
+                        {(isUpdateMessage || isUpdate) && (
                             <div className="form-row">
                                 <label className="form-label">Filtering Attributes</label>
                                 <div className="form-row-with-browse">

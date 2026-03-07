@@ -134,27 +134,38 @@ export function RegisterImageDialog({
                         </div>
                         <div className="form-row">
                             <label className="form-label">Image Type</label>
-                            <select
-                                className="form-select"
-                                value={imageType}
-                                onChange={(e) => setImageType(Number(e.target.value))}
-                            >
-                                <option value={0} disabled={!preOk}>
-                                    Pre Image{!preOk ? " (not available)" : ""}
-                                </option>
-                                <option value={1} disabled={!postOk}>
-                                    Post Image{!postOk ? " (not available)" : ""}
-                                </option>
-                                <option value={2} disabled={!bothOk}>
-                                    Both{!bothOk ? " (not available)" : ""}
-                                </option>
-                            </select>
-                            {(!preOk || !postOk) && (
-                                <div className="form-hint">
-                                    {!preOk && "Pre Image is not available for Create steps. "}
-                                    {!postOk && step.messageName === "Delete" && "Post Image is not available for Delete steps. "}
-                                    {!postOk && step.messageName !== "Delete" && "Post Image requires Post-Operation stage. "}
-                                </div>
+                            {isUpdate ? (
+                                <>
+                                    <div className="form-read-only">
+                                        {imageType === 0 ? "Pre Image" : imageType === 1 ? "Post Image" : "Both"}
+                                    </div>
+                                    <div className="form-hint">Image type cannot be changed after registration.</div>
+                                </>
+                            ) : (
+                                <>
+                                    <select
+                                        className="form-select"
+                                        value={imageType}
+                                        onChange={(e) => setImageType(Number(e.target.value))}
+                                    >
+                                        <option value={0} disabled={!preOk}>
+                                            Pre Image{!preOk ? " (not available)" : ""}
+                                        </option>
+                                        <option value={1} disabled={!postOk}>
+                                            Post Image{!postOk ? " (not available)" : ""}
+                                        </option>
+                                        <option value={2} disabled={!bothOk}>
+                                            Both{!bothOk ? " (not available)" : ""}
+                                        </option>
+                                    </select>
+                                    {(!preOk || !postOk) && (
+                                        <div className="form-hint">
+                                            {!preOk && "Pre Image is not available for Create steps. "}
+                                            {!postOk && step.messageName === "Delete" && "Post Image is not available for Delete steps. "}
+                                            {!postOk && step.messageName !== "Delete" && "Post Image requires Post-Operation stage. "}
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                         <div className="form-row">

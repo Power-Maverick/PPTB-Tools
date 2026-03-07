@@ -419,8 +419,7 @@ export class DataverseClient {
             const payload: Record<string, unknown> = {};
             if (imageData.name !== undefined) payload["name"] = imageData.name;
             if (imageData.entityalias !== undefined) payload["entityalias"] = imageData.entityalias;
-            if (imageData.imagetype !== undefined) payload["imagetype"] = imageData.imagetype;
-            // messagepropertyname is set at creation time and cannot be changed via update
+            // imagetype and messagepropertyname are set at creation time and cannot be changed via update
             if (imageData.attributes !== undefined) payload["attributes"] = imageData.attributes;
             if (imageData.description !== undefined) payload["description"] = imageData.description;
             await window.dataverseAPI.update("sdkmessageprocessingstepimage", imageId, payload, "primary");
