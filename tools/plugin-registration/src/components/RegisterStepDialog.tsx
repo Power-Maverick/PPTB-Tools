@@ -60,6 +60,10 @@ export function RegisterStepDialog({
     // Initialized to "" — only set inside the isOpen effect, which always runs before the filter effect.
     const pendingFilterIdRef = useRef("");
 
+    // Incrementing this key forces the filter-loading effect to re-run even when selectedMessageId
+    // does not change (e.g. re-opening the update dialog for the same step).
+    const [filterLoadKey, setFilterLoadKey] = useState(0);
+
     // ── Reset all form fields when the dialog opens (or existingStep changes) ──
     useEffect(() => {
         if (!isOpen) return;
@@ -73,6 +77,9 @@ export function RegisterStepDialog({
         setFilteringAttributes(existingStep?.filteringattributes ?? "");
         setAsyncAutoDelete(existingStep?.asyncautodelete ?? false);
         setSubmitError("");
+        // Force the filter-loading effect to re-run regardless of whether selectedMessageId changed,
+        // so the filter dropdown is always restored when re-opening the dialog for the same step.
+        setFilterLoadKey((k) => k + 1);
     }, [isOpen, existingStep]);
 
     // Load messages on open
@@ -85,12 +92,14 @@ export function RegisterStepDialog({
             .finally(() => setLoadingMessages(false));
     }, [isOpen]);
 
-    // Load entity filters when message changes; restore pending filter ID if present
+    // Load entity filters when message changes OR when filterLoadKey increments (dialog re-opened).
+    // pendingFilterIdRef carries the filter to restore; it is consumed (set to "") after use so
+    // subsequent user-driven message changes start with an empty selection.
     useEffect(() => {
         if (!selectedMessageId) { setFilters([]); setSelectedFilterId(""); return; }
         setLoadingFilters(true);
         const filterToRestore = pendingFilterIdRef.current;
-        pendingFilterIdRef.current = ""; // consume — subsequent user-driven changes should clear
+        pendingFilterIdRef.current = ""; // consume
         client.fetchMessageFilters(selectedMessageId)
             .then((loadedFilters) => {
                 setFilters(loadedFilters);
@@ -98,7 +107,7 @@ export function RegisterStepDialog({
             })
             .catch(console.error)
             .finally(() => setLoadingFilters(false));
-    }, [selectedMessageId]);
+    }, [selectedMessageId, filterLoadKey]);
 
     // Auto-generate name (new steps only)
     useEffect(() => {

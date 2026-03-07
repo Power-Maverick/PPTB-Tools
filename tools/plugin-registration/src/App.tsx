@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import type { TreeNode, PluginAssembly, PluginType, ProcessingStep, StepImage } from "./models/interfaces";
 import { DataverseClient } from "./utils/DataverseClient";
 import { PluginTree } from "./components/PluginTree";
@@ -443,6 +443,26 @@ export default function App() {
         return null;
     })();
 
+    // Flat stepId → ProcessingStep lookup built once per steps change, used by imageStep below.
+    const stepById = useMemo(() => {
+        const map = new Map<string, ProcessingStep>();
+        for (const [, ss] of steps) {
+            for (const s of ss) {
+                map.set(s.sdkmessageprocessingstepid, s);
+            }
+        }
+        return map;
+    }, [steps]);
+
+    // When an image node is selected, find its parent step so the update-image dialog can be rendered.
+    const imageStep: ProcessingStep | null = (() => {
+        if (selectedNode?.type === "image") {
+            const img = selectedNode.data as StepImage;
+            return stepById.get(img.sdkmessageprocessingstepid) ?? null;
+        }
+        return null;
+    })();
+
     // Context-sensitive toolbar state
     const canUpdate = !!(selectedAssembly || selectedStep || selectedImage);
     const canUnregister = !!(selectedAssembly || selectedStep || selectedImage);
@@ -696,11 +716,11 @@ export default function App() {
                     onClose={() => setShowRegisterImage(false)}
                 />
             )}
-            {selectedImage && selectedStep && (
+            {selectedImage && imageStep && (
                 <RegisterImageDialog
                     isOpen={showUpdateImage}
                     isUpdate={true}
-                    step={selectedStep}
+                    step={imageStep}
                     existingImage={selectedImage}
                     onRegister={(imageData) => handleUpdateImage(imageData)}
                     onClose={() => setShowUpdateImage(false)}
