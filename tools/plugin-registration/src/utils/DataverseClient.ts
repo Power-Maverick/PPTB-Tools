@@ -417,11 +417,10 @@ export class DataverseClient {
     async updateImage(imageId: string, imageData: Partial<StepImage>): Promise<void> {
         try {
             const payload: Record<string, unknown> = {};
-            // name is set at creation time and cannot be changed via update
+            // name, imagetype and messagepropertyname are set at creation time and cannot be changed via update
             if (imageData.entityalias !== undefined) payload["entityalias"] = imageData.entityalias;
-            // imagetype and messagepropertyname are set at creation time and cannot be changed via update
-            // Send null (not empty string) when no specific attributes are set — null means "all attributes" in Dataverse
-            if (imageData.attributes !== undefined) payload["attributes"] = imageData.attributes || null;
+            // Use empty string (not null) for "all attributes" — matches Dataverse SDK behavior and avoids 0x80040216
+            if (imageData.attributes !== undefined) payload["attributes"] = imageData.attributes || "";
             if (imageData.description !== undefined) payload["description"] = imageData.description;
             await window.dataverseAPI.update("sdkmessageprocessingstepimage", imageId, payload, "primary");
         } catch (error: unknown) {
