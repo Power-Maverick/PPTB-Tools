@@ -74,7 +74,7 @@ export function RegisterImageDialog({
     const canBrowseAttrs = !!entityName && entityName !== "none" && entityName !== "any";
 
     const handleSubmit = async () => {
-        if (!name || (!isUpdate && !entityAlias)) return;
+        if ((!isUpdate && !name) || !entityAlias) return;
         setSaving(true);
         setSubmitError("");
         try {
@@ -115,29 +115,29 @@ export function RegisterImageDialog({
                             <div className="form-read-only">{step.name}</div>
                         </div>
                         <div className="form-row">
-                            <label className="form-label">Name *</label>
-                            <input
-                                className="form-input"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="e.g. PreImage"
-                            />
-                        </div>
-                        <div className="form-row">
-                            <label className="form-label">Entity Alias{!isUpdate && " *"}</label>
+                            <label className="form-label">Name{!isUpdate && " *"}</label>
                             {isUpdate ? (
                                 <>
-                                    <div className="form-read-only">{entityAlias}</div>
-                                    <div className="form-hint">Entity alias cannot be changed after registration.</div>
+                                    <div className="form-read-only">{name}</div>
+                                    <div className="form-hint">Name cannot be changed after registration.</div>
                                 </>
                             ) : (
                                 <input
                                     className="form-input"
-                                    value={entityAlias}
-                                    onChange={(e) => setEntityAlias(e.target.value)}
-                                    placeholder="e.g. preImage"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    placeholder="e.g. PreImage"
                                 />
                             )}
+                        </div>
+                        <div className="form-row">
+                            <label className="form-label">Entity Alias *</label>
+                            <input
+                                className="form-input"
+                                value={entityAlias}
+                                onChange={(e) => setEntityAlias(e.target.value)}
+                                placeholder="e.g. preImage"
+                            />
                         </div>
                         <div className="form-row">
                             <label className="form-label">Image Type</label>
@@ -212,7 +212,7 @@ export function RegisterImageDialog({
                         <button
                             className="btn-primary"
                             onClick={() => void handleSubmit()}
-                            disabled={saving || !name || (!isUpdate && !entityAlias)}
+                            disabled={saving || (!isUpdate && !name) || !entityAlias}
                         >
                             {saving ? "Saving…" : isUpdate ? "Update" : "Register"}
                         </button>
