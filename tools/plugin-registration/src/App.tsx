@@ -218,19 +218,29 @@ export default function App() {
 
     // ── Assembly actions ──
     const handleRegisterAssembly = async (content: string, name: string, isolationMode: number, description: string) => {
-        await client.registerAssembly(content, name, isolationMode, description);
-        notify("Assembly registered successfully.");
-        setShowRegisterAssembly(false);
-        void loadAssemblies();
+        try {
+            await client.registerAssembly(content, name, isolationMode, description);
+            notify("Assembly registered successfully.");
+            setShowRegisterAssembly(false);
+            void loadAssemblies();
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            throw err; // re-throw so dialog can show inline error
+        }
     };
 
     const handleUpdateAssembly = async (content: string, _name: string, _isolationMode: number, description: string) => {
         if (selectedNode?.type !== "assembly") return;
         const asm = selectedNode.data as PluginAssembly;
-        await client.updateAssembly(asm.pluginassemblyid, description, content);
-        notify("Assembly updated.");
-        setShowUpdateAssembly(false);
-        void loadAssemblies();
+        try {
+            await client.updateAssembly(asm.pluginassemblyid, description, content);
+            notify("Assembly updated.");
+            setShowUpdateAssembly(false);
+            void loadAssemblies();
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            throw err;
+        }
     };
 
     const handleSaveAssemblyDescription = async (description: string) => {
@@ -266,24 +276,34 @@ export default function App() {
     };
 
     const handleRegisterStep = async (stepData: Partial<ProcessingStep> & { messageId: string; filterId?: string; pluginTypeId: string }) => {
-        await client.registerStep(stepData);
-        notify("Step registered successfully.");
-        setShowRegisterStep(false);
-        const ptId = stepData.pluginTypeId;
-        const s = await client.fetchSteps(ptId);
-        setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
+        try {
+            await client.registerStep(stepData);
+            notify("Step registered successfully.");
+            setShowRegisterStep(false);
+            const ptId = stepData.pluginTypeId;
+            const s = await client.fetchSteps(ptId);
+            setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            throw err; // re-throw so dialog can show inline error
+        }
     };
 
     const handleUpdateStep = async (stepData: Partial<ProcessingStep> & { messageId: string; filterId?: string; pluginTypeId: string }) => {
         if (selectedNode?.type !== "step") return;
         const step = selectedNode.data as ProcessingStep;
-        await client.updateStep(step.sdkmessageprocessingstepid, stepData);
-        notify("Step updated.");
-        setShowUpdateStep(false);
-        const ptId = step.plugintypeid ?? stepData.pluginTypeId;
-        if (ptId) {
-            const s = await client.fetchSteps(ptId);
-            setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
+        try {
+            await client.updateStep(step.sdkmessageprocessingstepid, stepData);
+            notify("Step updated.");
+            setShowUpdateStep(false);
+            const ptId = step.plugintypeid ?? stepData.pluginTypeId;
+            if (ptId) {
+                const s = await client.fetchSteps(ptId);
+                setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
+            }
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            throw err; // re-throw so dialog can show inline error
         }
     };
 
@@ -351,21 +371,31 @@ export default function App() {
 
     // ── Image actions ──
     const handleRegisterImage = async (imageData: Partial<StepImage> & { stepId: string }) => {
-        await client.registerImage(imageData);
-        notify("Image registered.");
-        setShowRegisterImage(false);
-        const imgs = await client.fetchImages(imageData.stepId);
-        setImages((prev: Map<string, StepImage[]>) => new Map(prev).set(imageData.stepId, imgs));
+        try {
+            await client.registerImage(imageData);
+            notify("Image registered.");
+            setShowRegisterImage(false);
+            const imgs = await client.fetchImages(imageData.stepId);
+            setImages((prev: Map<string, StepImage[]>) => new Map(prev).set(imageData.stepId, imgs));
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            throw err; // re-throw so dialog can show inline error
+        }
     };
 
     const handleUpdateImage = async (imageData: Partial<StepImage> & { stepId: string }) => {
         if (selectedNode?.type !== "image") return;
         const img = selectedNode.data as StepImage;
-        await client.updateImage(img.sdkmessageprocessingstepimageid, imageData);
-        notify("Image updated.");
-        setShowUpdateImage(false);
-        const imgs = await client.fetchImages(imageData.stepId);
-        setImages((prev: Map<string, StepImage[]>) => new Map(prev).set(imageData.stepId, imgs));
+        try {
+            await client.updateImage(img.sdkmessageprocessingstepimageid, imageData);
+            notify("Image updated.");
+            setShowUpdateImage(false);
+            const imgs = await client.fetchImages(imageData.stepId);
+            setImages((prev: Map<string, StepImage[]>) => new Map(prev).set(imageData.stepId, imgs));
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            throw err; // re-throw so dialog can show inline error
+        }
     };
 
     const handleSaveImageDescription = async (description: string) => {

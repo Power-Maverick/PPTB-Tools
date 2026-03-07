@@ -39,6 +39,14 @@ function getDefaultImageType(step: ProcessingStep, existing?: number): number {
     return init;
 }
 
+/**
+ * Returns the correct messagepropertyname for a given SDK message.
+ * Create uses "Id" (the newly created record's ID); all others use "Target".
+ */
+function getMessagePropertyName(messageName: string): string {
+    return messageName === "Create" ? "Id" : "Target";
+}
+
 export function RegisterImageDialog({
     isOpen,
     isUpdate,
@@ -54,6 +62,7 @@ export function RegisterImageDialog({
     const [description, setDescription] = useState(existingImage?.description ?? "");
     const [showAttrPicker, setShowAttrPicker] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [submitError, setSubmitError] = useState("");
 
     if (!isOpen) return null;
 
@@ -67,16 +76,19 @@ export function RegisterImageDialog({
     const handleSubmit = async () => {
         if (!name || !entityAlias) return;
         setSaving(true);
+        setSubmitError("");
         try {
             await onRegister({
                 name,
                 entityalias: entityAlias,
                 imagetype: imageType,
-                messagepropertyname: "Target",
+                messagepropertyname: getMessagePropertyName(step.messageName),
                 attributes,
                 description,
                 stepId: step.sdkmessageprocessingstepid,
             });
+        } catch (err: unknown) {
+            setSubmitError(err instanceof Error ? err.message : String(err));
         } finally {
             setSaving(false);
         }
@@ -173,6 +185,9 @@ export function RegisterImageDialog({
                                 onChange={(e) => setDescription(e.target.value)}
                             />
                         </div>
+                        {submitError && (
+                            <div className="form-submit-error">{submitError}</div>
+                        )}
                     </div>
                     <div className="dialog-footer">
                         <button className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
@@ -196,3 +211,4 @@ export function RegisterImageDialog({
         </>
     );
 }
+

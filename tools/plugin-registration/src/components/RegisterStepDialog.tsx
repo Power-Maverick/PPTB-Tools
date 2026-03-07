@@ -15,6 +15,11 @@ interface RegisterStepDialogProps {
 
 type ImpersonationMode = "calling" | "system" | "user";
 
+/** Async mode is only allowed on Post-Operation (stage 40) */
+function asyncAllowed(stage: number): boolean {
+    return stage === 40;
+}
+
 const client = new DataverseClient();
 
 export function RegisterStepDialog({
@@ -36,6 +41,7 @@ export function RegisterStepDialog({
     const [description, setDescription] = useState(existingStep?.description ?? "");
     const [filteringAttributes, setFilteringAttributes] = useState(existingStep?.filteringattributes ?? "");
     const [asyncAutoDelete, setAsyncAutoDelete] = useState(existingStep?.asyncautodelete ?? false);
+    const [submitError, setSubmitError] = useState("");
 
     // ── Run in User's Context ──
     const [impersonationMode, setImpersonationMode] = useState<ImpersonationMode>("calling");
@@ -50,9 +56,24 @@ export function RegisterStepDialog({
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [loadingFilters, setLoadingFilters] = useState(false);
 
-    // Keep a ref so the init effect can always read the latest existingStep
-    const existingStepRef = useRef(existingStep);
-    existingStepRef.current = existingStep;
+    // Holds the filter ID to restore after the filter list loads (used on open in update mode).
+    // Initialized to "" — only set inside the isOpen effect, which always runs before the filter effect.
+    const pendingFilterIdRef = useRef("");
+
+    // ── Reset all form fields when the dialog opens (or existingStep changes) ──
+    useEffect(() => {
+        if (!isOpen) return;
+        pendingFilterIdRef.current = existingStep?.sdkmessagefilterid ?? "";
+        setSelectedMessageId(existingStep?.sdkmessageid ?? "");
+        setName(existingStep?.name ?? "");
+        setStage(existingStep?.stage ?? 40);
+        setMode(existingStep?.mode ?? 0);
+        setRank(existingStep?.rank ?? 1);
+        setDescription(existingStep?.description ?? "");
+        setFilteringAttributes(existingStep?.filteringattributes ?? "");
+        setAsyncAutoDelete(existingStep?.asyncautodelete ?? false);
+        setSubmitError("");
+    }, [isOpen, existingStep]);
 
     // Load messages on open
     useEffect(() => {
@@ -64,18 +85,22 @@ export function RegisterStepDialog({
             .finally(() => setLoadingMessages(false));
     }, [isOpen]);
 
-    // Load entity filters when message changes
+    // Load entity filters when message changes; restore pending filter ID if present
     useEffect(() => {
-        if (!selectedMessageId) { setFilters([]); return; }
+        if (!selectedMessageId) { setFilters([]); setSelectedFilterId(""); return; }
         setLoadingFilters(true);
-        setSelectedFilterId("");
+        const filterToRestore = pendingFilterIdRef.current;
+        pendingFilterIdRef.current = ""; // consume — subsequent user-driven changes should clear
         client.fetchMessageFilters(selectedMessageId)
-            .then(setFilters)
+            .then((loadedFilters) => {
+                setFilters(loadedFilters);
+                setSelectedFilterId(filterToRestore);
+            })
             .catch(console.error)
             .finally(() => setLoadingFilters(false));
     }, [selectedMessageId]);
 
-    // Auto-generate name
+    // Auto-generate name (new steps only)
     useEffect(() => {
         if (isUpdate) return;
         const msg = messages.find((m) => m.sdkmessageid === selectedMessageId);
@@ -89,7 +114,7 @@ export function RegisterStepDialog({
     // Initialise Run in User's Context when dialog opens
     useEffect(() => {
         if (!isOpen) return;
-        const existingId = existingStepRef.current?.impersonatinguserid;
+        const existingId = existingStep?.impersonatinguserid;
         if (!existingId) {
             setImpersonationMode("calling");
             setSelectedUser(null);
@@ -97,7 +122,6 @@ export function RegisterStepDialog({
             setSystemUserError("");
             return;
         }
-        // Fetch user details to determine if it's SYSTEM or a regular user
         setImpersonationMode("user");
         setSelectedUser({ systemuserid: existingId, fullname: "Loading…", domainname: "" });
         client.fetchSystemUserById(existingId)
@@ -118,7 +142,7 @@ export function RegisterStepDialog({
             .catch(() => {
                 setSelectedUser({ systemuserid: existingId, fullname: existingId, domainname: "" });
             });
-    }, [isOpen]);
+    }, [isOpen, existingStep]);
 
     // Fetch SYSTEM user GUID when "system" mode is selected and we don't have it yet
     useEffect(() => {
@@ -146,11 +170,21 @@ export function RegisterStepDialog({
     const isUpdateMessage = selectedMessage?.name === "Update";
     const entityName = selectedFilter?.primaryobjecttypecode ?? "";
     const canBrowseAttrs = isUpdateMessage && !!entityName && entityName !== "none" && entityName !== "any";
+    const asyncEnabled = asyncAllowed(stage);
 
     const getImpersonatingUserId = (): string | undefined => {
         if (impersonationMode === "calling") return undefined;
         if (impersonationMode === "system") return systemUserId || undefined;
         return selectedUser?.systemuserid || undefined;
+    };
+
+    const handleStageChange = (newStage: number) => {
+        setStage(newStage);
+        // Async mode is only valid for Post-Operation
+        if (!asyncAllowed(newStage) && mode === 1) {
+            setMode(0);
+            setAsyncAutoDelete(false);
+        }
     };
 
     const handleModeChange = (newMode: ImpersonationMode) => {
@@ -168,6 +202,7 @@ export function RegisterStepDialog({
     const handleSubmit = async () => {
         if (!selectedMessageId) return;
         setSaving(true);
+        setSubmitError("");
         try {
             await onRegister({
                 name,
@@ -182,6 +217,8 @@ export function RegisterStepDialog({
                 filterId: selectedFilterId || undefined,
                 pluginTypeId: pluginType.plugintypeid,
             });
+        } catch (err: unknown) {
+            setSubmitError(err instanceof Error ? err.message : String(err));
         } finally {
             setSaving(false);
         }
@@ -254,7 +291,7 @@ export function RegisterStepDialog({
                         </div>
                         <div className="form-row">
                             <label className="form-label">Stage</label>
-                            <select className="form-select" value={stage} onChange={(e) => setStage(Number(e.target.value))}>
+                            <select className="form-select" value={stage} onChange={(e) => handleStageChange(Number(e.target.value))}>
                                 <option value={10}>Pre-Validation</option>
                                 <option value={20}>Pre-Operation</option>
                                 <option value={40}>Post-Operation</option>
@@ -264,8 +301,13 @@ export function RegisterStepDialog({
                             <label className="form-label">Execution Mode</label>
                             <select className="form-select" value={mode} onChange={(e) => setMode(Number(e.target.value))}>
                                 <option value={0}>Synchronous</option>
-                                <option value={1}>Asynchronous</option>
+                                <option value={1} disabled={!asyncEnabled}>
+                                    Asynchronous{!asyncEnabled ? " (Post-Operation only)" : ""}
+                                </option>
                             </select>
+                            {!asyncEnabled && (
+                                <div className="form-hint">Asynchronous execution is only available for Post-Operation steps.</div>
+                            )}
                         </div>
                         <div className="form-row">
                             <label className="form-label">Rank</label>
@@ -385,6 +427,9 @@ export function RegisterStepDialog({
                                 </label>
                             </div>
                         )}
+                        {submitError && (
+                            <div className="form-submit-error">{submitError}</div>
+                        )}
                     </div>
                     <div className="dialog-footer">
                         <button className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
@@ -410,7 +455,6 @@ export function RegisterStepDialog({
                 onSelect={handleUserSelected}
                 onClose={() => {
                     setShowUserPicker(false);
-                    // If user closes picker without selecting and no user was previously set, revert to calling
                     if (!selectedUser) {
                         setImpersonationMode("calling");
                     }

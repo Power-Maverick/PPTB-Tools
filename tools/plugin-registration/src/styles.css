@@ -857,6 +857,18 @@ button:disabled {
     color: var(--button-danger-bg);
 }
 
+/* ── Inline dialog error banner ── */
+.form-submit-error {
+    margin-top: 10px;
+    padding: 8px 10px;
+    background-color: #fde7e9;
+    border: 1px solid #f1707a;
+    border-radius: 3px;
+    font-size: 12px;
+    color: #a4262c;
+    word-break: break-word;
+}
+
 /* ── User Picker Dialog ── */
 .user-picker-dialog {
     width: 480px;
