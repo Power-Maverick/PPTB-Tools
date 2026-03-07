@@ -60,7 +60,7 @@ export class DataverseClient {
     async fetchSteps(pluginTypeId: string): Promise<ProcessingStep[]> {
         try {
             const response = await window.dataverseAPI.queryData(
-                `sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,description,rank,mode,stage,filteringattributes,asyncautodelete,statecode,_impersonatinguserid_value&$filter=_eventhandler_value eq '${pluginTypeId}'&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)&$orderby=name`,
+                `sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,description,rank,mode,stage,filteringattributes,asyncautodelete,statecode,_impersonatinguserid_value,_sdkmessageid_value,_sdkmessagefilterid_value&$filter=_eventhandler_value eq '${pluginTypeId}'&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)&$orderby=name`,
                 "primary",
             );
             return (response.value as Record<string, unknown>[]).map((s) => {
@@ -420,7 +420,7 @@ export class DataverseClient {
             if (imageData.name !== undefined) payload["name"] = imageData.name;
             if (imageData.entityalias !== undefined) payload["entityalias"] = imageData.entityalias;
             if (imageData.imagetype !== undefined) payload["imagetype"] = imageData.imagetype;
-            if (imageData.messagepropertyname !== undefined) payload["messagepropertyname"] = imageData.messagepropertyname;
+            // messagepropertyname is set at creation time and cannot be changed via update
             if (imageData.attributes !== undefined) payload["attributes"] = imageData.attributes;
             if (imageData.description !== undefined) payload["description"] = imageData.description;
             await window.dataverseAPI.update("sdkmessageprocessingstepimage", imageId, payload, "primary");
