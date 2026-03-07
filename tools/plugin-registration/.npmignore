@@ -1,0 +1,12 @@
+src/
+node_modules/
+.vscode/
+*.ts
+!*.d.ts
+tsconfig.json
+tsconfig.node.json
+vite.config.ts
+index.html
+README.md
+.git/
+.gitignore
