@@ -292,6 +292,34 @@ export default function App() {
         }
     }, []);
 
+    /**
+     * Run async tasks with at most `concurrency` in flight at any time.
+     * Safe in JS's single-threaded model: `index++` is atomic between awaits,
+     * so each worker claims a unique slot before yielding.
+     * All workers start immediately; Promise.all waits for all to finish.
+     */
+    async function runWithConcurrency<T>(
+        tasks: (() => Promise<T>)[],
+        concurrency = 5,
+    ): Promise<T[]> {
+        const results: T[] = new Array(tasks.length);
+        let index = 0;
+        async function worker() {
+            // index++ is read-then-increment with no await in between, so no two
+            // workers ever get the same slot despite running concurrently.
+            while (index < tasks.length) {
+                const i = index++;
+                results[i] = await tasks[i]();
+            }
+        }
+        // Spawn up to `concurrency` workers; each keeps pulling the next task
+        // until all tasks are exhausted.
+        await Promise.all(
+            Array.from({ length: Math.min(concurrency, tasks.length) }, worker),
+        );
+        return results;
+    }
+
     /** Load all plugin types + steps for entity/message views */
     const loadAllData = useCallback(async () => {
         if (loadingAllStepsRef.current) return;
@@ -302,23 +330,25 @@ export default function App() {
             const pts = pluginTypesRef.current;
             const ss = stepsRef.current;
 
-            // Step 1: load all missing plugin types in parallel
+            // Step 1: load all missing plugin types – at most 5 concurrent requests
             const missingAsmIds = asms.map((a) => a.pluginassemblyid).filter((id) => !pts.has(id));
             let newPtMap = new Map(pts);
             if (missingAsmIds.length > 0) {
-                const results = await Promise.all(
-                    missingAsmIds.map((id) => client.fetchPluginTypes(id).then((types) => [id, types] as const)),
+                const results = await runWithConcurrency(
+                    missingAsmIds.map((id) => () => client.fetchPluginTypes(id).then((types) => [id, types] as const)),
+                    5,
                 );
                 for (const [id, types] of results) newPtMap.set(id, types);
                 setPluginTypes(newPtMap);
             }
 
-            // Step 2: load all missing steps in parallel
+            // Step 2: load all missing steps – at most 5 concurrent requests
             const allPts = Array.from(newPtMap.values()).flat();
             const missingPtIds = allPts.map((pt) => pt.plugintypeid).filter((id) => !ss.has(id));
             if (missingPtIds.length > 0) {
-                const results = await Promise.all(
-                    missingPtIds.map((id) => client.fetchSteps(id).then((s) => [id, s] as const)),
+                const results = await runWithConcurrency(
+                    missingPtIds.map((id) => () => client.fetchSteps(id).then((s) => [id, s] as const)),
+                    5,
                 );
                 setSteps((prev: Map<string, ProcessingStep[]>) => {
                     const next = new Map(prev);
