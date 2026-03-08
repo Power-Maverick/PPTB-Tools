@@ -70,13 +70,18 @@ export interface StepImage {
     description: string;
 }
 
-export type TreeNodeType = 'assembly' | 'plugintype' | 'step' | 'image';
+export type TreeNodeType = 'assembly' | 'plugintype' | 'step' | 'image' | 'entity-group' | 'message-group';
+
+export interface VirtualGroupData {
+    groupName: string;
+    groupType: 'entity' | 'message';
+}
 
 export interface TreeNode {
     id: string;
     type: TreeNodeType;
     name: string;
-    data: PluginAssembly | PluginType | ProcessingStep | StepImage;
+    data: PluginAssembly | PluginType | ProcessingStep | StepImage | VirtualGroupData;
     children?: TreeNode[];
     isExpanded?: boolean;
     isWorkflowActivity?: boolean;

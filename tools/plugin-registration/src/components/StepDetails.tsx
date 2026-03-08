@@ -62,35 +62,35 @@ export function StepDetails({ step, onSave, onRegisterImage, onEnable, onDisable
             </PropertySection>
             <PropertySection title="Information" defaultExpanded={true}>
                 <div className="prop-row">
-                    <span className="prop-label">StepId</span>
+                    <span className="prop-label" onClick={() => setFocusedField("Name")}>StepId</span>
                     <span className="prop-value" onClick={() => setFocusedField("Name")}>{step.sdkmessageprocessingstepid}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">Name</span>
+                    <span className="prop-label" onClick={() => setFocusedField("Name")}>Name</span>
                     <span className="prop-value" onClick={() => setFocusedField("Name")}>{step.name}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">Message</span>
+                    <span className="prop-label" onClick={() => setFocusedField("Message")}>Message</span>
                     <span className="prop-value" onClick={() => setFocusedField("Message")}>{step.messageName}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">PrimaryEntity</span>
+                    <span className="prop-label" onClick={() => setFocusedField("PrimaryEntity")}>PrimaryEntity</span>
                     <span className="prop-value" onClick={() => setFocusedField("PrimaryEntity")}>{step.primaryEntityName || "none"}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">Stage</span>
+                    <span className="prop-label" onClick={() => setFocusedField("Stage")}>Stage</span>
                     <span className="prop-value" onClick={() => setFocusedField("Stage")}>{STAGES[step.stage] ?? step.stage}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">Mode</span>
+                    <span className="prop-label" onClick={() => setFocusedField("Mode")}>Mode</span>
                     <span className="prop-value" onClick={() => setFocusedField("Mode")}>{MODES[step.mode] ?? step.mode}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">Rank</span>
+                    <span className="prop-label" onClick={() => setFocusedField("Rank")}>Rank</span>
                     <span className="prop-value" onClick={() => setFocusedField("Rank")}>{step.rank}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">Status</span>
+                    <span className="prop-label" onClick={() => setFocusedField("Status")}>Status</span>
                     <span className="prop-value" onClick={() => setFocusedField("Status")}>
                         <span className={`badge ${isEnabled ? "badge-success" : "badge-danger"}`}>
                             {isEnabled ? "Enabled" : "Disabled"}
@@ -99,7 +99,7 @@ export function StepDetails({ step, onSave, onRegisterImage, onEnable, onDisable
                 </div>
                 {step.filteringattributes && (
                     <div className="prop-row">
-                        <span className="prop-label">FilteringAttributes</span>
+                        <span className="prop-label" onClick={() => setFocusedField("FilteringAttributes")}>FilteringAttributes</span>
                         <span className="prop-value" onClick={() => setFocusedField("FilteringAttributes")}>{step.filteringattributes}</span>
                     </div>
                 )}

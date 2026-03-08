@@ -5,6 +5,8 @@ interface PluginTreeProps {
     selectedId: string | null;
     onSelectNode: (node: TreeNode) => void;
     onToggleExpand: (nodeId: string) => void;
+    onDoubleClickNode?: (node: TreeNode) => void;
+    emptyMessage?: string;
 }
 
 function getTypeLabel(type: TreeNodeType): string {
@@ -13,6 +15,8 @@ function getTypeLabel(type: TreeNodeType): string {
         case "plugintype": return "Plugin";
         case "step": return "Step";
         case "image": return "Image";
+        case "entity-group": return "Entity";
+        case "message-group": return "Message";
     }
 }
 
@@ -25,6 +29,8 @@ function getIconClass(node: TreeNode): string {
         const step = node.data as ProcessingStep;
         return step.statecode === 0 ? "node-icon node-icon-step-enabled" : "node-icon node-icon-step-disabled";
     }
+    if (node.type === "entity-group") return "node-icon node-icon-entity";
+    if (node.type === "message-group") return "node-icon node-icon-message";
     return "node-icon node-icon-image";
 }
 
@@ -32,6 +38,8 @@ function getIconText(node: TreeNode): string {
     if (node.type === "assembly") return "A";
     if (node.type === "plugintype") return node.isWorkflowActivity ? "W" : "P";
     if (node.type === "step") return "S";
+    if (node.type === "entity-group") return "E";
+    if (node.type === "message-group") return "M";
     return "I";
 }
 
@@ -41,13 +49,14 @@ interface FlatNodeProps {
     selectedId: string | null;
     onSelectNode: (node: TreeNode) => void;
     onToggleExpand: (nodeId: string) => void;
+    onDoubleClickNode?: (node: TreeNode) => void;
 }
 
-function FlatNode({ node, depth, selectedId, onSelectNode, onToggleExpand }: FlatNodeProps) {
+function FlatNode({ node, depth, selectedId, onSelectNode, onToggleExpand, onDoubleClickNode }: FlatNodeProps) {
     const isSelected = node.id === selectedId;
     const typeLabel = getTypeLabel(node.type);
 
-    // Images never have children.
+    // Images and virtual group nodes never lazy-load.
     // For other node types: show toggle if children haven't been fetched yet (lazy load pending)
     // OR children have been fetched and there is at least one child.
     const canHaveChildren = node.type !== "image";
@@ -64,12 +73,18 @@ function FlatNode({ node, depth, selectedId, onSelectNode, onToggleExpand }: Fla
         onSelectNode(node);
     };
 
+    const handleDoubleClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onDoubleClickNode) onDoubleClickNode(node);
+    };
+
     return (
         <>
             <div
                 className={`tree-node${isSelected ? " selected" : ""}`}
                 style={{ paddingLeft: `${4 + depth * 18}px` }}
                 onClick={handleSelectClick}
+                onDoubleClick={handleDoubleClick}
                 role="treeitem"
                 aria-selected={isSelected}
             >
@@ -95,15 +110,16 @@ function FlatNode({ node, depth, selectedId, onSelectNode, onToggleExpand }: Fla
                     selectedId={selectedId}
                     onSelectNode={onSelectNode}
                     onToggleExpand={onToggleExpand}
+                    onDoubleClickNode={onDoubleClickNode}
                 />
             ))}
         </>
     );
 }
 
-export function PluginTree({ nodes, selectedId, onSelectNode, onToggleExpand }: PluginTreeProps) {
+export function PluginTree({ nodes, selectedId, onSelectNode, onToggleExpand, onDoubleClickNode, emptyMessage }: PluginTreeProps) {
     if (nodes.length === 0) {
-        return <div className="empty-tree">No assemblies found. Click Register → New Assembly to add one.</div>;
+        return <div className="empty-tree">{emptyMessage ?? "No items found."}</div>;
     }
     return (
         <div className="tree-container" role="tree">
@@ -115,6 +131,7 @@ export function PluginTree({ nodes, selectedId, onSelectNode, onToggleExpand }: 
                     selectedId={selectedId}
                     onSelectNode={onSelectNode}
                     onToggleExpand={onToggleExpand}
+                    onDoubleClickNode={onDoubleClickNode}
                 />
             ))}
         </div>

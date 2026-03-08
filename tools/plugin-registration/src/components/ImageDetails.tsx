@@ -58,23 +58,23 @@ export function ImageDetails({ image, onSave, onUpdate, onUnregister }: ImageDet
                     <span className="prop-value">{image.sdkmessageprocessingstepimageid}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">Name</span>
+                    <span className="prop-label" onClick={() => setFocusedField("Name")}>Name</span>
                     <span className="prop-value" onClick={() => setFocusedField("Name")}>{image.name}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">EntityAlias</span>
+                    <span className="prop-label" onClick={() => setFocusedField("EntityAlias")}>EntityAlias</span>
                     <span className="prop-value" onClick={() => setFocusedField("EntityAlias")}>{image.entityalias}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">ImageType</span>
+                    <span className="prop-label" onClick={() => setFocusedField("ImageType")}>ImageType</span>
                     <span className="prop-value" onClick={() => setFocusedField("ImageType")}>{IMAGE_TYPES[image.imagetype] ?? image.imagetype}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">MessagePropertyName</span>
+                    <span className="prop-label" onClick={() => setFocusedField("MessagePropertyName")}>MessagePropertyName</span>
                     <span className="prop-value" onClick={() => setFocusedField("MessagePropertyName")}>{image.messagepropertyname}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">Attributes</span>
+                    <span className="prop-label" onClick={() => setFocusedField("Attributes")}>Attributes</span>
                     <span className="prop-value" onClick={() => setFocusedField("Attributes")}>{image.attributes || <em>All</em>}</span>
                 </div>
             </PropertySection>

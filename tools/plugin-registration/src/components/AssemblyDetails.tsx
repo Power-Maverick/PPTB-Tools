@@ -57,7 +57,7 @@ export function AssemblyDetails({ assembly, onSave, onUpdate, onUnregister }: As
             </PropertySection>
             <PropertySection title="Information" defaultExpanded={true}>
                 <div className="prop-row">
-                    <span className="prop-label">AssemblyId</span>
+                    <span className="prop-label" onClick={() => setFocusedField("AssemblyId")}>AssemblyId</span>
                     <span className="prop-value" onClick={() => setFocusedField("AssemblyId")}>{assembly.pluginassemblyid}</span>
                 </div>
                 {assembly.createdon && (
@@ -67,11 +67,11 @@ export function AssemblyDetails({ assembly, onSave, onUpdate, onUnregister }: As
                     </div>
                 )}
                 <div className="prop-row">
-                    <span className="prop-label">Culture</span>
+                    <span className="prop-label" onClick={() => setFocusedField("Culture")}>Culture</span>
                     <span className="prop-value" onClick={() => setFocusedField("Culture")}>{assembly.culture || "neutral"}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">IsolationMode</span>
+                    <span className="prop-label" onClick={() => setFocusedField("IsolationMode")}>IsolationMode</span>
                     <span className="prop-value" onClick={() => setFocusedField("IsolationMode")}>{ISOLATION_MODES[assembly.isolationmode] ?? assembly.isolationmode}</span>
                 </div>
                 {assembly.modifiedon && (
@@ -81,19 +81,19 @@ export function AssemblyDetails({ assembly, onSave, onUpdate, onUnregister }: As
                     </div>
                 )}
                 <div className="prop-row">
-                    <span className="prop-label">Name</span>
+                    <span className="prop-label" onClick={() => setFocusedField("Name")}>Name</span>
                     <span className="prop-value" onClick={() => setFocusedField("Name")}>{assembly.name}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">PublicKeyToken</span>
+                    <span className="prop-label" onClick={() => setFocusedField("PublicKeyToken")}>PublicKeyToken</span>
                     <span className="prop-value" onClick={() => setFocusedField("PublicKeyToken")}>{assembly.publickeytoken || "null"}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">SourceType</span>
+                    <span className="prop-label" onClick={() => setFocusedField("SourceType")}>SourceType</span>
                     <span className="prop-value" onClick={() => setFocusedField("SourceType")}>{SOURCE_TYPES[assembly.sourcetype] ?? assembly.sourcetype}</span>
                 </div>
                 <div className="prop-row">
-                    <span className="prop-label">Version</span>
+                    <span className="prop-label" onClick={() => setFocusedField("Version")}>Version</span>
                     <span className="prop-value" onClick={() => setFocusedField("Version")}>{assembly.version}</span>
                 </div>
             </PropertySection>
