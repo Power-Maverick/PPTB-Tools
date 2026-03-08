@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { PluginAssembly } from "../models/interfaces";
 
 interface RegisterAssemblyDialogProps {
@@ -9,6 +9,8 @@ interface RegisterAssemblyDialogProps {
     onClose: () => void;
 }
 
+const DEFAULT_ISOLATION_MODE = 2; // Sandbox
+
 export function RegisterAssemblyDialog({
     isOpen,
     isUpdate,
@@ -18,11 +20,23 @@ export function RegisterAssemblyDialog({
 }: RegisterAssemblyDialogProps) {
     const [content, setContent] = useState("");
     const [assemblyName, setAssemblyName] = useState("");
-    const [isolationMode, setIsolationMode] = useState(2);
+    const [isolationMode, setIsolationMode] = useState(DEFAULT_ISOLATION_MODE);
     const [description, setDescription] = useState(existingAssembly?.description ?? "");
     const [saving, setSaving] = useState(false);
     const [fileError, setFileError] = useState("");
     const fileRef = useRef<HTMLInputElement>(null);
+
+    // Reset form state whenever the dialog opens or the target assembly changes
+    useEffect(() => {
+        if (!isOpen) return;
+        setContent("");
+        setAssemblyName("");
+        setIsolationMode(DEFAULT_ISOLATION_MODE);
+        setDescription(existingAssembly?.description ?? "");
+        setSaving(false);
+        setFileError("");
+        if (fileRef.current) fileRef.current.value = "";
+    }, [isOpen, existingAssembly]);
 
     if (!isOpen) return null;
 

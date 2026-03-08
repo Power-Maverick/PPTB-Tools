@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ProcessingStep, StepImage } from "../models/interfaces";
 import { AttributePickerDialog } from "./AttributePickerDialog";
 
@@ -63,6 +63,19 @@ export function RegisterImageDialog({
     const [showAttrPicker, setShowAttrPicker] = useState(false);
     const [saving, setSaving] = useState(false);
     const [submitError, setSubmitError] = useState("");
+
+    // Reset form state whenever the dialog opens or the target step/image changes
+    useEffect(() => {
+        if (!isOpen) return;
+        setName(existingImage?.name ?? "");
+        setEntityAlias(existingImage?.entityalias ?? "");
+        setImageType(getDefaultImageType(step, existingImage?.imagetype));
+        setAttributes(existingImage?.attributes ?? "");
+        setDescription(existingImage?.description ?? "");
+        setShowAttrPicker(false);
+        setSaving(false);
+        setSubmitError("");
+    }, [isOpen, step, existingImage]);
 
     if (!isOpen) return null;
 
