@@ -15,9 +15,6 @@
     "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/plugin-registration/README.md",
     "iconUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/plugin-registration/icons/pluginRegistration.png"
   },
-  "features": {
-    "multiConnection": "optional"
-  },
   "type": "module",
   "scripts": {
     "build": "npm run typecheck && vite build",

@@ -1,11 +1,4 @@
-import type {
-    PluginAssembly,
-    PluginType,
-    ProcessingStep,
-    StepImage,
-    SdkMessage,
-    SdkMessageFilter,
-} from "../models/interfaces";
+import type { PluginAssembly, PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, StepImage } from "../models/interfaces";
 
 export class DataverseClient {
     async fetchAssemblies(): Promise<PluginAssembly[]> {
@@ -114,10 +107,7 @@ export class DataverseClient {
 
     async fetchMessages(): Promise<SdkMessage[]> {
         try {
-            const response = await window.dataverseAPI.queryData(
-                "sdkmessages?$select=sdkmessageid,name&$orderby=name",
-                "primary",
-            );
+            const response = await window.dataverseAPI.queryData("sdkmessages?$select=sdkmessageid,name&$orderby=name");
             return (response.value as Record<string, unknown>[]).map((m) => ({
                 sdkmessageid: m["sdkmessageid"] as string,
                 name: m["name"] as string,
@@ -179,10 +169,7 @@ export class DataverseClient {
             filter += ` and contains(fullname,'${safeSearch}')`;
         }
         try {
-            const response = await window.dataverseAPI.queryData(
-                `systemusers?$select=systemuserid,fullname,domainname&$filter=${filter}&$orderby=fullname&$top=100`,
-                "primary",
-            );
+            const response = await window.dataverseAPI.queryData(`systemusers?$select=systemuserid,fullname,domainname&$filter=${filter}&$orderby=fullname&$top=100`);
             return (response.value as Record<string, unknown>[]).map((u) => ({
                 systemuserid: u["systemuserid"] as string,
                 fullname: (u["fullname"] as string) ?? "",
@@ -200,10 +187,7 @@ export class DataverseClient {
             return null;
         }
         try {
-            const response = await window.dataverseAPI.queryData(
-                `systemusers?$select=systemuserid,fullname,domainname&$filter=systemuserid eq '${userId}'&$top=1`,
-                "primary",
-            );
+            const response = await window.dataverseAPI.queryData(`systemusers?$select=systemuserid,fullname,domainname&$filter=systemuserid eq '${userId}'&$top=1`);
             const values = response.value as Record<string, unknown>[];
             if (values.length === 0) return null;
             return {
@@ -223,10 +207,7 @@ export class DataverseClient {
             throw new Error(`Invalid fullname: "${fullname}"`);
         }
         try {
-            const response = await window.dataverseAPI.queryData(
-                `systemusers?$select=systemuserid,fullname,domainname&$filter=fullname eq '${fullname}'&$top=1`,
-                "primary",
-            );
+            const response = await window.dataverseAPI.queryData(`systemusers?$select=systemuserid,fullname,domainname&$filter=fullname eq '${fullname}'&$top=1`);
             const values = response.value as Record<string, unknown>[];
             if (values.length === 0) return null;
             return {
@@ -240,12 +221,7 @@ export class DataverseClient {
         }
     }
 
-    async registerAssembly(
-        content: string,
-        name: string,
-        isolationMode: number,
-        description: string,
-    ): Promise<string> {
+    async registerAssembly(content: string, name: string, isolationMode: number, description: string): Promise<string> {
         try {
             const result = await window.dataverseAPI.create(
                 "pluginassembly",
@@ -265,20 +241,11 @@ export class DataverseClient {
         }
     }
 
-    async updateAssembly(
-        assemblyId: string,
-        description: string,
-        content?: string,
-    ): Promise<void> {
+    async updateAssembly(assemblyId: string, description: string, content?: string): Promise<void> {
         try {
             const payload: Record<string, unknown> = { description };
             if (content) payload["content"] = content;
-            await window.dataverseAPI.update(
-                "pluginassembly",
-                assemblyId,
-                payload,
-                "primary",
-            );
+            await window.dataverseAPI.update("pluginassembly", assemblyId, payload);
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to update assembly: ${msg}`);
@@ -287,18 +254,20 @@ export class DataverseClient {
 
     async deleteAssembly(assemblyId: string): Promise<void> {
         try {
-            await window.dataverseAPI.delete("pluginassembly", assemblyId, "primary");
+            await window.dataverseAPI.delete("pluginassembly", assemblyId);
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to delete assembly: ${msg}`);
         }
     }
 
-    async registerStep(stepData: Partial<ProcessingStep> & {
-        messageId: string;
-        filterId?: string;
-        pluginTypeId: string;
-    }): Promise<string> {
+    async registerStep(
+        stepData: Partial<ProcessingStep> & {
+            messageId: string;
+            filterId?: string;
+            pluginTypeId: string;
+        },
+    ): Promise<string> {
         try {
             const payload: Record<string, unknown> = {
                 name: stepData.name,
@@ -317,11 +286,7 @@ export class DataverseClient {
             if (stepData.impersonatinguserid) {
                 payload["impersonatinguserid@odata.bind"] = `/systemusers(${stepData.impersonatinguserid})`;
             }
-            const result = await window.dataverseAPI.create(
-                "sdkmessageprocessingstep",
-                payload,
-                "primary",
-            );
+            const result = await window.dataverseAPI.create("sdkmessageprocessingstep", payload);
             return result.id;
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
@@ -329,10 +294,7 @@ export class DataverseClient {
         }
     }
 
-    async updateStep(
-        stepId: string,
-        stepData: Partial<ProcessingStep> & { messageId?: string; filterId?: string },
-    ): Promise<void> {
+    async updateStep(stepId: string, stepData: Partial<ProcessingStep> & { messageId?: string; filterId?: string }): Promise<void> {
         try {
             const payload: Record<string, unknown> = {};
             if (stepData.name !== undefined) payload["name"] = stepData.name;
@@ -347,7 +309,7 @@ export class DataverseClient {
             if (stepData.impersonatinguserid) {
                 payload["impersonatinguserid@odata.bind"] = `/systemusers(${stepData.impersonatinguserid})`;
             }
-            await window.dataverseAPI.update("sdkmessageprocessingstep", stepId, payload, "primary");
+            await window.dataverseAPI.update("sdkmessageprocessingstep", stepId, payload);
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to update step: ${msg}`);
@@ -356,7 +318,7 @@ export class DataverseClient {
 
     async deleteStep(stepId: string): Promise<void> {
         try {
-            await window.dataverseAPI.delete("sdkmessageprocessingstep", stepId, "primary");
+            await window.dataverseAPI.delete("sdkmessageprocessingstep", stepId);
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to delete step: ${msg}`);
@@ -365,12 +327,7 @@ export class DataverseClient {
 
     async enableStep(stepId: string): Promise<void> {
         try {
-            await window.dataverseAPI.update(
-                "sdkmessageprocessingstep",
-                stepId,
-                { statecode: 0, statuscode: 1 },
-                "primary",
-            );
+            await window.dataverseAPI.update("sdkmessageprocessingstep", stepId, { statecode: 0, statuscode: 1 });
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to enable step: ${msg}`);
@@ -379,12 +336,7 @@ export class DataverseClient {
 
     async disableStep(stepId: string): Promise<void> {
         try {
-            await window.dataverseAPI.update(
-                "sdkmessageprocessingstep",
-                stepId,
-                { statecode: 1, statuscode: 2 },
-                "primary",
-            );
+            await window.dataverseAPI.update("sdkmessageprocessingstep", stepId, { statecode: 1, statuscode: 2 });
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to disable step: ${msg}`);
@@ -402,11 +354,7 @@ export class DataverseClient {
                 description: imageData.description ?? "",
                 "sdkmessageprocessingstepid@odata.bind": `/sdkmessageprocessingsteps(${imageData.stepId})`,
             };
-            const result = await window.dataverseAPI.create(
-                "sdkmessageprocessingstepimage",
-                payload,
-                "primary",
-            );
+            const result = await window.dataverseAPI.create("sdkmessageprocessingstepimage", payload);
             return result.id;
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
@@ -419,10 +367,23 @@ export class DataverseClient {
             const payload: Record<string, unknown> = {};
             // name, imagetype and messagepropertyname are set at creation time and cannot be changed via update
             if (imageData.entityalias !== undefined) payload["entityalias"] = imageData.entityalias;
-            // Use empty string (not null) for "all attributes" — matches Dataverse SDK behavior and avoids 0x80040216
-            if (imageData.attributes !== undefined) payload["attributes"] = imageData.attributes || "";
-            if (imageData.description !== undefined) payload["description"] = imageData.description;
-            await window.dataverseAPI.update("sdkmessageprocessingstepimage", imageId, payload, "primary");
+            // Only add attributes if they exist; omit for "All Attributes"
+            if (imageData.attributes) {
+                payload["attributes"] = imageData.attributes;
+            }
+
+            // AVOID empty strings for description; only add if there is actual text
+            if (imageData.description && imageData.description.trim() !== "") {
+                payload["description"] = imageData.description;
+            }
+
+            // CRITICAL: Some versions of Dataverse require the parent step ID to be
+            // present in the update payload to pass internal validation.
+            if (imageData.sdkmessageprocessingstepid) {
+                payload["sdkmessageprocessingstepid@odata.bind"] = `/sdkmessageprocessingsteps(${imageData.sdkmessageprocessingstepid})`;
+            }
+
+            await window.dataverseAPI.update("sdkmessageprocessingstepimage", imageId, payload);
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to update image: ${msg}`);
@@ -431,7 +392,7 @@ export class DataverseClient {
 
     async deleteImage(imageId: string): Promise<void> {
         try {
-            await window.dataverseAPI.delete("sdkmessageprocessingstepimage", imageId, "primary");
+            await window.dataverseAPI.delete("sdkmessageprocessingstepimage", imageId);
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to delete image: ${msg}`);
