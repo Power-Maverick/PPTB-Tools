@@ -304,10 +304,25 @@ export class DataverseClient {
             if (stepData.stage !== undefined) payload["stage"] = stepData.stage;
             if (stepData.filteringattributes !== undefined) payload["filteringattributes"] = stepData.filteringattributes;
             if (stepData.asyncautodelete !== undefined) payload["asyncautodelete"] = stepData.asyncautodelete;
-            if (stepData.messageId) payload["sdkmessageid@odata.bind"] = `/sdkmessages(${stepData.messageId})`;
-            if (stepData.filterId) payload["sdkmessagefilterid@odata.bind"] = `/sdkmessagefilters(${stepData.filterId})`;
-            if (stepData.impersonatinguserid) {
-                payload["impersonatinguserid@odata.bind"] = `/systemusers(${stepData.impersonatinguserid})`;
+            if (stepData.messageId) {
+                payload["sdkmessageid@odata.bind"] = `/sdkmessages(${stepData.messageId})`;
+            }
+            // Handle filterId: undefined => no change, non-empty => set, empty/null => clear
+            if (stepData.filterId !== undefined) {
+                if (stepData.filterId) {
+                    payload["sdkmessagefilterid@odata.bind"] = `/sdkmessagefilters(${stepData.filterId})`;
+                } else {
+                    payload["sdkmessagefilterid@odata.bind"] = null;
+                }
+            }
+            // Handle impersonatinguserid: absent => no change, value => set, empty/null => clear
+            if ("impersonatinguserid" in stepData) {
+                const impersonatingUserId = (stepData as Partial<ProcessingStep>).impersonatinguserid as string | null | undefined;
+                if (impersonatingUserId) {
+                    payload["impersonatinguserid@odata.bind"] = `/systemusers(${impersonatingUserId})`;
+                } else {
+                    payload["impersonatinguserid@odata.bind"] = null;
+                }
             }
             await window.dataverseAPI.update("sdkmessageprocessingstep", stepId, payload);
         } catch (error: unknown) {
