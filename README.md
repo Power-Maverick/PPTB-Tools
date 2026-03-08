@@ -10,6 +10,7 @@ Tools for Power Platform ToolBox (PPTB) - a comprehensive toolkit for working wi
         - [Entity Field Catalog](#entity-field-catalog)
         - [ERD Generator](#erd-generator)
         - [PCF Builder](#pcf-builder)
+        - [Plugin Registration](#plugin-registration)
         - [Security Role Comparator](#security-role-comparator)
         - [Solution Dependency Analyzer](#solution-dependency-analyzer)
         - [View Layout Copier](#view-layout-copier)
@@ -166,6 +167,30 @@ Build and manage Power Apps Component Framework (PCF) custom controls. **React-b
 - Manage PCF projects within PPTB
 - Build and test PCF controls using integrated commands
 - Package PCF controls into solutions for deployment
+
+### [Plugin Registration](./tools/plugin-registration)
+
+Tool README: [here](./tools/plugin-registration/README.md)
+
+Register and manage Microsoft Dataverse plugin assemblies, custom workflow activities, and SDK message processing steps. Exclusively for PPTB.
+
+**Key Features:**
+
+- **React + TypeScript**: Modern component-based architecture with Vite build system
+- **PPTB-Only Integration**: Designed exclusively for Power Platform ToolBox (uses @pptb/types v1.0.20)
+- **Plugin Assembly Management**: Register, update, and unregister plugin assemblies (.dll files)
+- **Plugin Type Browsing**: View all plugin classes within each registered assembly
+- **Step Registration**: Register SDK Message Processing Steps with full configuration (stage, mode, entity, filtering attributes)
+- **Step Images**: Register pre/post entity images for processing steps
+- **Enable/Disable Steps**: Toggle step activation status without removing them
+- **Tree View UI**: Hierarchical view mimicking the classic Plugin Registration Tool
+
+**Use Cases:**
+
+- Register custom IPlugin implementations and configure their execution steps
+- Set up pre/post images for accessing entity attribute values before and after an operation
+- Register custom workflow activities for use in Power Automate
+- Manage plugin step lifecycle across development and production environments
 
 ### [Security Role Comparator](./tools/security-role-comparator)
 

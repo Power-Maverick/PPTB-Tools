@@ -1,0 +1,56 @@
+{
+  "name": "@power-maverick/tool-plugin-registration",
+  "displayName": "Plugin Registration",
+  "version": "0.0.2",
+  "description": "Register and manage Dataverse plugin assemblies, custom workflow activities, and SDK message processing steps",
+  "icon": "icons/prt.svg",
+  "contributors": [
+    {
+      "name": "Power Maverick",
+      "url": "https://github.com/Power-Maverick"
+    },
+    {
+      "name": "LinkeD365",
+      "url": "https://github.com/LinkeD365"
+    }
+  ],
+  "license": "GPL-2.0",
+  "configurations": {
+    "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/plugin-registration",
+    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/plugin-registration/README.md"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "npm run typecheck && vite build",
+    "typecheck": "tsc --noEmit",
+    "dev": "vite",
+    "preview": "vite preview",
+    "finalize-package": "npm shrinkwrap",
+    "publish-package": "npm publish --access public"
+  },
+  "files": [
+    "dist",
+    "npm-shrinkwrap.json"
+  ],
+  "keywords": [
+    "dataverse",
+    "plugin",
+    "registration",
+    "power-platform",
+    "pptb",
+    "toolbox"
+  ],
+  "author": "Power Maverick",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@pptb/types": "^1.0.20",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.7"
+  }
+}
