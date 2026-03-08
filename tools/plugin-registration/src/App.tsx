@@ -8,12 +8,10 @@ import { RegisterAssemblyDialog } from "./components/RegisterAssemblyDialog";
 import { RegisterImageDialog } from "./components/RegisterImageDialog";
 import { RegisterStepDialog } from "./components/RegisterStepDialog";
 import { StepDetails } from "./components/StepDetails";
-import type { PluginAssembly, PluginType, ProcessingStep, StepImage, TreeNode, VirtualGroupData } from "./models/interfaces";
+import type { PluginAssembly, PluginType, ProcessingStep, StepImage, TreeNode } from "./models/interfaces";
 import { DataverseClient } from "./utils/DataverseClient";
 
 const client = new DataverseClient();
-
-type ViewMode = 'assembly' | 'entity' | 'message';
 
 function buildTreeNodes(
     assemblies: PluginAssembly[],
@@ -67,127 +65,6 @@ function buildTreeNodes(
     });
 }
 
-function buildStepNodeWithImages(
-    step: ProcessingStep,
-    images: Map<string, StepImage[]>,
-    expandedIds: Set<string>,
-): TreeNode {
-    const stepImages = images.get(step.sdkmessageprocessingstepid) ?? [];
-    const imageNodes: TreeNode[] = stepImages.map((img) => ({
-        id: img.sdkmessageprocessingstepimageid,
-        type: "image" as const,
-        name: img.name,
-        data: img,
-    }));
-    return {
-        id: step.sdkmessageprocessingstepid,
-        type: "step" as const,
-        name: step.name,
-        data: step,
-        children: imageNodes,
-        isExpanded: expandedIds.has(step.sdkmessageprocessingstepid),
-        childrenLoaded: images.has(step.sdkmessageprocessingstepid),
-    };
-}
-
-function buildEntityViewNodes(
-    steps: Map<string, ProcessingStep[]>,
-    images: Map<string, StepImage[]>,
-    expandedIds: Set<string>,
-): TreeNode[] {
-    const allSteps: ProcessingStep[] = [];
-    for (const ss of steps.values()) allSteps.push(...ss);
-
-    // Group by entity → message → steps
-    const byEntity = new Map<string, Map<string, ProcessingStep[]>>();
-    for (const step of allSteps) {
-        const entity = step.primaryEntityName || "none";
-        const message = step.messageName || "Unknown";
-        if (!byEntity.has(entity)) byEntity.set(entity, new Map());
-        const byMsg = byEntity.get(entity)!;
-        if (!byMsg.has(message)) byMsg.set(message, []);
-        byMsg.get(message)!.push(step);
-    }
-
-    const entityNodes: TreeNode[] = [];
-    for (const [entity, messages] of Array.from(byEntity.entries()).sort(([a], [b]) => a.localeCompare(b))) {
-        const entityId = `entity-${entity}`;
-        const messageNodes: TreeNode[] = [];
-        for (const [message, ss] of Array.from(messages.entries()).sort(([a], [b]) => a.localeCompare(b))) {
-            const messageId = `entity-${entity}-msg-${message}`;
-            const stepNodes: TreeNode[] = ss.map((step) => buildStepNodeWithImages(step, images, expandedIds));
-            messageNodes.push({
-                id: messageId,
-                type: "message-group" as const,
-                name: message,
-                data: { groupName: message, groupType: "message" } satisfies VirtualGroupData,
-                children: stepNodes,
-                isExpanded: expandedIds.has(messageId),
-                childrenLoaded: true,
-            });
-        }
-        entityNodes.push({
-            id: entityId,
-            type: "entity-group" as const,
-            name: entity,
-            data: { groupName: entity, groupType: "entity" } satisfies VirtualGroupData,
-            children: messageNodes,
-            isExpanded: expandedIds.has(entityId),
-            childrenLoaded: true,
-        });
-    }
-    return entityNodes;
-}
-
-function buildMessageViewNodes(
-    steps: Map<string, ProcessingStep[]>,
-    images: Map<string, StepImage[]>,
-    expandedIds: Set<string>,
-): TreeNode[] {
-    const allSteps: ProcessingStep[] = [];
-    for (const ss of steps.values()) allSteps.push(...ss);
-
-    // Group by message → entity → steps
-    const byMessage = new Map<string, Map<string, ProcessingStep[]>>();
-    for (const step of allSteps) {
-        const message = step.messageName || "Unknown";
-        const entity = step.primaryEntityName || "none";
-        if (!byMessage.has(message)) byMessage.set(message, new Map());
-        const byEnt = byMessage.get(message)!;
-        if (!byEnt.has(entity)) byEnt.set(entity, []);
-        byEnt.get(entity)!.push(step);
-    }
-
-    const messageNodes: TreeNode[] = [];
-    for (const [message, entities] of Array.from(byMessage.entries()).sort(([a], [b]) => a.localeCompare(b))) {
-        const messageId = `message-${message}`;
-        const entityNodes: TreeNode[] = [];
-        for (const [entity, ss] of Array.from(entities.entries()).sort(([a], [b]) => a.localeCompare(b))) {
-            const entityId = `message-${message}-entity-${entity}`;
-            const stepNodes: TreeNode[] = ss.map((step) => buildStepNodeWithImages(step, images, expandedIds));
-            entityNodes.push({
-                id: entityId,
-                type: "entity-group" as const,
-                name: entity,
-                data: { groupName: entity, groupType: "entity" } satisfies VirtualGroupData,
-                children: stepNodes,
-                isExpanded: expandedIds.has(entityId),
-                childrenLoaded: true,
-            });
-        }
-        messageNodes.push({
-            id: messageId,
-            type: "message-group" as const,
-            name: message,
-            data: { groupName: message, groupType: "message" } satisfies VirtualGroupData,
-            children: entityNodes,
-            isExpanded: expandedIds.has(messageId),
-            childrenLoaded: true,
-        });
-    }
-    return messageNodes;
-}
-
 /** Filter tree nodes for search. Images are excluded from matching but shown as children of matched steps. */
 function filterTreeForSearch(nodes: TreeNode[], lowerTerm: string): TreeNode[] {
     if (!lowerTerm) return nodes;
@@ -222,21 +99,8 @@ export default function App() {
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
 
-    // View mode + search
-    const [viewMode, setViewMode] = useState<ViewMode>("assembly");
-    const [showViewDropdown, setShowViewDropdown] = useState(false);
+    // Search
     const [searchTerm, setSearchTerm] = useState("");
-    const [loadingAllSteps, setLoadingAllSteps] = useState(false);
-    const loadingAllStepsRef = useRef(false);
-    const viewDropdownRef = useRef<HTMLDivElement>(null);
-
-    // Refs to avoid stale closures in loadAllData
-    const assembliesRef = useRef(assemblies);
-    assembliesRef.current = assemblies;
-    const pluginTypesRef = useRef(pluginTypes);
-    pluginTypesRef.current = pluginTypes;
-    const stepsRef = useRef(steps);
-    stepsRef.current = steps;
 
     // Register dropdown
     const [showRegisterDropdown, setShowRegisterDropdown] = useState(false);
@@ -250,14 +114,11 @@ export default function App() {
     const [showRegisterImage, setShowRegisterImage] = useState(false);
     const [showUpdateImage, setShowUpdateImage] = useState(false);
 
-    // Close dropdowns when clicking outside
+    // Close register dropdown when clicking outside
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
                 setShowRegisterDropdown(false);
-            }
-            if (viewDropdownRef.current && !viewDropdownRef.current.contains(e.target as Node)) {
-                setShowViewDropdown(false);
             }
         };
         document.addEventListener("mousedown", handleClick);
@@ -292,90 +153,11 @@ export default function App() {
         }
     }, []);
 
-    /**
-     * Run async tasks with at most `concurrency` in flight at any time.
-     * Safe in JS's single-threaded model: `index++` is atomic between awaits,
-     * so each worker claims a unique slot before yielding.
-     * All workers start immediately; Promise.all waits for all to finish.
-     */
-    async function runWithConcurrency<T>(
-        tasks: (() => Promise<T>)[],
-        concurrency = 5,
-    ): Promise<T[]> {
-        const results: T[] = new Array(tasks.length);
-        let index = 0;
-        async function worker() {
-            // index++ is read-then-increment with no await in between, so no two
-            // workers ever get the same slot despite running concurrently.
-            while (index < tasks.length) {
-                const i = index++;
-                results[i] = await tasks[i]();
-            }
-        }
-        // Spawn up to `concurrency` workers; each keeps pulling the next task
-        // until all tasks are exhausted.
-        await Promise.all(
-            Array.from({ length: Math.min(concurrency, tasks.length) }, worker),
-        );
-        return results;
-    }
-
-    /** Load all plugin types + steps for entity/message views */
-    const loadAllData = useCallback(async () => {
-        if (loadingAllStepsRef.current) return;
-        loadingAllStepsRef.current = true;
-        setLoadingAllSteps(true);
-        try {
-            const asms = assembliesRef.current;
-            const pts = pluginTypesRef.current;
-            const ss = stepsRef.current;
-
-            // Step 1: load all missing plugin types – at most 5 concurrent requests
-            const missingAsmIds = asms.map((a) => a.pluginassemblyid).filter((id) => !pts.has(id));
-            let newPtMap = new Map(pts);
-            if (missingAsmIds.length > 0) {
-                const results = await runWithConcurrency(
-                    missingAsmIds.map((id) => () => client.fetchPluginTypes(id).then((types) => [id, types] as const)),
-                    5,
-                );
-                for (const [id, types] of results) newPtMap.set(id, types);
-                setPluginTypes(newPtMap);
-            }
-
-            // Step 2: load all missing steps – at most 5 concurrent requests
-            const allPts = Array.from(newPtMap.values()).flat();
-            const missingPtIds = allPts.map((pt) => pt.plugintypeid).filter((id) => !ss.has(id));
-            if (missingPtIds.length > 0) {
-                const results = await runWithConcurrency(
-                    missingPtIds.map((id) => () => client.fetchSteps(id).then((s) => [id, s] as const)),
-                    5,
-                );
-                setSteps((prev: Map<string, ProcessingStep[]>) => {
-                    const next = new Map(prev);
-                    for (const [id, s] of results) next.set(id, s);
-                    return next;
-                });
-            }
-        } catch (err) {
-            console.error("Failed to load all data:", err);
-        } finally {
-            loadingAllStepsRef.current = false;
-            setLoadingAllSteps(false);
-        }
-    }, []); // stable – reads state via refs
-
     useEffect(() => {
         if (isPPTB) {
             void loadAssemblies();
         }
     }, [isPPTB, loadAssemblies]);
-
-    // Load all data when switching to entity or message view
-    useEffect(() => {
-        if (isPPTB && (viewMode === "entity" || viewMode === "message")) {
-            void loadAllData();
-        }
-    }, [viewMode, isPPTB, loadAllData]);
 
     // Load children data when a node is selected (for bottom grid)
     const handleSelectNode = useCallback(
@@ -779,17 +561,11 @@ export default function App() {
     const bottomSteps = selectedPluginType ? (steps.get(selectedPluginType.plugintypeid) ?? []) : [];
     const bottomImages = selectedStep ? (images.get(selectedStep.sdkmessageprocessingstepid) ?? []) : [];
 
-    const rawTreeNodes = viewMode === "entity"
-        ? buildEntityViewNodes(steps, images, expandedIds)
-        : viewMode === "message"
-            ? buildMessageViewNodes(steps, images, expandedIds)
-            : buildTreeNodes(assemblies, pluginTypes, steps, images, expandedIds);
+    const rawTreeNodes = buildTreeNodes(assemblies, pluginTypes, steps, images, expandedIds);
 
     const treeNodes = searchTerm
         ? filterTreeForSearch(rawTreeNodes, searchTerm.toLowerCase())
         : rawTreeNodes;
-
-    const viewModeLabel = viewMode === "entity" ? "By Entity" : viewMode === "message" ? "By Message" : "By Assembly";
 
     if (loading && assemblies.length === 0) {
         return (
@@ -854,31 +630,6 @@ export default function App() {
                     )}
                 </div>
 
-                {/* View dropdown */}
-                <div className="toolbar-group" ref={viewDropdownRef}>
-                    <button className="toolbar-btn" onClick={() => setShowViewDropdown((v) => !v)}>
-                        View: {viewModeLabel} <span className="dropdown-arrow">▾</span>
-                    </button>
-                    {showViewDropdown && (
-                        <div className="toolbar-dropdown">
-                            {(["assembly", "entity", "message"] as ViewMode[]).map((mode) => (
-                                <div
-                                    key={mode}
-                                    className="toolbar-dropdown-item"
-                                    onClick={() => {
-                                        setViewMode(mode);
-                                        setSearchTerm("");
-                                        setShowViewDropdown(false);
-                                    }}
-                                    style={{ fontWeight: viewMode === mode ? 700 : undefined }}
-                                >
-                                    {mode === "assembly" ? "By Assembly" : mode === "entity" ? "By Entity" : "By Message"}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
                 <div className="toolbar-separator" />
 
                 <div className="toolbar-group">
@@ -935,12 +686,6 @@ export default function App() {
                             <button className="tree-search-clear" onClick={() => setSearchTerm("")} title="Clear search">✕</button>
                         )}
                     </div>
-                    {(loadingAllSteps) && (
-                        <div className="empty-tree" style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px" }}>
-                            <div className="loading-spinner" style={{ width: "14px", height: "14px", borderWidth: "2px" }} />
-                            <span>Loading all data…</span>
-                        </div>
-                    )}
                     <PluginTree
                         nodes={treeNodes}
                         selectedId={selectedNode?.id ?? null}
@@ -950,9 +695,7 @@ export default function App() {
                         emptyMessage={
                             searchTerm
                                 ? `No results for "${searchTerm}"`
-                                : viewMode !== "assembly"
-                                    ? "No data loaded yet. Switching view loads all steps."
-                                    : "No assemblies found. Click Register → New Assembly to add one."
+                                : "No assemblies found. Click Register → New Assembly to add one."
                         }
                     />
                 </div>
