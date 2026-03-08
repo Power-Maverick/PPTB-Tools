@@ -67,8 +67,32 @@ function buildTreeNodes(
     });
 }
 
+function buildStepNodeWithImages(
+    step: ProcessingStep,
+    images: Map<string, StepImage[]>,
+    expandedIds: Set<string>,
+): TreeNode {
+    const stepImages = images.get(step.sdkmessageprocessingstepid) ?? [];
+    const imageNodes: TreeNode[] = stepImages.map((img) => ({
+        id: img.sdkmessageprocessingstepimageid,
+        type: "image" as const,
+        name: img.name,
+        data: img,
+    }));
+    return {
+        id: step.sdkmessageprocessingstepid,
+        type: "step" as const,
+        name: step.name,
+        data: step,
+        children: imageNodes,
+        isExpanded: expandedIds.has(step.sdkmessageprocessingstepid),
+        childrenLoaded: images.has(step.sdkmessageprocessingstepid),
+    };
+}
+
 function buildEntityViewNodes(
     steps: Map<string, ProcessingStep[]>,
+    images: Map<string, StepImage[]>,
     expandedIds: Set<string>,
 ): TreeNode[] {
     const allSteps: ProcessingStep[] = [];
@@ -91,14 +115,7 @@ function buildEntityViewNodes(
         const messageNodes: TreeNode[] = [];
         for (const [message, ss] of Array.from(messages.entries()).sort(([a], [b]) => a.localeCompare(b))) {
             const messageId = `entity-${entity}-msg-${message}`;
-            const stepNodes: TreeNode[] = ss.map((step) => ({
-                id: step.sdkmessageprocessingstepid,
-                type: "step" as const,
-                name: step.name,
-                data: step,
-                children: [],
-                childrenLoaded: false,
-            }));
+            const stepNodes: TreeNode[] = ss.map((step) => buildStepNodeWithImages(step, images, expandedIds));
             messageNodes.push({
                 id: messageId,
                 type: "message-group" as const,
@@ -124,6 +141,7 @@ function buildEntityViewNodes(
 
 function buildMessageViewNodes(
     steps: Map<string, ProcessingStep[]>,
+    images: Map<string, StepImage[]>,
     expandedIds: Set<string>,
 ): TreeNode[] {
     const allSteps: ProcessingStep[] = [];
@@ -146,14 +164,7 @@ function buildMessageViewNodes(
         const entityNodes: TreeNode[] = [];
         for (const [entity, ss] of Array.from(entities.entries()).sort(([a], [b]) => a.localeCompare(b))) {
             const entityId = `message-${message}-entity-${entity}`;
-            const stepNodes: TreeNode[] = ss.map((step) => ({
-                id: step.sdkmessageprocessingstepid,
-                type: "step" as const,
-                name: step.name,
-                data: step,
-                children: [],
-                childrenLoaded: false,
-            }));
+            const stepNodes: TreeNode[] = ss.map((step) => buildStepNodeWithImages(step, images, expandedIds));
             entityNodes.push({
                 id: entityId,
                 type: "entity-group" as const,
@@ -739,9 +750,9 @@ export default function App() {
     const bottomImages = selectedStep ? (images.get(selectedStep.sdkmessageprocessingstepid) ?? []) : [];
 
     const rawTreeNodes = viewMode === "entity"
-        ? buildEntityViewNodes(steps, expandedIds)
+        ? buildEntityViewNodes(steps, images, expandedIds)
         : viewMode === "message"
-            ? buildMessageViewNodes(steps, expandedIds)
+            ? buildMessageViewNodes(steps, images, expandedIds)
             : buildTreeNodes(assemblies, pluginTypes, steps, images, expandedIds);
 
     const treeNodes = searchTerm
