@@ -367,13 +367,13 @@ export class DataverseClient {
             const payload: Record<string, unknown> = {};
             // name, imagetype and messagepropertyname are set at creation time and cannot be changed via update
             if (imageData.entityalias !== undefined) payload["entityalias"] = imageData.entityalias;
-            // Only add attributes if they exist; omit for "All Attributes"
-            if (imageData.attributes) {
+            // Set attributes whenever provided (including empty string, which means "All Attributes" in Dataverse)
+            if (imageData.attributes !== undefined) {
                 payload["attributes"] = imageData.attributes;
             }
 
-            // AVOID empty strings for description; only add if there is actual text
-            if (imageData.description && imageData.description.trim() !== "") {
+            // Set description whenever provided (including empty string to clear any existing description)
+            if (imageData.description !== undefined) {
                 payload["description"] = imageData.description;
             }
 
