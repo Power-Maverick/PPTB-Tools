@@ -109,6 +109,24 @@ export function StepDetails({ step, onSave, onRegisterImage, onEnable, onDisable
                         <span className="prop-value">{step.asyncautodelete ? "Yes" : "No"}</span>
                     </div>
                 )}
+                {step.configuration && (
+                    <div className="prop-row">
+                        <span className="prop-label">UnsecureConfig</span>
+                        <span className="prop-value">{step.configuration}</span>
+                    </div>
+                )}
+                <div className="prop-row">
+                    <span className="prop-label">SecureConfig</span>
+                    <span className="prop-value">{step.secureconfigid ? "Configured" : "Not configured"}</span>
+                </div>
+                {step.supporteddeployment != null && (
+                    <div className="prop-row">
+                        <span className="prop-label">SupportedDeployment</span>
+                        <span className="prop-value">
+                            {step.supporteddeployment === 0 ? "Server Only" : step.supporteddeployment === 1 ? "Outlook Only" : "Both"}
+                        </span>
+                    </div>
+                )}
             </PropertySection>
             <div className="details-footer">
                 <div className="field-hint">
