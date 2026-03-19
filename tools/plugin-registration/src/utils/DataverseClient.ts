@@ -588,4 +588,13 @@ export class DataverseClient {
             throw new Error(`Failed to update secure config: ${msg}`);
         }
     }
+
+    async deleteSecureConfig(id: string): Promise<void> {
+        try {
+            await window.dataverseAPI.delete("sdkmessageprocessingstepsecureconfig", id);
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to delete secure config: ${msg}`);
+        }
+    }
 }

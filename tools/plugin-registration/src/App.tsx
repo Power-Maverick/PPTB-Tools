@@ -193,7 +193,9 @@ export default function App() {
     const loadAll = useCallback(async () => {
         setLoading(true);
         setError("");
-        // Reset child caches and selection upfront so the tree clears immediately
+        // Reset all state upfront so the tree clears immediately
+        setAssemblies([]);
+        setServiceEndpoints([]);
         setPluginTypes(new Map());
         setSteps(new Map());
         setImages(new Map());
@@ -422,11 +424,18 @@ export default function App() {
         try {
             // If secureconfig provided, create the secure config record first and bind it
             const stepPayload: typeof stepData & { secureconfigid?: string } = { ...stepData };
+            let createdScId: string | undefined;
             if (stepData.secureconfig) {
-                const scId = await client.createSecureConfig(stepData.secureconfig);
-                stepPayload.secureconfigid = scId;
+                createdScId = await client.createSecureConfig(stepData.secureconfig);
+                stepPayload.secureconfigid = createdScId;
             }
-            await client.registerStep(stepPayload);
+            try {
+                await client.registerStep(stepPayload);
+            } catch (registerErr) {
+                // Clean up orphaned secure config record if step creation failed
+                if (createdScId) await client.deleteSecureConfig(createdScId).catch(() => undefined);
+                throw registerErr;
+            }
             notify("Step registered successfully.");
             setShowRegisterStep(false);
             const ptId = stepData.pluginTypeId;
@@ -444,15 +453,22 @@ export default function App() {
         try {
             // Handle secure config changes
             const stepPayload: typeof stepData & { secureconfigid?: string } = { ...stepData };
+            let createdScId: string | undefined;
             if (stepData.secureconfig) {
                 if (step.secureconfigid) {
                     await client.updateSecureConfig(step.secureconfigid, stepData.secureconfig);
                 } else {
-                    const scId = await client.createSecureConfig(stepData.secureconfig);
-                    stepPayload.secureconfigid = scId;
+                    createdScId = await client.createSecureConfig(stepData.secureconfig);
+                    stepPayload.secureconfigid = createdScId;
                 }
             }
-            await client.updateStep(step.sdkmessageprocessingstepid, stepPayload);
+            try {
+                await client.updateStep(step.sdkmessageprocessingstepid, stepPayload);
+            } catch (updateErr) {
+                // Clean up orphaned secure config record if step update failed
+                if (createdScId) await client.deleteSecureConfig(createdScId).catch(() => undefined);
+                throw updateErr;
+            }
             notify("Step updated.");
             setShowUpdateStep(false);
             const ptId = step.plugintypeid ?? stepData.pluginTypeId;
