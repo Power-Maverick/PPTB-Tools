@@ -1,8 +1,8 @@
 {
   "name": "@power-maverick/tool-plugin-registration",
   "displayName": "Plugin Registration",
-  "version": "0.0.2",
-  "description": "Register and manage Dataverse plugin assemblies, custom workflow activities, and SDK message processing steps",
+  "version": "0.1.0",
+  "description": "Register and manage Dataverse plugin assemblies, custom workflow activities, SDK message processing steps, service endpoints, and webhooks",
   "icon": "icons/prt.svg",
   "contributors": [
     {
@@ -12,6 +12,10 @@
     {
       "name": "LinkeD365",
       "url": "https://github.com/LinkeD365"
+    },
+    {
+      "name": "nickmeron",
+      "url": "https://github.com/nickmeron"
     }
   ],
   "license": "GPL-2.0",
