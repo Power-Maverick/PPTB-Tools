@@ -20,7 +20,9 @@
     "build": "vite build",
     "dev": "vite",
     "preview": "vite preview",
-    "finalize-package": "npm shrinkwrap"
+    "finalize-package": "npm shrinkwrap",
+    "version-stable": "npm version patch --no-git-tag-version",
+    "publish-package": "npm run build && npm run version-stable && npm publish --access public"
   },
   "files": [
     "dist",

@@ -1,7 +1,7 @@
 {
   "name": "@power-maverick/tool-view-layout-copier",
   "displayName": "View Layout Copier",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Copy layout from one view to multiple views of the same entity in a single operation",
   "contributors": [
     {
@@ -24,7 +24,9 @@
     "build": "vite build",
     "dev": "vite",
     "preview": "vite preview",
-    "finalize-package": "npm shrinkwrap"
+    "finalize-package": "npm shrinkwrap",
+    "version-stable": "npm version patch --no-git-tag-version",
+    "publish-package": "npm run build && npm run version-stable && npm publish --access public"
   },
   "files": [
     "dist",
