@@ -154,7 +154,11 @@ export class MigrationEngine {
                 const sampleRecord = selectedRecords[0].data;
                 
                 for (const mapping of enabledMappings) {
-                    if (!(mapping.sourceField in sampleRecord)) {
+                    // Lookup fields are stored as _fieldname_value in OData query results
+                    const isLookupField = mapping.fieldType.includes("Lookup") || mapping.fieldType.includes("Owner") || mapping.fieldType.includes("Customer");
+                    const lookupValueField = `_${mapping.sourceField}_value`;
+                    const fieldPresent = mapping.sourceField in sampleRecord || (isLookupField && lookupValueField in sampleRecord);
+                    if (!fieldPresent) {
                         missingFields.add(mapping.sourceField);
                     }
                 }

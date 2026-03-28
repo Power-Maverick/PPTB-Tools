@@ -212,7 +212,13 @@ function App() {
 
         try {
             const client = new DataverseClient("primary");
-            const selectFields = fieldMappings.filter((m) => m.isEnabled).map((m) => m.sourceField);
+            const selectFields = fieldMappings.filter((m) => m.isEnabled).map((m) => {
+                // Dataverse OData Web API represents lookup fields as _fieldname_value in $select
+                if (m.fieldType.includes("Lookup") || m.fieldType.includes("Owner") || m.fieldType.includes("Customer")) {
+                    return `_${m.sourceField}_value`;
+                }
+                return m.sourceField;
+            });
 
             // Add primary ID and primary name fields
             if (!selectFields.includes(selectedEntity.primaryIdAttribute)) {
