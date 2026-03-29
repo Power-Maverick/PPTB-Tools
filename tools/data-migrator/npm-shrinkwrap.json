@@ -1,12 +1,12 @@
 {
   "name": "@power-maverick/tool-data-migrator",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "@power-maverick/tool-data-migrator",
-      "version": "1.0.3",
+      "version": "1.0.5",
       "license": "GPL-2.0",
       "dependencies": {
         "@fluentui/react-components": "^9.56.2",
