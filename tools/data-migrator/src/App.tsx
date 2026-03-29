@@ -9,6 +9,7 @@ import { PreviewData } from "./components/PreviewData";
 import { AutoMappingResult, DataverseEntity, FieldMapping, LookupMapping, MigrationConfig, MigrationOperation, MigrationProgress, PreviewRecord } from "./models/interfaces";
 import "./styles/App.css";
 import { DataverseClient } from "./utils/DataverseClient";
+import { isReferenceFieldType } from "./utils/fieldUtils";
 import { MigrationEngine } from "./utils/MigrationEngine";
 
 function App() {
@@ -163,7 +164,7 @@ function App() {
             setFieldMappings(mappings);
 
             // Initialize lookup mappings for reference fields
-            const lookupFields = fields.filter((f) => f.type.includes("Lookup") || f.type.includes("Owner") || f.type.includes("Customer"));
+            const lookupFields = fields.filter((f) => isReferenceFieldType(f.type));
 
             const lookups: LookupMapping[] = lookupFields.map((field) => ({
                 fieldName: field.logicalName,
@@ -212,7 +213,13 @@ function App() {
 
         try {
             const client = new DataverseClient("primary");
-            const selectFields = fieldMappings.filter((m) => m.isEnabled).map((m) => m.sourceField);
+            const selectFields = fieldMappings.filter((m) => m.isEnabled).map((m) => {
+                // Dataverse OData Web API represents lookup fields as _fieldname_value in $select
+                if (isReferenceFieldType(m.fieldType)) {
+                    return `_${m.sourceField}_value`;
+                }
+                return m.sourceField;
+            });
 
             // Add primary ID and primary name fields
             if (!selectFields.includes(selectedEntity.primaryIdAttribute)) {
@@ -238,13 +245,29 @@ function App() {
                 );
             }
 
-            const preview: PreviewRecord[] = sourceRecords.map((record) => ({
-                action: (operations[0] || "create").toUpperCase() as "CREATE" | "UPDATE" | "DELETE",
-                data: record,
-                primaryId: record[selectedEntity.primaryIdAttribute] || "",
-                primaryName: record[selectedEntity.primaryNameAttribute] || "",
-                isSelected: true, // Default all records to selected
-            }));
+            // Normalize lookup fields: OData returns _fieldname_value keys, but the preview table
+            // renders cells using the bare logical name. Copy the value so both keys are present.
+            const enabledLookupFields = fieldMappings
+                .filter((m) => m.isEnabled && isReferenceFieldType(m.fieldType))
+                .map((m) => m.sourceField);
+
+            const preview: PreviewRecord[] = sourceRecords.map((record) => {
+                const normalizedData = { ...record };
+                for (const fieldName of enabledLookupFields) {
+                    const odataKey = `_${fieldName}_value`;
+                    // OData never returns both keys, but guard against overwriting if it ever does
+                    if (odataKey in normalizedData && !(fieldName in normalizedData)) {
+                        normalizedData[fieldName] = normalizedData[odataKey];
+                    }
+                }
+                return {
+                    action: (operations[0] || "create").toUpperCase() as "CREATE" | "UPDATE" | "DELETE",
+                    data: normalizedData,
+                    primaryId: normalizedData[selectedEntity.primaryIdAttribute] || "",
+                    primaryName: normalizedData[selectedEntity.primaryNameAttribute] || "",
+                    isSelected: true, // Default all records to selected
+                };
+            });
 
             setPreviewRecords(preview);
             setShowPreview(true);
