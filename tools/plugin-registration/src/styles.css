@@ -150,6 +150,20 @@ body {
     margin: 0 4px;
 }
 
+.toolbar-filter-group {
+    gap: 8px;
+    padding: 0 4px;
+}
+
+.toolbar-filter-label {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    color: var(--text-primary);
+}
+
 .toolbar-dropdown {
     position: absolute;
     top: 100%;
@@ -336,6 +350,8 @@ body {
 .node-icon-image       { background-color: var(--node-image-bg); }
 .node-icon-entity      { background-color: #0078d4; }
 .node-icon-message     { background-color: #038387; }
+.node-icon-endpoint    { background-color: #0078d4; }
+.node-icon-webhook     { background-color: #7719aa; }
 
 .tree-node-type {
     font-size: 11px;

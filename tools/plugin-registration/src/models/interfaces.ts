@@ -57,6 +57,11 @@ export interface ProcessingStep {
     statecode: number; // 0=Enabled, 1=Disabled
     plugintypename?: string;
     impersonatinguserid?: string; // GUID of user to impersonate; empty = calling user
+    configuration?: string;   // unsecure configuration (Dataverse field: configuration)
+    secureconfig?: string;
+    secureconfigid?: string;
+    supporteddeployment?: number; // 0=ServerOnly, 1=OutlookOnly, 2=Both
+    serviceendpointid?: string;
 }
 
 export interface StepImage {
@@ -70,7 +75,29 @@ export interface StepImage {
     description: string;
 }
 
-export type TreeNodeType = 'assembly' | 'plugintype' | 'step' | 'image' | 'entity-group' | 'message-group';
+export interface ServiceEndpoint {
+    serviceendpointid: string;
+    name: string;
+    description: string;
+    contract: number;
+    // contract: 1=OneWay, 2=Queue, 3=REST, 4=TwoWay, 5=Topic, 6=PersistentQueue, 7=EventHub, 8=Webhook, 9=EventGrid
+    url?: string;
+    authtype?: number;
+    // 0=NotSpecified, 1=ACS, 2=SASKey, 3=SASToken, 4=WebhookKey, 5=HttpHeader, 6=HttpQueryString, 7=ConnectionString, 8=AccessKey, 9=ManagedIdentity
+    authvalue?: string;
+    messageformat?: number; // 2=JSON, 3=XML
+    namespaceaddress?: string;
+    path?: string;
+    saskeyname?: string;
+    saskey?: string;
+    sastoken?: string;
+    userclaim?: number; // 0=None, 1=UserId, 2=ContactId
+    ismanaged?: boolean;
+    createdon?: string;
+    modifiedon?: string;
+}
+
+export type TreeNodeType = 'assembly' | 'plugintype' | 'step' | 'image' | 'entity-group' | 'message-group' | 'serviceendpoint';
 
 export interface VirtualGroupData {
     groupName: string;
@@ -81,10 +108,11 @@ export interface TreeNode {
     id: string;
     type: TreeNodeType;
     name: string;
-    data: PluginAssembly | PluginType | ProcessingStep | StepImage | VirtualGroupData;
+    data: PluginAssembly | PluginType | ProcessingStep | StepImage | VirtualGroupData | ServiceEndpoint;
     children?: TreeNode[];
     isExpanded?: boolean;
     isWorkflowActivity?: boolean;
+    isWebhook?: boolean;
     childrenLoaded?: boolean; // true once children have been fetched (even if empty)
 }
 

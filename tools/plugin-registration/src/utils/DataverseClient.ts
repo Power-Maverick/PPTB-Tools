@@ -1,4 +1,4 @@
-import type { PluginAssembly, PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, StepImage } from "../models/interfaces";
+import type { PluginAssembly, PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, StepImage, ServiceEndpoint } from "../models/interfaces";
 
 export class DataverseClient {
     async fetchAssemblies(): Promise<PluginAssembly[]> {
@@ -53,7 +53,7 @@ export class DataverseClient {
     async fetchSteps(pluginTypeId: string): Promise<ProcessingStep[]> {
         try {
             const response = await window.dataverseAPI.queryData(
-                `sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,description,rank,mode,stage,filteringattributes,asyncautodelete,statecode,_impersonatinguserid_value,_sdkmessageid_value,_sdkmessagefilterid_value&$filter=_eventhandler_value eq '${pluginTypeId}'&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)&$orderby=name`,
+                `sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,description,rank,mode,stage,filteringattributes,asyncautodelete,statecode,_impersonatinguserid_value,_sdkmessageid_value,_sdkmessagefilterid_value,configuration,_sdkmessageprocessingstepsecureconfigid_value,supporteddeployment&$filter=_eventhandler_value eq '${pluginTypeId}'&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)&$orderby=name`,
                 "primary",
             );
             return (response.value as Record<string, unknown>[]).map((s) => {
@@ -75,6 +75,9 @@ export class DataverseClient {
                     statecode: (s["statecode"] as number) ?? 0,
                     plugintypeid: pluginTypeId,
                     impersonatinguserid: (s["_impersonatinguserid_value"] as string) ?? undefined,
+                    configuration: (s["configuration"] as string) ?? undefined,
+                    secureconfigid: (s["_sdkmessageprocessingstepsecureconfigid_value"] as string) ?? undefined,
+                    supporteddeployment: s["supporteddeployment"] != null ? (s["supporteddeployment"] as number) : undefined,
                 };
             });
         } catch (error: unknown) {
@@ -286,6 +289,15 @@ export class DataverseClient {
             if (stepData.impersonatinguserid) {
                 payload["impersonatinguserid@odata.bind"] = `/systemusers(${stepData.impersonatinguserid})`;
             }
+            if (stepData.configuration !== undefined) {
+                payload["configuration"] = stepData.configuration;
+            }
+            if (stepData.supporteddeployment !== undefined) {
+                payload["supporteddeployment"] = stepData.supporteddeployment;
+            }
+            if ((stepData as { secureconfigid?: string }).secureconfigid) {
+                payload["sdkmessageprocessingstepsecureconfigid@odata.bind"] = `/sdkmessageprocessingstepsecureconfigs(${(stepData as { secureconfigid?: string }).secureconfigid})`;
+            }
             const result = await window.dataverseAPI.create("sdkmessageprocessingstep", payload);
             return result.id;
         } catch (error: unknown) {
@@ -323,6 +335,15 @@ export class DataverseClient {
                 } else {
                     payload["impersonatinguserid@odata.bind"] = null;
                 }
+            }
+            if (stepData.configuration !== undefined) {
+                payload["configuration"] = stepData.configuration;
+            }
+            if (stepData.supporteddeployment !== undefined) {
+                payload["supporteddeployment"] = stepData.supporteddeployment;
+            }
+            if ((stepData as { secureconfigid?: string }).secureconfigid) {
+                payload["sdkmessageprocessingstepsecureconfigid@odata.bind"] = `/sdkmessageprocessingstepsecureconfigs(${(stepData as { secureconfigid?: string }).secureconfigid})`;
             }
             await window.dataverseAPI.update("sdkmessageprocessingstep", stepId, payload);
         } catch (error: unknown) {
@@ -411,6 +432,169 @@ export class DataverseClient {
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to delete image: ${msg}`);
+        }
+    }
+
+    async fetchServiceEndpoints(): Promise<ServiceEndpoint[]> {
+        try {
+            const response = await window.dataverseAPI.queryData(
+                // authvalue, saskey, sastoken are write-only in Dataverse — excluded from $select
+                "serviceendpoints?$select=serviceendpointid,name,description,contract,url,authtype,messageformat,namespaceaddress,path,saskeyname,userclaim,ismanaged,createdon,modifiedon&$orderby=name",
+                "primary",
+            );
+            return (response.value as Record<string, unknown>[]).map((e) => ({
+                serviceendpointid: e["serviceendpointid"] as string,
+                name: e["name"] as string,
+                description: (e["description"] as string) ?? "",
+                contract: e["contract"] as number,
+                url: (e["url"] as string) ?? undefined,
+                authtype: e["authtype"] != null ? (e["authtype"] as number) : undefined,
+                messageformat: e["messageformat"] != null ? (e["messageformat"] as number) : undefined,
+                namespaceaddress: (e["namespaceaddress"] as string) ?? undefined,
+                path: (e["path"] as string) ?? undefined,
+                saskeyname: (e["saskeyname"] as string) ?? undefined,
+                userclaim: e["userclaim"] != null ? (e["userclaim"] as number) : undefined,
+                ismanaged: (e["ismanaged"] as boolean) ?? undefined,
+                createdon: (e["createdon"] as string) ?? undefined,
+                modifiedon: (e["modifiedon"] as string) ?? undefined,
+            }));
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to fetch service endpoints: ${msg}`);
+        }
+    }
+
+    async registerServiceEndpoint(data: Partial<ServiceEndpoint>): Promise<string> {
+        try {
+            const result = await window.dataverseAPI.create("serviceendpoint", data as Record<string, unknown>, "primary");
+            return result.id;
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to register service endpoint: ${msg}`);
+        }
+    }
+
+    async updateServiceEndpoint(id: string, data: Partial<ServiceEndpoint>): Promise<void> {
+        try {
+            await window.dataverseAPI.update("serviceendpoint", id, data as Record<string, unknown>);
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to update service endpoint: ${msg}`);
+        }
+    }
+
+    async deleteServiceEndpoint(id: string): Promise<void> {
+        try {
+            await window.dataverseAPI.delete("serviceendpoint", id);
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to delete service endpoint: ${msg}`);
+        }
+    }
+
+    async fetchStepsForEndpoint(endpointId: string): Promise<ProcessingStep[]> {
+        try {
+            const response = await window.dataverseAPI.queryData(
+                `sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,description,rank,mode,stage,filteringattributes,asyncautodelete,statecode,_sdkmessageid_value,_sdkmessagefilterid_value,configuration,_sdkmessageprocessingstepsecureconfigid_value,supporteddeployment&$filter=_eventhandler_value eq '${endpointId}'&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)&$orderby=name`,
+                "primary",
+            );
+            return (response.value as Record<string, unknown>[]).map((s) => {
+                const msgExpand = s["sdkmessageid"] as Record<string, unknown> | null;
+                const filterExpand = s["sdkmessagefilterid"] as Record<string, unknown> | null;
+                return {
+                    sdkmessageprocessingstepid: s["sdkmessageprocessingstepid"] as string,
+                    name: s["name"] as string,
+                    description: (s["description"] as string) ?? "",
+                    rank: (s["rank"] as number) ?? 1,
+                    mode: (s["mode"] as number) ?? 0,
+                    stage: (s["stage"] as number) ?? 40,
+                    sdkmessageid: (s["_sdkmessageid_value"] as string) ?? "",
+                    messageName: (msgExpand?.["name"] as string) ?? "",
+                    sdkmessagefilterid: (s["_sdkmessagefilterid_value"] as string) ?? "",
+                    primaryEntityName: (filterExpand?.["primaryobjecttypecode"] as string) ?? "none",
+                    filteringattributes: (s["filteringattributes"] as string) ?? "",
+                    asyncautodelete: (s["asyncautodelete"] as boolean) ?? false,
+                    statecode: (s["statecode"] as number) ?? 0,
+                    serviceendpointid: endpointId,
+                    configuration: (s["configuration"] as string) ?? undefined,
+                    secureconfigid: (s["_sdkmessageprocessingstepsecureconfigid_value"] as string) ?? undefined,
+                    supporteddeployment: s["supporteddeployment"] != null ? (s["supporteddeployment"] as number) : undefined,
+                };
+            });
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to fetch steps for endpoint: ${msg}`);
+        }
+    }
+
+    async registerStepForEndpoint(stepData: {
+        name: string;
+        description?: string;
+        rank?: number;
+        mode?: number;
+        stage?: number;
+        filteringattributes?: string;
+        asyncautodelete?: boolean;
+        messageId: string;
+        filterId?: string;
+        endpointId: string;
+        configuration?: string;
+        supporteddeployment?: number;
+    }): Promise<string> {
+        try {
+            const payload: Record<string, unknown> = {
+                name: stepData.name,
+                description: stepData.description ?? "",
+                rank: stepData.rank ?? 1,
+                mode: stepData.mode ?? 0,
+                stage: stepData.stage ?? 40,
+                filteringattributes: stepData.filteringattributes ?? "",
+                asyncautodelete: stepData.asyncautodelete ?? false,
+                "sdkmessageid@odata.bind": `/sdkmessages(${stepData.messageId})`,
+                "eventhandler_serviceendpoint@odata.bind": `/serviceendpoints(${stepData.endpointId})`,
+            };
+            if (stepData.filterId) {
+                payload["sdkmessagefilterid@odata.bind"] = `/sdkmessagefilters(${stepData.filterId})`;
+            }
+            if (stepData.configuration !== undefined) {
+                payload["configuration"] = stepData.configuration;
+            }
+            if (stepData.supporteddeployment !== undefined) {
+                payload["supporteddeployment"] = stepData.supporteddeployment;
+            }
+            const result = await window.dataverseAPI.create("sdkmessageprocessingstep", payload);
+            return result.id;
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to register step for endpoint: ${msg}`);
+        }
+    }
+
+    async createSecureConfig(secureconfig: string): Promise<string> {
+        try {
+            const result = await window.dataverseAPI.create("sdkmessageprocessingstepsecureconfig", { secureconfig });
+            return result.id;
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to create secure config: ${msg}`);
+        }
+    }
+
+    async updateSecureConfig(id: string, secureconfig: string): Promise<void> {
+        try {
+            await window.dataverseAPI.update("sdkmessageprocessingstepsecureconfig", id, { secureconfig });
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to update secure config: ${msg}`);
+        }
+    }
+
+    async deleteSecureConfig(id: string): Promise<void> {
+        try {
+            await window.dataverseAPI.delete("sdkmessageprocessingstepsecureconfig", id);
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to delete secure config: ${msg}`);
         }
     }
 }
