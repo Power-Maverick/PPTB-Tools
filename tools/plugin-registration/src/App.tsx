@@ -566,6 +566,80 @@ export default function App() {
         }
     };
 
+    const bulkToggleStepsForPluginType = async (action: "enable" | "disable") => {
+        if (selectedNode?.type !== "plugintype") return;
+        const pt = selectedNode.data as PluginType;
+        const verb = action === "enable" ? "enabled" : "disabled";
+        try {
+            const cached = steps.get(pt.plugintypeid);
+            const ptSteps = cached ?? (await client.fetchSteps(pt.plugintypeid));
+            if (!cached) setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(pt.plugintypeid, ptSteps));
+            if (ptSteps.length === 0) { notify("No steps found."); return; }
+            const op = (id: string) => (action === "enable" ? client.enableStep(id) : client.disableStep(id));
+            const results = await Promise.allSettled(ptSteps.map((s) => op(s.sdkmessageprocessingstepid)));
+            const failed = results.filter((r) => r.status === "rejected").length;
+            if (failed > 0) {
+                notify(`${ptSteps.length - failed} step(s) ${verb}. ${failed} failed.`, "error");
+            } else {
+                notify(`All ${ptSteps.length} step(s) ${verb}.`);
+            }
+            const refreshed = await client.fetchSteps(pt.plugintypeid);
+            setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(pt.plugintypeid, refreshed));
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+        }
+    };
+
+    const handleEnableAllStepsForPluginType = () => bulkToggleStepsForPluginType("enable");
+    const handleDisableAllStepsForPluginType = () => bulkToggleStepsForPluginType("disable");
+
+    const bulkToggleStepsForAssembly = async (action: "enable" | "disable") => {
+        if (selectedNode?.type !== "assembly") return;
+        const asm = selectedNode.data as PluginAssembly;
+        const verb = action === "enable" ? "enabled" : "disabled";
+        try {
+            const cachedTypes = pluginTypes.get(asm.pluginassemblyid);
+            const pts = cachedTypes ?? (await client.fetchPluginTypes(asm.pluginassemblyid));
+            if (!cachedTypes) setPluginTypes((prev: Map<string, PluginType[]>) => new Map(prev).set(asm.pluginassemblyid, pts));
+            if (pts.length === 0) { notify("No plugin types found."); return; }
+            const stepsEntries = await Promise.all(
+                pts.map(async (pt: PluginType) => {
+                    const cached = steps.get(pt.plugintypeid);
+                    const ptSteps = cached ?? (await client.fetchSteps(pt.plugintypeid));
+                    return { ptId: pt.plugintypeid, ptSteps };
+                }),
+            );
+            setSteps((prev: Map<string, ProcessingStep[]>) => {
+                const next = new Map(prev);
+                for (const { ptId, ptSteps } of stepsEntries) {
+                    if (!prev.has(ptId)) next.set(ptId, ptSteps);
+                }
+                return next;
+            });
+            const allSteps = stepsEntries.flatMap(({ ptSteps }) => ptSteps);
+            if (allSteps.length === 0) { notify("No steps found."); return; }
+            const op = (id: string) => (action === "enable" ? client.enableStep(id) : client.disableStep(id));
+            const results = await Promise.allSettled(allSteps.map((s) => op(s.sdkmessageprocessingstepid)));
+            const failed = results.filter((r) => r.status === "rejected").length;
+            if (failed > 0) {
+                notify(`${allSteps.length - failed} step(s) ${verb}. ${failed} failed.`, "error");
+            } else {
+                notify(`All ${allSteps.length} step(s) ${verb}.`);
+            }
+            const refreshed = await Promise.all(pts.map(async (pt: PluginType) => ({ ptId: pt.plugintypeid, ptSteps: await client.fetchSteps(pt.plugintypeid) })));
+            setSteps((prev: Map<string, ProcessingStep[]>) => {
+                const next = new Map(prev);
+                for (const { ptId, ptSteps } of refreshed) next.set(ptId, ptSteps);
+                return next;
+            });
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+        }
+    };
+
+    const handleEnableAllStepsForAssembly = () => bulkToggleStepsForAssembly("enable");
+    const handleDisableAllStepsForAssembly = () => bulkToggleStepsForAssembly("disable");
+
     // ── Service Endpoint actions ──
     const handleRegisterServiceEndpoint = async (data: Partial<ServiceEndpoint>) => {
         try {
@@ -992,6 +1066,31 @@ export default function App() {
                             </button>
                             <button className="toolbar-btn" onClick={() => void handleDisableStep()} disabled={!stepIsEnabled}>
                                 Disable
+                            </button>
+                        </div>
+                    </>
+                )}
+                {(selectedPluginType || selectedAssembly) && (
+                    <>
+                        <div className="toolbar-separator" />
+                        <div className="toolbar-group">
+                            <button
+                                className="toolbar-btn"
+                                onClick={() => {
+                                    if (selectedPluginType) void handleEnableAllStepsForPluginType();
+                                    else void handleEnableAllStepsForAssembly();
+                                }}
+                            >
+                                Enable All
+                            </button>
+                            <button
+                                className="toolbar-btn"
+                                onClick={() => {
+                                    if (selectedPluginType) void handleDisableAllStepsForPluginType();
+                                    else void handleDisableAllStepsForAssembly();
+                                }}
+                            >
+                                Disable All
                             </button>
                         </div>
                     </>
