@@ -152,6 +152,9 @@ export default function App() {
     const [showPlugins, setShowPlugins] = useState(true);
     const [showEndpoints, setShowEndpoints] = useState(true);
 
+    // Bulk enable/disable in progress
+    const [bulkToggling, setBulkToggling] = useState(false);
+
     // Register dropdown
     const [showRegisterDropdown, setShowRegisterDropdown] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -570,6 +573,7 @@ export default function App() {
         if (selectedNode?.type !== "plugintype") return;
         const pt = selectedNode.data as PluginType;
         const verb = action === "enable" ? "enabled" : "disabled";
+        setBulkToggling(true);
         try {
             const cached = steps.get(pt.plugintypeid);
             const ptSteps = cached ?? (await client.fetchSteps(pt.plugintypeid));
@@ -587,6 +591,8 @@ export default function App() {
             setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(pt.plugintypeid, refreshed));
         } catch (err: unknown) {
             notify(err instanceof Error ? err.message : String(err), "error");
+        } finally {
+            setBulkToggling(false);
         }
     };
 
@@ -597,6 +603,7 @@ export default function App() {
         if (selectedNode?.type !== "assembly") return;
         const asm = selectedNode.data as PluginAssembly;
         const verb = action === "enable" ? "enabled" : "disabled";
+        setBulkToggling(true);
         try {
             const cachedTypes = pluginTypes.get(asm.pluginassemblyid);
             const pts = cachedTypes ?? (await client.fetchPluginTypes(asm.pluginassemblyid));
@@ -634,6 +641,8 @@ export default function App() {
             });
         } catch (err: unknown) {
             notify(err instanceof Error ? err.message : String(err), "error");
+        } finally {
+            setBulkToggling(false);
         }
     };
 
@@ -1076,21 +1085,23 @@ export default function App() {
                         <div className="toolbar-group">
                             <button
                                 className="toolbar-btn"
+                                disabled={bulkToggling}
                                 onClick={() => {
                                     if (selectedPluginType) void handleEnableAllStepsForPluginType();
                                     else void handleEnableAllStepsForAssembly();
                                 }}
                             >
-                                Enable All
+                                {bulkToggling ? <><span className="toolbar-spinner" /> Enabling…</> : "Enable All"}
                             </button>
                             <button
                                 className="toolbar-btn"
+                                disabled={bulkToggling}
                                 onClick={() => {
                                     if (selectedPluginType) void handleDisableAllStepsForPluginType();
                                     else void handleDisableAllStepsForAssembly();
                                 }}
                             >
-                                Disable All
+                                {bulkToggling ? <><span className="toolbar-spinner" /> Disabling…</> : "Disable All"}
                             </button>
                         </div>
                     </>
