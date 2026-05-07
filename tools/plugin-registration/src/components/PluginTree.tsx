@@ -17,12 +17,14 @@ function getTypeLabel(node: TreeNode): string {
         case "image": return "Image";
         case "entity-group": return "Entity";
         case "message-group": return "Message";
+        case "package": return "Package";
         case "serviceendpoint": return node.isWebhook ? "Webhook" : "Service Endpoint";
     }
 }
 
 function getIconClass(node: TreeNode): string {
     if (node.type === "assembly") return "node-icon node-icon-assembly";
+    if (node.type === "package") return "node-icon node-icon-package";
     if (node.type === "plugintype") {
         return node.isWorkflowActivity ? "node-icon node-icon-workflow" : "node-icon node-icon-plugin";
     }
@@ -38,6 +40,7 @@ function getIconClass(node: TreeNode): string {
 
 function getIconText(node: TreeNode): string {
     if (node.type === "assembly") return "A";
+    if (node.type === "package") return "K";
     if (node.type === "plugintype") return node.isWorkflowActivity ? "W" : "P";
     if (node.type === "step") return "S";
     if (node.type === "entity-group") return "E";

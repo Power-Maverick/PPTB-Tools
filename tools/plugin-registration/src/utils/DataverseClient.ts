@@ -1,10 +1,10 @@
-import type { PluginAssembly, PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, StepImage, ServiceEndpoint } from "../models/interfaces";
+import type { PluginAssembly, PluginPackage, PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, StepImage, ServiceEndpoint } from "../models/interfaces";
 
 export class DataverseClient {
     async fetchAssemblies(): Promise<PluginAssembly[]> {
         try {
             const response = await window.dataverseAPI.queryData(
-                "pluginassemblies?$select=pluginassemblyid,name,version,culture,publickeytoken,sourcetype,isolationmode,description,createdon,modifiedon&$orderby=name",
+                "pluginassemblies?$select=pluginassemblyid,name,version,culture,publickeytoken,sourcetype,isolationmode,description,_packageid_value,createdon,modifiedon&$orderby=name",
                 "primary",
             );
             return (response.value as Record<string, unknown>[]).map((a) => ({
@@ -16,6 +16,7 @@ export class DataverseClient {
                 sourcetype: a["sourcetype"] as number,
                 isolationmode: a["isolationmode"] as number,
                 description: (a["description"] as string) ?? "",
+                _packageid_value: (a["_packageid_value"] as string) ?? undefined,
                 createdon: a["createdon"] as string | undefined,
                 modifiedon: a["modifiedon"] as string | undefined,
             }));
@@ -224,19 +225,22 @@ export class DataverseClient {
         }
     }
 
-    async registerAssembly(content: string, name: string, isolationMode: number, description: string): Promise<string> {
+    async registerAssembly(content: string, name: string, isolationMode: number, description: string, packageId?: string): Promise<string> {
         try {
-            const result = await window.dataverseAPI.create(
-                "pluginassembly",
-                {
-                    content,
-                    name,
-                    isolationmode: isolationMode,
-                    description,
-                    sourcetype: 0,
-                },
-                "primary",
-            );
+            const payload: Record<string, unknown> = {
+                content,
+                name,
+                isolationmode: isolationMode,
+                description,
+                sourcetype: 0,
+            };
+            if (packageId) {
+                if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(packageId)) {
+                    throw new Error(`Invalid package ID: "${packageId}"`);
+                }
+                payload["packageid@odata.bind"] = `/pluginpackages(${packageId})`;
+            }
+            const result = await window.dataverseAPI.create("pluginassembly", payload, "primary");
             return result.id;
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
@@ -244,10 +248,20 @@ export class DataverseClient {
         }
     }
 
-    async updateAssembly(assemblyId: string, description: string, content?: string): Promise<void> {
+    async updateAssembly(assemblyId: string, description: string, content?: string, packageId?: string): Promise<void> {
         try {
             const payload: Record<string, unknown> = { description };
             if (content) payload["content"] = content;
+            if (packageId !== undefined) {
+                if (packageId) {
+                    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(packageId)) {
+                        throw new Error(`Invalid package ID: "${packageId}"`);
+                    }
+                    payload["packageid@odata.bind"] = `/pluginpackages(${packageId})`;
+                } else {
+                    payload["packageid@odata.bind"] = null;
+                }
+            }
             await window.dataverseAPI.update("pluginassembly", assemblyId, payload);
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
@@ -261,6 +275,63 @@ export class DataverseClient {
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to delete assembly: ${msg}`);
+        }
+    }
+
+    // ── Plugin Package methods ──
+
+    async fetchPackages(): Promise<PluginPackage[]> {
+        try {
+            const response = await window.dataverseAPI.queryData(
+                "pluginpackages?$select=pluginpackageid,name,uniquename,version,ismanaged,createdon,modifiedon&$orderby=name",
+                "primary",
+            );
+            return (response.value as Record<string, unknown>[]).map((p) => ({
+                pluginpackageid: p["pluginpackageid"] as string,
+                name: p["name"] as string,
+                uniquename: (p["uniquename"] as string) ?? "",
+                version: (p["version"] as string) ?? "",
+                ismanaged: (p["ismanaged"] as boolean) ?? false,
+                createdon: p["createdon"] as string | undefined,
+                modifiedon: p["modifiedon"] as string | undefined,
+            }));
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to fetch packages: ${msg}`);
+        }
+    }
+
+    async createPackage(name: string, uniquename: string, version: string, content: string): Promise<string> {
+        try {
+            const result = await window.dataverseAPI.create(
+                "pluginpackage",
+                { name, uniquename, version, content },
+                "primary",
+            );
+            return result.id;
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to create package: ${msg}`);
+        }
+    }
+
+    async updatePackage(packageId: string, version: string, content?: string): Promise<void> {
+        try {
+            const payload: Record<string, unknown> = { version };
+            if (content) payload["content"] = content;
+            await window.dataverseAPI.update("pluginpackage", packageId, payload);
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to update package: ${msg}`);
+        }
+    }
+
+    async deletePackage(packageId: string): Promise<void> {
+        try {
+            await window.dataverseAPI.delete("pluginpackage", packageId);
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to delete package: ${msg}`);
         }
     }
 

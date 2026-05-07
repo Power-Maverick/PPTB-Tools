@@ -353,16 +353,49 @@ body {
     letter-spacing: 0;
 }
 
-.node-icon-assembly    { background-color: var(--node-assembly-bg); }
-.node-icon-plugin      { background-color: var(--node-plugin-bg); }
-.node-icon-workflow    { background-color: var(--node-workflow-bg); }
-.node-icon-step-enabled  { background-color: var(--node-step-enabled-bg); }
-.node-icon-step-disabled { background-color: var(--node-step-disabled-bg); }
-.node-icon-image       { background-color: var(--node-image-bg); }
-.node-icon-entity      { background-color: #0078d4; }
-.node-icon-message     { background-color: #038387; }
-.node-icon-endpoint    { background-color: #0078d4; }
-.node-icon-webhook     { background-color: #7719aa; }
+.node-icon-assembly {
+    background-color: var(--node-assembly-bg);
+}
+
+.node-icon-package {
+    background-color: #004880;
+}
+
+.node-icon-plugin {
+    background-color: var(--node-plugin-bg);
+}
+
+.node-icon-workflow {
+    background-color: var(--node-workflow-bg);
+}
+
+.node-icon-step-enabled {
+    background-color: var(--node-step-enabled-bg);
+}
+
+.node-icon-step-disabled {
+    background-color: var(--node-step-disabled-bg);
+}
+
+.node-icon-image {
+    background-color: var(--node-image-bg);
+}
+
+.node-icon-entity {
+    background-color: #0078d4;
+}
+
+.node-icon-message {
+    background-color: #038387;
+}
+
+.node-icon-endpoint {
+    background-color: #0078d4;
+}
+
+.node-icon-webhook {
+    background-color: #7719aa;
+}
 
 .tree-node-type {
     font-size: 11px;
@@ -644,9 +677,20 @@ button:disabled {
     font-weight: 600;
 }
 
-.badge-success { background-color: var(--badge-success-bg); color: var(--badge-success-text); }
-.badge-danger  { background-color: var(--badge-danger-bg);  color: var(--badge-danger-text); }
-.badge-info    { background-color: var(--badge-info-bg);    color: var(--badge-info-text); }
+.badge-success {
+    background-color: var(--badge-success-bg);
+    color: var(--badge-success-text);
+}
+
+.badge-danger {
+    background-color: var(--badge-danger-bg);
+    color: var(--badge-danger-text);
+}
+
+.badge-info {
+    background-color: var(--badge-info-bg);
+    color: var(--badge-info-text);
+}
 
 /* ── Dialog ── */
 .dialog-overlay {
@@ -797,7 +841,9 @@ button:disabled {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* ── Attribute Picker Dialog ── */
@@ -1049,4 +1095,3 @@ button:disabled {
     overflow: hidden;
     text-overflow: ellipsis;
 }
-

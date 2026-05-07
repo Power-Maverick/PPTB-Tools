@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from "react";
-import type { PluginAssembly } from "../models/interfaces";
+import type { PluginAssembly, PluginPackage } from "../models/interfaces";
 
 interface RegisterAssemblyDialogProps {
     isOpen: boolean;
     isUpdate: boolean;
     existingAssembly?: PluginAssembly;
-    onRegister: (content: string, name: string, isolationMode: number, description: string) => Promise<void>;
+    packages?: PluginPackage[];
+    onCreatePackage?: () => void;
+    onRegister: (content: string, name: string, isolationMode: number, description: string, packageId?: string) => Promise<void>;
     onClose: () => void;
 }
 
@@ -15,6 +17,8 @@ export function RegisterAssemblyDialog({
     isOpen,
     isUpdate,
     existingAssembly,
+    packages = [],
+    onCreatePackage,
     onRegister,
     onClose,
 }: RegisterAssemblyDialogProps) {
@@ -22,6 +26,7 @@ export function RegisterAssemblyDialog({
     const [assemblyName, setAssemblyName] = useState("");
     const [isolationMode, setIsolationMode] = useState(DEFAULT_ISOLATION_MODE);
     const [description, setDescription] = useState(existingAssembly?.description ?? "");
+    const [packageId, setPackageId] = useState(existingAssembly?._packageid_value ?? "");
     const [saving, setSaving] = useState(false);
     const [fileError, setFileError] = useState("");
     const fileRef = useRef<HTMLInputElement>(null);
@@ -33,6 +38,7 @@ export function RegisterAssemblyDialog({
         setAssemblyName("");
         setIsolationMode(DEFAULT_ISOLATION_MODE);
         setDescription(existingAssembly?.description ?? "");
+        setPackageId(existingAssembly?._packageid_value ?? "");
         setSaving(false);
         setFileError("");
         if (fileRef.current) fileRef.current.value = "";
@@ -64,7 +70,7 @@ export function RegisterAssemblyDialog({
         if (!content) { setFileError("Please select a .dll file."); return; }
         setSaving(true);
         try {
-            await onRegister(content, assemblyName, isolationMode, description);
+            await onRegister(content, assemblyName, isolationMode, description, packageId || undefined);
         } finally {
             setSaving(false);
         }
@@ -113,6 +119,40 @@ export function RegisterAssemblyDialog({
                             placeholder="Optional description"
                         />
                     </div>
+                    {packages.length > 0 && (
+                        <div className="form-row">
+                            <label className="form-label">Package Assignment</label>
+                            <select
+                                className="form-select"
+                                value={packageId}
+                                onChange={(e) => setPackageId(e.target.value)}
+                            >
+                                <option value="">Standalone (no package)</option>
+                                {packages
+                                    .filter((p) => !p.ismanaged)
+                                    .map((p) => (
+                                        <option key={p.pluginpackageid} value={p.pluginpackageid}>
+                                            {p.name} ({p.version})
+                                        </option>
+                                    ))}
+                            </select>
+                            {onCreatePackage && (
+                                <button
+                                    type="button"
+                                    className="btn-secondary"
+                                    style={{ marginTop: 4, fontSize: 11 }}
+                                    onClick={onCreatePackage}
+                                >
+                                    + Create New Package…
+                                </button>
+                            )}
+                            {isUpdate && existingAssembly?._packageid_value && (
+                                <span style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>
+                                    Currently in package: {packages.find((p) => p.pluginpackageid === existingAssembly._packageid_value)?.name ?? existingAssembly._packageid_value}
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <div className="dialog-footer">
                     <button className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>

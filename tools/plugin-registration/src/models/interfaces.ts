@@ -8,6 +8,7 @@ export interface PluginAssembly {
     isolationmode: number; // 1=None, 2=Sandbox
     description: string;
     content?: string; // base64 encoded assembly
+    _packageid_value?: string; // GUID of the parent pluginpackage, null = standalone
     createdon?: string;
     modifiedon?: string;
 }
@@ -75,6 +76,17 @@ export interface StepImage {
     description: string;
 }
 
+export interface PluginPackage {
+    pluginpackageid: string;
+    name: string;
+    uniquename: string;
+    version: string;
+    content?: string; // base64 encoded .nupkg (write-only on create/update)
+    ismanaged?: boolean;
+    createdon?: string;
+    modifiedon?: string;
+}
+
 export interface ServiceEndpoint {
     serviceendpointid: string;
     name: string;
@@ -97,7 +109,7 @@ export interface ServiceEndpoint {
     modifiedon?: string;
 }
 
-export type TreeNodeType = 'assembly' | 'plugintype' | 'step' | 'image' | 'entity-group' | 'message-group' | 'serviceendpoint';
+export type TreeNodeType = 'assembly' | 'plugintype' | 'step' | 'image' | 'entity-group' | 'message-group' | 'serviceendpoint' | 'package';
 
 export interface VirtualGroupData {
     groupName: string;
@@ -108,7 +120,7 @@ export interface TreeNode {
     id: string;
     type: TreeNodeType;
     name: string;
-    data: PluginAssembly | PluginType | ProcessingStep | StepImage | VirtualGroupData | ServiceEndpoint;
+    data: PluginAssembly | PluginType | ProcessingStep | StepImage | VirtualGroupData | ServiceEndpoint | PluginPackage;
     children?: TreeNode[];
     isExpanded?: boolean;
     isWorkflowActivity?: boolean;
