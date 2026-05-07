@@ -198,6 +198,11 @@ body {
     background-color: var(--bg-hover);
 }
 
+.toolbar-dropdown-item--active {
+    font-weight: 600;
+    color: var(--accent, #0078d4);
+}
+
 .dropdown-arrow {
     font-size: 10px;
     margin-left: 2px;

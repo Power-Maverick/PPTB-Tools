@@ -1,6 +1,9 @@
-import type { PluginPackage } from "../models/interfaces";
-import { PropertySection } from "./PropertySection"; interface PackageDetailsProps {
+import type { PluginAssembly, PluginPackage } from "../models/interfaces";
+import { PropertySection } from "./PropertySection";
+
+interface PackageDetailsProps {
     pkg: PluginPackage;
+    assemblies?: PluginAssembly[];
     onUpdate: () => void;
     onDelete: () => void;
 }
@@ -13,7 +16,7 @@ const FIELD_HINTS: Record<string, string> = {
     IsManaged: "Whether this package was imported as part of a managed solution",
 };
 
-export function PackageDetails({ pkg, onUpdate, onDelete }: PackageDetailsProps) {
+export function PackageDetails({ pkg, assemblies = [], onUpdate, onDelete }: PackageDetailsProps) {
     return (
         <div className="details-pane">
             {pkg.ismanaged && (
@@ -55,6 +58,16 @@ export function PackageDetails({ pkg, onUpdate, onDelete }: PackageDetailsProps)
                     </div>
                 )}
             </PropertySection>
+            {assemblies.length > 0 && (
+                <PropertySection title="Assemblies" defaultExpanded={true}>
+                    {assemblies.map((asm) => (
+                        <div className="prop-row" key={asm.pluginassemblyid}>
+                            <span className="prop-label">{asm.name}</span>
+                            <span className="prop-value">{asm.version}</span>
+                        </div>
+                    ))}
+                </PropertySection>
+            )}
             <div className="details-footer">
                 <div className="field-hint">
                     <div className="field-hint-label">Package</div>

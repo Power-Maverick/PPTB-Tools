@@ -29,6 +29,7 @@ function buildTreeNodes(
     endpointSteps: Map<string, ProcessingStep[]>,
     showPlugins: boolean,
     showEndpoints: boolean,
+    viewMode: 'assemblies' | 'packages',
 ): TreeNode[] {
     // Inner helper: build a single assembly node (recursive into types/steps/images)
     const buildAssemblyNode = (asm: PluginAssembly): TreeNode => {
@@ -153,9 +154,14 @@ function buildTreeNodes(
 
     const result: TreeNode[] = [];
     if (showPlugins) {
-        result.push(...packageNodes);
-        result.push(...orphanedNodes);
-        result.push(...standaloneAssemblyNodes);
+        if (viewMode === 'packages') {
+            result.push(...packageNodes);
+            result.push(...orphanedNodes);
+            result.push(...standaloneAssemblyNodes);
+        } else {
+            // Assemblies view: flat list of all assemblies regardless of package association
+            result.push(...assemblies.map(buildAssemblyNode));
+        }
     }
     if (showEndpoints) result.push(...endpointNodes);
     return result;
@@ -208,9 +214,14 @@ export default function App() {
     // Bulk enable/disable in progress
     const [bulkToggling, setBulkToggling] = useState(false);
 
+    // View mode: 'assemblies' (default, flat list) | 'packages' (grouped under package nodes)
+    const [viewMode, setViewMode] = useState<'assemblies' | 'packages'>('assemblies');
+
     // Register dropdown
     const [showRegisterDropdown, setShowRegisterDropdown] = useState(false);
+    const [showViewDropdown, setShowViewDropdown] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const viewDropdownRef = useRef<HTMLDivElement>(null);
 
     // Dialog state
     const [showRegisterAssembly, setShowRegisterAssembly] = useState(false);
@@ -227,11 +238,14 @@ export default function App() {
     const [showRegisterEndpointStep, setShowRegisterEndpointStep] = useState(false);
     const [showUpdateEndpointStep, setShowUpdateEndpointStep] = useState(false);
 
-    // Close register dropdown when clicking outside
+    // Close dropdowns when clicking outside
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
                 setShowRegisterDropdown(false);
+            }
+            if (viewDropdownRef.current && !viewDropdownRef.current.contains(e.target as Node)) {
+                setShowViewDropdown(false);
             }
         };
         document.addEventListener("mousedown", handleClick);
@@ -1052,7 +1066,7 @@ export default function App() {
     const bottomSteps = selectedPluginType ? (steps.get(selectedPluginType.plugintypeid) ?? []) : [];
     const bottomImages = selectedStep ? (images.get(selectedStep.sdkmessageprocessingstepid) ?? []) : [];
 
-    const rawTreeNodes = buildTreeNodes(assemblies, packages, pluginTypes, steps, images, expandedIds, serviceEndpoints, endpointSteps, showPlugins, showEndpoints);
+    const rawTreeNodes = buildTreeNodes(assemblies, packages, pluginTypes, steps, images, expandedIds, serviceEndpoints, endpointSteps, showPlugins, showEndpoints, viewMode);
 
     const treeNodes = searchTerm
         ? filterTreeForSearch(rawTreeNodes, searchTerm.toLowerCase())
@@ -1154,6 +1168,29 @@ export default function App() {
                                 }}
                             >
                                 New Service Endpoint
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* View dropdown */}
+                <div className="toolbar-group" ref={viewDropdownRef}>
+                    <button className="toolbar-btn" onClick={() => setShowViewDropdown((v) => !v)}>
+                        View: {viewMode === 'packages' ? 'Packages' : 'Assemblies'} <span className="dropdown-arrow">▾</span>
+                    </button>
+                    {showViewDropdown && (
+                        <div className="toolbar-dropdown">
+                            <div
+                                className={`toolbar-dropdown-item${viewMode === 'assemblies' ? ' toolbar-dropdown-item--active' : ''}`}
+                                onClick={() => { setViewMode('assemblies'); setShowViewDropdown(false); setSelectedNode(null); }}
+                            >
+                                Assemblies
+                            </div>
+                            <div
+                                className={`toolbar-dropdown-item${viewMode === 'packages' ? ' toolbar-dropdown-item--active' : ''}`}
+                                onClick={() => { setViewMode('packages'); setShowViewDropdown(false); setSelectedNode(null); }}
+                            >
+                                Packages
                             </div>
                         </div>
                     )}
@@ -1275,6 +1312,7 @@ export default function App() {
                     {selectedPackage && (
                         <PackageDetails
                             pkg={selectedPackage}
+                            assemblies={assemblies.filter((a) => a._packageid_value === selectedPackage.pluginpackageid)}
                             onUpdate={() => setShowUpdatePackage(true)}
                             onDelete={() => void handleDeletePackage()}
                         />
