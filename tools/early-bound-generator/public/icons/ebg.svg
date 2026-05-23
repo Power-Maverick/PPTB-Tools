@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Full-bleed blue background -->
+  <rect width="32" height="32" fill="#0078d4"/>
+  <g>
+    <!-- Code brackets: < > -->
+    <path d="M7 16 L11 12 L11 13.5 L8.5 16 L11 18.5 L11 20 Z" fill="white"/>
+    <path d="M25 16 L21 12 L21 13.5 L23.5 16 L21 18.5 L21 20 Z" fill="white"/>
+    <!-- Three lines representing generated code -->
+    <rect x="13" y="12" width="6" height="1.5" rx="0.75" fill="white" fill-opacity="0.9"/>
+    <rect x="13" y="15.25" width="6" height="1.5" rx="0.75" fill="white" fill-opacity="0.9"/>
+    <rect x="13" y="18.5" width="6" height="1.5" rx="0.75" fill="white" fill-opacity="0.9"/>
+    <!-- Small "C#" label bottom-right -->
+    <text x="18.5" y="28" font-family="Segoe UI, Arial, sans-serif" font-size="5.5" font-weight="700" fill="white" fill-opacity="0.85">C#</text>
+  </g>
+</svg>

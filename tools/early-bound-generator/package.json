@@ -1,0 +1,48 @@
+{
+  "name": "@power-maverick/tool-early-bound-generator",
+  "displayName": "Early Bound Generator",
+  "description": "Generate strongly-typed C# early-bound classes for Dataverse entities, option sets, and messages",
+  "version": "0.0.1",
+  "license": "GPL-2.0",
+  "icon": "icons/ebg.svg",
+  "contributors": [
+    {
+      "name": "Matthew Wilding",
+      "url": "https://github.com/mbwilding"
+    }
+  ],
+  "configurations": {
+    "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/early-bound-generator",
+    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/early-bound-generator/README.md"
+  },
+  "features": {
+    "multiConnection": "none"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "npm run typecheck && vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "dev": "vite",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "files": [
+    "dist",
+    "npm-shrinkwrap.json"
+  ],
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@pptb/types": "^1.0.20",
+    "@types/node": "^20.19.21",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "happy-dom": "^20.9.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.7",
+    "vitest": "^4.1.7"
+  }
+}
