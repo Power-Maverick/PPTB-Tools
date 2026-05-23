@@ -7,6 +7,9 @@ import { generateEntityFile } from "./entityGenerator";
 import { generateOptionSetsFile, generateEntityOptionSetsFile, generateSingleOptionSetFile, collectOptionSets } from "./optionSetGenerator";
 import { generateContextFile } from "./contextGenerator";
 import { generateMessageFile, generateMessagesFile } from "./messageGenerator";
+import { extractNamespaceBody } from "./helpers";
+import { joinPath } from "../utils/pathUtils";
+import { getErrorMessage } from "../utils/getErrorMessage";
 import type { SdkMessagePair } from "./types";
 
 export type LogFn = (message: string) => void;
@@ -140,14 +143,6 @@ function parseRelationships(raw: unknown): EntityMetadata["OneToManyRelationship
         Entity1NavigationPropertyName: r["Entity1NavigationPropertyName"] as string | undefined,
         Entity2NavigationPropertyName: r["Entity2NavigationPropertyName"] as string | undefined,
     }));
-}
-
-function joinPath(...parts: string[]): string {
-    return parts
-        .filter(Boolean)
-        .map((p) => p.replace(/\\/g, "/"))
-        .join("/")
-        .replace(/\/+/g, "/");
 }
 
 async function writeTextWithPermission(path: string, content: string, log: LogFn): Promise<void> {
@@ -393,12 +388,12 @@ export async function runCodegen(settings: EbgSettings, settingsDir: string, out
             if (settings.createOneFilePerMessage) {
                 log(`--- Messages (${messagePairs.length}) ---`);
                 for (const pair of messagePairs) {
-                    const content = generateMessageFile(pair, naming, settings, appVersion);
+                    const content = generateMessageFile(pair, settings, appVersion);
                     await writeTextWithPermission(joinPath(messageDir, `${pair.Request.Name}.cs`), content, log);
                 }
             } else {
                 log("--- Messages (combined) ---");
-                const content = generateMessagesFile(messagePairs, naming, settings, appVersion);
+                const content = generateMessagesFile(messagePairs, settings, appVersion);
                 await writeTextWithPermission(joinPath(messageDir, messageFolderAndFile.filename), content, log);
             }
         } else {
@@ -426,7 +421,7 @@ async function fetchSdkMessages(settings: EbgSettings, filter: FilterService, lo
         }
         return pairs;
     } catch (err) {
-        log(`\tWarning: Could not fetch SDK messages: ${err instanceof Error ? err.message : String(err)}`);
+        log(`\tWarning: Could not fetch SDK messages: ${getErrorMessage(err)}`);
         return [];
     }
 }
@@ -484,25 +479,4 @@ async function fetchMessagePair(messageName: string, _messageId: string): Promis
     } catch {
         return null;
     }
-}
-
-function extractNamespaceBody(fileContent: string, namespace_: string): string {
-    const nsLine = `namespace ${namespace_}`;
-    const start = fileContent.indexOf(nsLine);
-    if (start === -1) return fileContent;
-    const braceStart = fileContent.indexOf("{", start);
-    if (braceStart === -1) return fileContent;
-    let depth = 0;
-    let end = braceStart;
-    for (let i = braceStart; i < fileContent.length; i++) {
-        if (fileContent[i] === "{") depth++;
-        else if (fileContent[i] === "}") {
-            depth--;
-            if (depth === 0) {
-                end = i;
-                break;
-            }
-        }
-    }
-    return fileContent.slice(braceStart + 1, end).trimEnd();
 }

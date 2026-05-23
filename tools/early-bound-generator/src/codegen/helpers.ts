@@ -22,6 +22,29 @@ export function isObsolete(displayName: string | undefined, obsoleteTokens: stri
     return false;
 }
 
+export function extractNamespaceBody(fileContent: string, namespace_: string): string {
+    const nsLine = `namespace ${namespace_}`;
+    const start = fileContent.indexOf(nsLine);
+    if (start === -1) return fileContent;
+
+    const braceStart = fileContent.indexOf("{", start);
+    if (braceStart === -1) return fileContent;
+
+    let depth = 0;
+    let end = braceStart;
+    for (let i = braceStart; i < fileContent.length; i++) {
+        if (fileContent[i] === "{") depth++;
+        else if (fileContent[i] === "}") {
+            depth--;
+            if (depth === 0) {
+                end = i;
+                break;
+            }
+        }
+    }
+    return fileContent.slice(braceStart + 1, end).trimEnd();
+}
+
 export function codeFileHeader(namespace_: string): string[] {
     return [
         "#nullable enable",

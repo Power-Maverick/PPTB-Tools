@@ -17,7 +17,6 @@ namespace DataverseModel
 	
 	[System.Runtime.Serialization.DataContractAttribute()]
 	[Microsoft.Xrm.Sdk.Client.RequestProxyAttribute("contoso_TriggerSync")]
-	[System.CodeDom.Compiler.GeneratedCodeAttribute("Dataverse Model Builder", "0.0.0")]
 	public partial class contoso_TriggerSyncRequest : Microsoft.Xrm.Sdk.OrganizationRequest
 	{
 		public static class Fields
@@ -34,7 +33,6 @@ namespace DataverseModel
 	
 	[System.Runtime.Serialization.DataContractAttribute()]
 	[Microsoft.Xrm.Sdk.Client.ResponseProxyAttribute("contoso_TriggerSync")]
-	[System.CodeDom.Compiler.GeneratedCodeAttribute("Dataverse Model Builder", "0.0.0")]
 	public partial class contoso_TriggerSyncResponse : Microsoft.Xrm.Sdk.OrganizationResponse
 	{
 		public static class Fields
@@ -64,7 +62,6 @@ namespace DataverseModel
 	
 	[System.Runtime.Serialization.DataContractAttribute()]
 	[Microsoft.Xrm.Sdk.Client.RequestProxyAttribute("contoso_CalculateCommission")]
-	[System.CodeDom.Compiler.GeneratedCodeAttribute("Dataverse Model Builder", "0.0.0")]
 	public partial class contoso_CalculateCommissionRequest : Microsoft.Xrm.Sdk.OrganizationRequest
 	{
 		public static class Fields
@@ -113,7 +110,6 @@ namespace DataverseModel
 	
 	[System.Runtime.Serialization.DataContractAttribute()]
 	[Microsoft.Xrm.Sdk.Client.ResponseProxyAttribute("contoso_CalculateCommission")]
-	[System.CodeDom.Compiler.GeneratedCodeAttribute("Dataverse Model Builder", "0.0.0")]
 	public partial class contoso_CalculateCommissionResponse : Microsoft.Xrm.Sdk.OrganizationResponse
 	{
 		public static class Fields
@@ -176,7 +172,6 @@ namespace DataverseModel
 	
 	[System.Runtime.Serialization.DataContractAttribute()]
 	[Microsoft.Xrm.Sdk.Client.RequestProxyAttribute("contoso_CalculateCommission")]
-	[System.CodeDom.Compiler.GeneratedCodeAttribute("Dataverse Model Builder", "0.0.0")]
 	public partial class contoso_CalculateCommissionRequest : Microsoft.Xrm.Sdk.OrganizationRequest
 	{
 		public static class Fields
@@ -225,7 +220,6 @@ namespace DataverseModel
 	
 	[System.Runtime.Serialization.DataContractAttribute()]
 	[Microsoft.Xrm.Sdk.Client.ResponseProxyAttribute("contoso_CalculateCommission")]
-	[System.CodeDom.Compiler.GeneratedCodeAttribute("Dataverse Model Builder", "0.0.0")]
 	public partial class contoso_CalculateCommissionResponse : Microsoft.Xrm.Sdk.OrganizationResponse
 	{
 		public static class Fields
@@ -270,7 +264,6 @@ namespace DataverseModel
 	
 	[System.Runtime.Serialization.DataContractAttribute()]
 	[Microsoft.Xrm.Sdk.Client.RequestProxyAttribute("contoso_TriggerSync")]
-	[System.CodeDom.Compiler.GeneratedCodeAttribute("Dataverse Model Builder", "0.0.0")]
 	public partial class contoso_TriggerSyncRequest : Microsoft.Xrm.Sdk.OrganizationRequest
 	{
 		public static class Fields
@@ -287,7 +280,6 @@ namespace DataverseModel
 	
 	[System.Runtime.Serialization.DataContractAttribute()]
 	[Microsoft.Xrm.Sdk.Client.ResponseProxyAttribute("contoso_TriggerSync")]
-	[System.CodeDom.Compiler.GeneratedCodeAttribute("Dataverse Model Builder", "0.0.0")]
 	public partial class contoso_TriggerSyncResponse : Microsoft.Xrm.Sdk.OrganizationResponse
 	{
 		public static class Fields

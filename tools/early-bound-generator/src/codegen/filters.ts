@@ -102,6 +102,8 @@ export class FilterService {
     private readonly attrBlacklist: AttributeBlacklistLogic;
     private readonly entityBlacklist: BlacklistLogic;
     private readonly messageBlacklist: BlacklistLogic;
+    private readonly entityPrefixWhitelistPatterns: RegExp[];
+    private readonly messagePrefixWhitelistPatterns: RegExp[];
     private readonly settings: EbgSettings;
 
     constructor(settings: EbgSettings) {
@@ -112,6 +114,9 @@ export class FilterService {
         this.entityBlacklist = buildBlacklistLogic(settings.entitiesToSkip, settings.entityPrefixesToSkip);
 
         this.messageBlacklist = buildBlacklistLogic(settings.messagesToSkip, []);
+
+        this.entityPrefixWhitelistPatterns = injectMissingWildcards(settings.entityPrefixesWhitelist);
+        this.messagePrefixWhitelistPatterns = injectMissingWildcards(settings.messagePrefixesWhitelist);
     }
 
     shouldGenerateEntity(entity: EntityMetadata): boolean {
@@ -122,8 +127,7 @@ export class FilterService {
 
         if (hasWhitelist || hasPrefixWhitelist) {
             const inExact = hasWhitelist && this.settings.entitiesWhitelist.some((w) => w.toLowerCase() === logical);
-            const prefixPatterns = injectMissingWildcards(this.settings.entityPrefixesWhitelist);
-            const inPrefix = hasPrefixWhitelist && prefixPatterns.some((r) => r.test(logical));
+            const inPrefix = hasPrefixWhitelist && this.entityPrefixWhitelistPatterns.some((r) => r.test(logical));
             if (!inExact && !inPrefix) return false;
         }
 
@@ -159,8 +163,7 @@ export class FilterService {
 
         if (hasWhitelist || hasPrefixWhitelist) {
             const inExact = hasWhitelist && this.settings.messagesWhitelist.some((w) => w.toLowerCase() === lower);
-            const prefixPatterns = injectMissingWildcards(this.settings.messagePrefixesWhitelist);
-            const inPrefix = hasPrefixWhitelist && prefixPatterns.some((r) => r.test(lower));
+            const inPrefix = hasPrefixWhitelist && this.messagePrefixWhitelistPatterns.some((r) => r.test(lower));
             if (!inExact && !inPrefix) return false;
         }
 

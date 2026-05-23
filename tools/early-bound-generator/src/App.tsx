@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { type EbgSettings, DEFAULT_SETTINGS } from "./models/interfaces";
 import { settingsToXml, xmlToSettings } from "./utils/xmlSerializer";
+import { joinPath, getDirname } from "./utils/pathUtils";
+import { getErrorMessage } from "./utils/getErrorMessage";
 import { PropertySection } from "./components/PropertySection";
 import { SettingRow } from "./components/SettingRow";
+import { BoolSettingRow } from "./components/BoolSettingRow";
 import { SettingsToolbar } from "./components/SettingsToolbar";
 import { StringListEditor } from "./components/StringListEditor";
 import { TerminalPanel } from "./components/TerminalPanel";
@@ -15,17 +18,7 @@ import "./styles.css";
 
 type EntityPickerTarget = "entitiesWhitelist" | "entitiesToSkip";
 
-function getDirname(p: string): string {
-    const idx = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
-    return idx > 0 ? p.substring(0, idx) : p;
-}
-
-function joinPaths(a: string, b: string): string {
-    const sep = a.includes("\\") ? "\\" : "/";
-    return a.replace(/[/\\]+$/, "") + sep + b.replace(/^[/\\]+/, "");
-}
-
-const SETTINGS_FILENAME = "DLaB.EBG.Settings.xml";
+const SETTINGS_FILENAME = "settings.xml";
 
 function App() {
     const [settings, setSettings] = useState<EbgSettings>(DEFAULT_SETTINGS);
@@ -46,13 +39,13 @@ function App() {
     const loadSettingsFromFile = useCallback(async (dir: string, filename: string) => {
         if (!window.toolboxAPI) return;
         try {
-            const raw = await window.toolboxAPI.fileSystem.readText(joinPaths(dir, filename));
+            const raw = await window.toolboxAPI.fileSystem.readText(joinPath(dir, filename));
             const { settings: loaded } = xmlToSettings(raw);
             setSettings(loaded);
             setSettingsFileName(filename);
             setError("");
         } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
+            const msg = getErrorMessage(err);
             setError(`Failed to load settings: ${msg}`);
         }
     }, []);
@@ -76,7 +69,7 @@ function App() {
                     setXmlCandidates(xmlFiles);
                 }
             } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err);
+                const msg = getErrorMessage(err);
                 setError(`Failed to read directory: ${msg}`);
             }
         },
@@ -107,7 +100,7 @@ function App() {
             if (!dir) return;
             await loadSettingsFromDir(dir);
         } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
+            const msg = getErrorMessage(err);
             setError(msg);
         }
     };
@@ -117,7 +110,7 @@ function App() {
         const xml = settingsToXml(settings, __APP_VERSION__);
         try {
             if (settingsDir) {
-                const filePath = joinPaths(settingsDir, settingsFileName);
+                const filePath = joinPath(settingsDir, settingsFileName);
                 await window.toolboxAPI.fileSystem.writeText(filePath, xml);
                 await window.toolboxAPI.utils.showNotification({ title: "Saved", body: filePath, type: "success" });
             } else {
@@ -130,7 +123,7 @@ function App() {
                 }
             }
         } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
+            const msg = getErrorMessage(err);
             setError(msg);
         }
     };
@@ -157,10 +150,10 @@ function App() {
                 return;
             }
 
-            const settingsFilePath = joinPaths(settingsDir, settingsFileName);
+            const settingsFilePath = joinPath(settingsDir, settingsFileName);
             await window.toolboxAPI.fileSystem.writeText(settingsFilePath, settingsToXml(settings, __APP_VERSION__));
 
-            const outputDir = settings.outputRelativeDirectory ? joinPaths(settingsDir, settings.outputRelativeDirectory) : settingsDir;
+            const outputDir = settings.outputRelativeDirectory ? joinPath(settingsDir, settings.outputRelativeDirectory) : settingsDir;
 
             const log = (line: string) => {
                 setTerminalOutput((prev) => (prev ? prev + "\n" + line : line));
@@ -174,7 +167,7 @@ function App() {
                 type: "success",
             });
         } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
+            const msg = getErrorMessage(err);
             setError(msg);
             setTerminalOutput(msg);
         } finally {
@@ -215,7 +208,7 @@ function App() {
         <div className="page-layout">
             <SettingsToolbar
                 isGenerating={isGenerating}
-                settingsPath={settingsDir ? joinPaths(settingsDir, settingsFileName) : ""}
+                settingsPath={settingsDir ? joinPath(settingsDir, settingsFileName) : ""}
                 onGenerate={handleGenerate}
                 onOpenSettings={handleOpenSettings}
                 onSaveSettings={handleSaveSettings}
@@ -251,67 +244,63 @@ function App() {
                                 title="Select builder settings JSON file"
                             />
                         </SettingRow>
-                        <SettingRow label="Suppress Generated Code Attribute" hint="Omit [System.CodeDom.Compiler.GeneratedCode] from generated files">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.suppressGeneratedCodeAttribute} onChange={(e) => updateSetting({ suppressGeneratedCodeAttribute: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Remove Runtime Version Comment" hint="Strip the runtime version comment from generated file headers">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.removeRuntimeVersionComment} onChange={(e) => updateSetting({ removeRuntimeVersionComment: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Suppress Auto-Generated File Header" hint="Suppress the auto-generated file header comment entirely">
-                            <label className="form-checkbox">
-                                <input
-                                    type="checkbox"
-                                    checked={settings.suppressAutogeneratedFileHeaderComment}
-                                    onChange={(e) => updateSetting({ suppressAutogeneratedFileHeaderComment: e.target.checked })}
-                                />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Generate Types As Internal" hint="Emit all generated types with internal rather than public visibility">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.generateTypesAsInternal} onChange={(e) => updateSetting({ generateTypesAsInternal: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Include Command Line" hint="Embed the pac command line in generated file headers">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.includeCommandLine} onChange={(e) => updateSetting({ includeCommandLine: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
+                        <BoolSettingRow
+                            label="Suppress Generated Code Attribute"
+                            hint="Omit [System.CodeDom.Compiler.GeneratedCode] from generated files"
+                            checked={settings.suppressGeneratedCodeAttribute}
+                            onChange={(v) => updateSetting({ suppressGeneratedCodeAttribute: v })}
+                        />
+                        <BoolSettingRow
+                            label="Remove Runtime Version Comment"
+                            hint="Strip the runtime version comment from generated file headers"
+                            checked={settings.removeRuntimeVersionComment}
+                            onChange={(v) => updateSetting({ removeRuntimeVersionComment: v })}
+                        />
+                        <BoolSettingRow
+                            label="Suppress Auto-Generated File Header"
+                            hint="Suppress the auto-generated file header comment entirely"
+                            checked={settings.suppressAutogeneratedFileHeaderComment}
+                            onChange={(v) => updateSetting({ suppressAutogeneratedFileHeaderComment: v })}
+                        />
+                        <BoolSettingRow
+                            label="Generate Types As Internal"
+                            hint="Emit all generated types with internal rather than public visibility"
+                            checked={settings.generateTypesAsInternal}
+                            onChange={(v) => updateSetting({ generateTypesAsInternal: v })}
+                        />
+                        <BoolSettingRow
+                            label="Include Command Line"
+                            hint="Embed the pac command line in generated file headers"
+                            checked={settings.includeCommandLine}
+                            onChange={(v) => updateSetting({ includeCommandLine: v })}
+                        />
                         <SettingRow label="File Prefix Text" hint="Text prepended to every generated file name">
                             <input className="form-input" value={settings.filePrefixText} placeholder="(none)" onChange={(e) => updateSetting({ filePrefixText: e.target.value })} />
                         </SettingRow>
-                        <SettingRow label="Make Reference Types Nullable" hint="Add C# nullable annotations to reference-type properties">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.makeReferenceTypesNullable} onChange={(e) => updateSetting({ makeReferenceTypesNullable: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Use Display Name For BPF Name" hint="Use the display name when naming Business Process Flow entities">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.useDisplayNameForBpfName} onChange={(e) => updateSetting({ useDisplayNameForBpfName: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Add New Files To Project" hint="Add newly generated .cs files to the target .csproj automatically">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.addNewFilesToProject} onChange={(e) => updateSetting({ addNewFilesToProject: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Delete Files From Output Folders" hint="Remove stale generated files from output folders">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.deleteFilesFromOutputFolders} onChange={(e) => updateSetting({ deleteFilesFromOutputFolders: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
+                        <BoolSettingRow
+                            label="Make Reference Types Nullable"
+                            hint="Add C# nullable annotations to reference-type properties"
+                            checked={settings.makeReferenceTypesNullable}
+                            onChange={(v) => updateSetting({ makeReferenceTypesNullable: v })}
+                        />
+                        <BoolSettingRow
+                            label="Use Display Name For BPF Name"
+                            hint="Use the display name when naming Business Process Flow entities"
+                            checked={settings.useDisplayNameForBpfName}
+                            onChange={(v) => updateSetting({ useDisplayNameForBpfName: v })}
+                        />
+                        <BoolSettingRow
+                            label="Add New Files To Project"
+                            hint="Add newly generated .cs files to the target .csproj automatically"
+                            checked={settings.addNewFilesToProject}
+                            onChange={(v) => updateSetting({ addNewFilesToProject: v })}
+                        />
+                        <BoolSettingRow
+                            label="Delete Files From Output Folders"
+                            hint="Remove stale generated files from output folders"
+                            checked={settings.deleteFilesFromOutputFolders}
+                            onChange={(v) => updateSetting({ deleteFilesFromOutputFolders: v })}
+                        />
                         <SettingRow label="Project Name For Early-Bound Files" hint=".csproj name to add generated files to (leave blank to auto-detect)">
                             <input
                                 className="form-input"
@@ -323,18 +312,18 @@ function App() {
                         <SettingRow label="Token Capitalisation Overrides" hint="Words treated as known tokens during CamelCase naming (e.g. SlaId, VoiceMail)">
                             <StringListEditor items={settings.tokenCapitalizationOverrides} onChange={(items) => updateSetting({ tokenCapitalizationOverrides: items })} placeholder="Add token..." />
                         </SettingRow>
-                        <SettingRow label="CamelCase Class Names" hint="Apply CamelCase formatting to generated class names">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.camelCaseClassNames} onChange={(e) => updateSetting({ camelCaseClassNames: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="CamelCase Member Names" hint="Apply CamelCase formatting to generated property and member names">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.camelCaseMemberNames} onChange={(e) => updateSetting({ camelCaseMemberNames: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
+                        <BoolSettingRow
+                            label="CamelCase Class Names"
+                            hint="Apply CamelCase formatting to generated class names"
+                            checked={settings.camelCaseClassNames}
+                            onChange={(v) => updateSetting({ camelCaseClassNames: v })}
+                        />
+                        <BoolSettingRow
+                            label="CamelCase Member Names"
+                            hint="Apply CamelCase formatting to generated property and member names"
+                            checked={settings.camelCaseMemberNames}
+                            onChange={(v) => updateSetting({ camelCaseMemberNames: v })}
+                        />
                         <SettingRow label="CamelCase Custom Words" hint="Additional words recognised as tokens during CamelCase naming">
                             <StringListEditor items={settings.camelCaseCustomWords} onChange={(items) => updateSetting({ camelCaseCustomWords: items })} placeholder="Add word..." />
                         </SettingRow>
@@ -356,12 +345,12 @@ function App() {
                         <SettingRow label="Entity Types Folder" hint="Sub-folder name for generated entity class files">
                             <input className="form-input" value={settings.entityTypesFolder} onChange={(e) => updateSetting({ entityTypesFolder: e.target.value })} />
                         </SettingRow>
-                        <SettingRow label="One File Per Entity" hint="Emit a separate .cs file for each entity (vs a single combined file)">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.createOneFilePerEntity} onChange={(e) => updateSetting({ createOneFilePerEntity: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
+                        <BoolSettingRow
+                            label="One File Per Entity"
+                            hint="Emit a separate .cs file for each entity (vs a single combined file)"
+                            checked={settings.createOneFilePerEntity}
+                            onChange={(v) => updateSetting({ createOneFilePerEntity: v })}
+                        />
                         <SettingRow label="Entities Whitelist" hint="Generate only these entities — leave empty to generate all entities">
                             <div className="entity-picker-row">
                                 <StringListEditor items={settings.entitiesWhitelist} onChange={(items) => updateSetting({ entitiesWhitelist: items })} placeholder="Add entity logical name..." />
@@ -400,120 +389,108 @@ function App() {
                         <SettingRow label="Attribute Blacklist" hint="Attribute logical names to always exclude across all entities">
                             <StringListEditor items={settings.attributeBlacklist} onChange={(items) => updateSetting({ attributeBlacklist: items })} placeholder="Add attribute logical name..." />
                         </SettingRow>
-                        <SettingRow label="Generate Attribute Name Consts" hint="Generate a Fields inner class with attribute logical name string constants">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.generateAttributeNameConsts} onChange={(e) => updateSetting({ generateAttributeNameConsts: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Generate Anonymous Type Constructor" hint="Generate a constructor that accepts an anonymous type initialiser">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.generateAnonymousTypeConstructor} onChange={(e) => updateSetting({ generateAnonymousTypeConstructor: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Generate Constructors Sans Logical Name" hint="Generate constructors that do not require the entity logical name argument">
-                            <label className="form-checkbox">
-                                <input
-                                    type="checkbox"
-                                    checked={settings.generateConstructorsSansLogicalName}
-                                    onChange={(e) => updateSetting({ generateConstructorsSansLogicalName: e.target.checked })}
-                                />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Generate Entity Relationships" hint="Generate relationship navigation properties on entity classes">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.generateEntityRelationships} onChange={(e) => updateSetting({ generateEntityRelationships: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Generate Enum Properties" hint="Generate typed enum properties for option set attributes">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.generateEnumProperties} onChange={(e) => updateSetting({ generateEnumProperties: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Replace Option Set Properties With Enum" hint="Replace OptionSetValue properties with the generated enum type">
-                            <label className="form-checkbox">
-                                <input
-                                    type="checkbox"
-                                    checked={settings.replaceOptionSetPropertiesWithEnum}
-                                    onChange={(e) => updateSetting({ replaceOptionSetPropertiesWithEnum: e.target.checked })}
-                                />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Generate INotify Pattern" hint="Implement INotifyPropertyChanged on all entity classes">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.generateINotifyPattern} onChange={(e) => updateSetting({ generateINotifyPattern: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Emit Virtual Attributes" hint="Include virtual/composite attributes (e.g. fullname) in generated classes">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.emitVirtualAttributes} onChange={(e) => updateSetting({ emitVirtualAttributes: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Emit Entity ETC" hint="Emit the entity type code constant in generated classes">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.emitEntityETC} onChange={(e) => updateSetting({ emitEntityETC: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Make All Fields Editable" hint="Generate all fields (including calculated/rollup) as settable properties">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.makeAllFieldsEditable} onChange={(e) => updateSetting({ makeAllFieldsEditable: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Make Read-Only Fields Editable" hint="Generate read-only fields as settable properties">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.makeReadonlyFieldsEditable} onChange={(e) => updateSetting({ makeReadonlyFieldsEditable: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Use Logical Names" hint="Name generated properties using attribute logical names instead of schema names">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.useLogicalNames} onChange={(e) => updateSetting({ useLogicalNames: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Use Enum For State Codes" hint="Generate enums for statecode and statuscode attributes">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.useEnumForStateCodes} onChange={(e) => updateSetting({ useEnumForStateCodes: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Use CrmSvcUtil State Enum Naming" hint="Use CrmSvcUtil-compatible naming convention for state/status enums">
-                            <label className="form-checkbox">
-                                <input
-                                    type="checkbox"
-                                    checked={settings.useCrmSvcUtilStateEnumNamingConvention}
-                                    onChange={(e) => updateSetting({ useCrmSvcUtilStateEnumNamingConvention: e.target.checked })}
-                                />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Obsolete Deprecated" hint="Mark deprecated entities and attributes with [Obsolete]">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.obsoleteDeprecated} onChange={(e) => updateSetting({ obsoleteDeprecated: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
+                        <BoolSettingRow
+                            label="Generate Attribute Name Consts"
+                            hint="Generate a Fields inner class with attribute logical name string constants"
+                            checked={settings.generateAttributeNameConsts}
+                            onChange={(v) => updateSetting({ generateAttributeNameConsts: v })}
+                        />
+                        <BoolSettingRow
+                            label="Generate Anonymous Type Constructor"
+                            hint="Generate a constructor that accepts an anonymous type initialiser"
+                            checked={settings.generateAnonymousTypeConstructor}
+                            onChange={(v) => updateSetting({ generateAnonymousTypeConstructor: v })}
+                        />
+                        <BoolSettingRow
+                            label="Generate Constructors Sans Logical Name"
+                            hint="Generate constructors that do not require the entity logical name argument"
+                            checked={settings.generateConstructorsSansLogicalName}
+                            onChange={(v) => updateSetting({ generateConstructorsSansLogicalName: v })}
+                        />
+                        <BoolSettingRow
+                            label="Generate Entity Relationships"
+                            hint="Generate relationship navigation properties on entity classes"
+                            checked={settings.generateEntityRelationships}
+                            onChange={(v) => updateSetting({ generateEntityRelationships: v })}
+                        />
+                        <BoolSettingRow
+                            label="Generate Enum Properties"
+                            hint="Generate typed enum properties for option set attributes"
+                            checked={settings.generateEnumProperties}
+                            onChange={(v) => updateSetting({ generateEnumProperties: v })}
+                        />
+                        <BoolSettingRow
+                            label="Replace Option Set Properties With Enum"
+                            hint="Replace OptionSetValue properties with the generated enum type"
+                            checked={settings.replaceOptionSetPropertiesWithEnum}
+                            onChange={(v) => updateSetting({ replaceOptionSetPropertiesWithEnum: v })}
+                        />
+                        <BoolSettingRow
+                            label="Generate INotify Pattern"
+                            hint="Implement INotifyPropertyChanged on all entity classes"
+                            checked={settings.generateINotifyPattern}
+                            onChange={(v) => updateSetting({ generateINotifyPattern: v })}
+                        />
+                        <BoolSettingRow
+                            label="Emit Virtual Attributes"
+                            hint="Include virtual/composite attributes (e.g. fullname) in generated classes"
+                            checked={settings.emitVirtualAttributes}
+                            onChange={(v) => updateSetting({ emitVirtualAttributes: v })}
+                        />
+                        <BoolSettingRow
+                            label="Emit Entity ETC"
+                            hint="Emit the entity type code constant in generated classes"
+                            checked={settings.emitEntityETC}
+                            onChange={(v) => updateSetting({ emitEntityETC: v })}
+                        />
+                        <BoolSettingRow
+                            label="Make All Fields Editable"
+                            hint="Generate all fields (including calculated/rollup) as settable properties"
+                            checked={settings.makeAllFieldsEditable}
+                            onChange={(v) => updateSetting({ makeAllFieldsEditable: v })}
+                        />
+                        <BoolSettingRow
+                            label="Make Read-Only Fields Editable"
+                            hint="Generate read-only fields as settable properties"
+                            checked={settings.makeReadonlyFieldsEditable}
+                            onChange={(v) => updateSetting({ makeReadonlyFieldsEditable: v })}
+                        />
+                        <BoolSettingRow
+                            label="Use Logical Names"
+                            hint="Name generated properties using attribute logical names instead of schema names"
+                            checked={settings.useLogicalNames}
+                            onChange={(v) => updateSetting({ useLogicalNames: v })}
+                        />
+                        <BoolSettingRow
+                            label="Use Enum For State Codes"
+                            hint="Generate enums for statecode and statuscode attributes"
+                            checked={settings.useEnumForStateCodes}
+                            onChange={(v) => updateSetting({ useEnumForStateCodes: v })}
+                        />
+                        <BoolSettingRow
+                            label="Use CrmSvcUtil State Enum Naming"
+                            hint="Use CrmSvcUtil-compatible naming convention for state/status enums"
+                            checked={settings.useCrmSvcUtilStateEnumNamingConvention}
+                            onChange={(v) => updateSetting({ useCrmSvcUtilStateEnumNamingConvention: v })}
+                        />
+                        <BoolSettingRow
+                            label="Obsolete Deprecated"
+                            hint="Mark deprecated entities and attributes with [Obsolete]"
+                            checked={settings.obsoleteDeprecated}
+                            onChange={(v) => updateSetting({ obsoleteDeprecated: v })}
+                        />
                         <SettingRow label="Obsolete Tokens" hint="Display name tokens that flag deprecation (e.g. *(Deprecated)*)">
                             <StringListEditor items={settings.obsoleteTokens} onChange={(items) => updateSetting({ obsoleteTokens: items })} placeholder="Add token..." />
                         </SettingRow>
                         <SettingRow label="Property Enum Mappings" hint="Manual enum-to-property mappings (format: EntityName.PropertyName=EnumType)">
                             <StringListEditor items={settings.propertyEnumMappings} onChange={(items) => updateSetting({ propertyEnumMappings: items })} placeholder="Add mapping..." />
                         </SettingRow>
-                        <SettingRow label="Add Debugger Non-User Code" hint="Apply [DebuggerNonUserCode] to suppress stepping into generated code">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.addDebuggerNonUserCode} onChange={(e) => updateSetting({ addDebuggerNonUserCode: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
+                        <BoolSettingRow
+                            label="Add Debugger Non-User Code"
+                            hint="Apply [DebuggerNonUserCode] to suppress stepping into generated code"
+                            checked={settings.addDebuggerNonUserCode}
+                            onChange={(v) => updateSetting({ addDebuggerNonUserCode: v })}
+                        />
                     </PropertySection>
 
                     {}
@@ -521,58 +498,54 @@ function App() {
                         <SettingRow label="Option Sets Folder" hint="Sub-folder name for generated option set enum files">
                             <input className="form-input" value={settings.optionSetsTypesFolder} onChange={(e) => updateSetting({ optionSetsTypesFolder: e.target.value })} />
                         </SettingRow>
-                        <SettingRow label="One File Per Option Set" hint="Emit a separate .cs file for each option set enum">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.createOneFilePerOptionSet} onChange={(e) => updateSetting({ createOneFilePerOptionSet: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Generate Global Option Sets" hint="Include global (not entity-local) option sets in the output">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.generateGlobalOptionSets} onChange={(e) => updateSetting({ generateGlobalOptionSets: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Generate Option Set Metadata Attribute" hint="Generate metadata attributes on generated enum values">
-                            <label className="form-checkbox">
-                                <input
-                                    type="checkbox"
-                                    checked={settings.generateOptionSetMetadataAttribute}
-                                    onChange={(e) => updateSetting({ generateOptionSetMetadataAttribute: e.target.checked })}
-                                />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Add Option Set Metadata Attribute" hint="Apply [OptionSetMetadataAttribute] to generated enums">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.addOptionSetMetadataAttribute} onChange={(e) => updateSetting({ addOptionSetMetadataAttribute: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Generate All Option Set Label Metadata" hint="Include all language labels for option set values (not just the default language)">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.generateAllOptionSetLabelMetadata} onChange={(e) => updateSetting({ generateAllOptionSetLabelMetadata: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Adjust Casing For Enum Options" hint="Apply CamelCase formatting to enum value names">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.adjustCasingForEnumOptions} onChange={(e) => updateSetting({ adjustCasingForEnumOptions: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Group Local Option Sets By Entity" hint="Place local option sets inside an entity-named sub-namespace">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.groupLocalOptionSetsByEntity} onChange={(e) => updateSetting({ groupLocalOptionSetsByEntity: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Cleanup CrmSvcUtil Local Option Sets" hint="Remove old CrmSvcUtil-generated local option set files on regeneration">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.cleanupCrmSvcUtilLocalOptionSets} onChange={(e) => updateSetting({ cleanupCrmSvcUtilLocalOptionSets: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
+                        <BoolSettingRow
+                            label="One File Per Option Set"
+                            hint="Emit a separate .cs file for each option set enum"
+                            checked={settings.createOneFilePerOptionSet}
+                            onChange={(v) => updateSetting({ createOneFilePerOptionSet: v })}
+                        />
+                        <BoolSettingRow
+                            label="Generate Global Option Sets"
+                            hint="Include global (not entity-local) option sets in the output"
+                            checked={settings.generateGlobalOptionSets}
+                            onChange={(v) => updateSetting({ generateGlobalOptionSets: v })}
+                        />
+                        <BoolSettingRow
+                            label="Generate Option Set Metadata Attribute"
+                            hint="Generate metadata attributes on generated enum values"
+                            checked={settings.generateOptionSetMetadataAttribute}
+                            onChange={(v) => updateSetting({ generateOptionSetMetadataAttribute: v })}
+                        />
+                        <BoolSettingRow
+                            label="Add Option Set Metadata Attribute"
+                            hint="Apply [OptionSetMetadataAttribute] to generated enums"
+                            checked={settings.addOptionSetMetadataAttribute}
+                            onChange={(v) => updateSetting({ addOptionSetMetadataAttribute: v })}
+                        />
+                        <BoolSettingRow
+                            label="Generate All Option Set Label Metadata"
+                            hint="Include all language labels for option set values (not just the default language)"
+                            checked={settings.generateAllOptionSetLabelMetadata}
+                            onChange={(v) => updateSetting({ generateAllOptionSetLabelMetadata: v })}
+                        />
+                        <BoolSettingRow
+                            label="Adjust Casing For Enum Options"
+                            hint="Apply CamelCase formatting to enum value names"
+                            checked={settings.adjustCasingForEnumOptions}
+                            onChange={(v) => updateSetting({ adjustCasingForEnumOptions: v })}
+                        />
+                        <BoolSettingRow
+                            label="Group Local Option Sets By Entity"
+                            hint="Place local option sets inside an entity-named sub-namespace"
+                            checked={settings.groupLocalOptionSetsByEntity}
+                            onChange={(v) => updateSetting({ groupLocalOptionSetsByEntity: v })}
+                        />
+                        <BoolSettingRow
+                            label="Cleanup CrmSvcUtil Local Option Sets"
+                            hint="Remove old CrmSvcUtil-generated local option set files on regeneration"
+                            checked={settings.cleanupCrmSvcUtilLocalOptionSets}
+                            onChange={(v) => updateSetting({ cleanupCrmSvcUtilLocalOptionSets: v })}
+                        />
                         <SettingRow label="Invalid C# Name Prefix" hint="Prefix applied to enum values that start with an invalid C# identifier character">
                             <input className="form-input" value={settings.invalidCSharpNamePrefix} onChange={(e) => updateSetting({ invalidCSharpNamePrefix: e.target.value })} />
                         </SettingRow>
@@ -626,21 +599,21 @@ function App() {
 
                     {}
                     <PropertySection title="Messages">
-                        <SettingRow label="Generate Messages" hint="Generate Request/Response classes for Dataverse messages, Actions, and Custom APIs">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.generateMessages} onChange={(e) => updateSetting({ generateMessages: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
+                        <BoolSettingRow
+                            label="Generate Messages"
+                            hint="Generate Request/Response classes for Dataverse messages, Actions, and Custom APIs"
+                            checked={settings.generateMessages}
+                            onChange={(v) => updateSetting({ generateMessages: v })}
+                        />
                         <SettingRow label="Message Types Folder" hint="Sub-folder name for generated message class files">
                             <input className="form-input" value={settings.messageTypesFolder} onChange={(e) => updateSetting({ messageTypesFolder: e.target.value })} />
                         </SettingRow>
-                        <SettingRow label="One File Per Message" hint="Emit a separate .cs file for each message">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.createOneFilePerMessage} onChange={(e) => updateSetting({ createOneFilePerMessage: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
+                        <BoolSettingRow
+                            label="One File Per Message"
+                            hint="Emit a separate .cs file for each message"
+                            checked={settings.createOneFilePerMessage}
+                            onChange={(v) => updateSetting({ createOneFilePerMessage: v })}
+                        />
                         <SettingRow label="Messages Whitelist" hint="Only generate these messages — leave empty to generate all messages">
                             <StringListEditor items={settings.messagesWhitelist} onChange={(items) => updateSetting({ messagesWhitelist: items })} placeholder="Add message name..." />
                         </SettingRow>
@@ -650,28 +623,24 @@ function App() {
                         <SettingRow label="Message Prefixes Whitelist" hint="Only generate messages whose name starts with these prefixes">
                             <StringListEditor items={settings.messagePrefixesWhitelist} onChange={(items) => updateSetting({ messagePrefixesWhitelist: items })} placeholder="Add prefix..." />
                         </SettingRow>
-                        <SettingRow label="Group Request With Response" hint="Place Request and Response classes in the same generated file">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.groupMessageRequestWithResponse} onChange={(e) => updateSetting({ groupMessageRequestWithResponse: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Generate Message Attribute Name Consts" hint="Generate a Fields inner class for message parameter name constants">
-                            <label className="form-checkbox">
-                                <input
-                                    type="checkbox"
-                                    checked={settings.generateMessageAttributeNameConsts}
-                                    onChange={(e) => updateSetting({ generateMessageAttributeNameConsts: e.target.checked })}
-                                />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Make Response Messages Editable" hint="Generate settable properties on Response message classes">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.makeResponseMessagesEditable} onChange={(e) => updateSetting({ makeResponseMessagesEditable: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
+                        <BoolSettingRow
+                            label="Group Request With Response"
+                            hint="Place Request and Response classes in the same generated file"
+                            checked={settings.groupMessageRequestWithResponse}
+                            onChange={(v) => updateSetting({ groupMessageRequestWithResponse: v })}
+                        />
+                        <BoolSettingRow
+                            label="Generate Message Attribute Name Consts"
+                            hint="Generate a Fields inner class for message parameter name constants"
+                            checked={settings.generateMessageAttributeNameConsts}
+                            onChange={(v) => updateSetting({ generateMessageAttributeNameConsts: v })}
+                        />
+                        <BoolSettingRow
+                            label="Make Response Messages Editable"
+                            hint="Generate settable properties on Response message classes"
+                            checked={settings.makeResponseMessagesEditable}
+                            onChange={(v) => updateSetting({ makeResponseMessagesEditable: v })}
+                        />
                     </PropertySection>
 
                     {}
@@ -711,30 +680,30 @@ function App() {
                         <SettingRow label="Model Builder Log Level" hint="Verbosity for pac modelbuilder logging: 0 = quiet, 5 = verbose">
                             <input className="form-input" value={settings.modelBuilderLogLevel} onChange={(e) => updateSetting({ modelBuilderLogLevel: e.target.value })} />
                         </SettingRow>
-                        <SettingRow label="Update Builder Settings JSON" hint="Write the builderSettings.json file before running pac modelbuilder">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.updateBuilderSettingsJson} onChange={(e) => updateSetting({ updateBuilderSettingsJson: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Read Serialised Metadata" hint="Read metadata from a previously serialised file instead of from Dataverse">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.readSerializedMetadata} onChange={(e) => updateSetting({ readSerializedMetadata: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Serialise Metadata" hint="Write the retrieved metadata to disk for use with Read Serialised Metadata">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.serializeMetadata} onChange={(e) => updateSetting({ serializeMetadata: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
-                        <SettingRow label="Wait For Attached Debugger" hint="Pause pac modelbuilder at startup until a .NET debugger attaches">
-                            <label className="form-checkbox">
-                                <input type="checkbox" checked={settings.waitForAttachedDebugger} onChange={(e) => updateSetting({ waitForAttachedDebugger: e.target.checked })} />
-                                Enabled
-                            </label>
-                        </SettingRow>
+                        <BoolSettingRow
+                            label="Update Builder Settings JSON"
+                            hint="Write the builderSettings.json file before running pac modelbuilder"
+                            checked={settings.updateBuilderSettingsJson}
+                            onChange={(v) => updateSetting({ updateBuilderSettingsJson: v })}
+                        />
+                        <BoolSettingRow
+                            label="Read Serialised Metadata"
+                            hint="Read metadata from a previously serialised file instead of from Dataverse"
+                            checked={settings.readSerializedMetadata}
+                            onChange={(v) => updateSetting({ readSerializedMetadata: v })}
+                        />
+                        <BoolSettingRow
+                            label="Serialise Metadata"
+                            hint="Write the retrieved metadata to disk for use with Read Serialised Metadata"
+                            checked={settings.serializeMetadata}
+                            onChange={(v) => updateSetting({ serializeMetadata: v })}
+                        />
+                        <BoolSettingRow
+                            label="Wait For Attached Debugger"
+                            hint="Pause pac modelbuilder at startup until a .NET debugger attaches"
+                            checked={settings.waitForAttachedDebugger}
+                            onChange={(v) => updateSetting({ waitForAttachedDebugger: v })}
+                        />
                     </PropertySection>
                 </div>
                 <TerminalPanel

@@ -1,10 +1,9 @@
 import type { EbgSettings } from "../models/interfaces";
 import type { SdkMessagePair } from "./types";
 import { CODEGEN_TOOL_NAME } from "./types";
-import { NamingService } from "./naming";
-import { T, T2, T3, T4, codeFileHeader } from "./helpers";
+import { T, T2, T3, T4, codeFileHeader, extractNamespaceBody } from "./helpers";
 
-export function generateMessageFile(messagePair: SdkMessagePair, _namingService: NamingService, settings: EbgSettings, appVersion: string): string {
+export function generateMessageFile(messagePair: SdkMessagePair, settings: EbgSettings, appVersion: string): string {
     const requestName = messagePair.Request.Name + "Request";
     const responseName = messagePair.Request.Name + "Response";
     const lines = codeFileHeader(settings.namespace);
@@ -12,7 +11,9 @@ export function generateMessageFile(messagePair: SdkMessagePair, _namingService:
     lines.push(`${T}`);
     lines.push(`${T}[System.Runtime.Serialization.DataContractAttribute()]`);
     lines.push(`${T}[Microsoft.Xrm.Sdk.Client.RequestProxyAttribute("${messagePair.Request.Name}")]`);
-    lines.push(`${T}[System.CodeDom.Compiler.GeneratedCodeAttribute("${CODEGEN_TOOL_NAME}", "${appVersion}")]`);
+    if (!settings.suppressGeneratedCodeAttribute) {
+        lines.push(`${T}[System.CodeDom.Compiler.GeneratedCodeAttribute("${CODEGEN_TOOL_NAME}", "${appVersion}")]`);
+    }
     lines.push(`${T}public partial class ${requestName} : Microsoft.Xrm.Sdk.OrganizationRequest`);
     lines.push(`${T}{`);
 
@@ -58,7 +59,9 @@ export function generateMessageFile(messagePair: SdkMessagePair, _namingService:
     lines.push(`${T}`);
     lines.push(`${T}[System.Runtime.Serialization.DataContractAttribute()]`);
     lines.push(`${T}[Microsoft.Xrm.Sdk.Client.ResponseProxyAttribute("${messagePair.Request.Name}")]`);
-    lines.push(`${T}[System.CodeDom.Compiler.GeneratedCodeAttribute("${CODEGEN_TOOL_NAME}", "${appVersion}")]`);
+    if (!settings.suppressGeneratedCodeAttribute) {
+        lines.push(`${T}[System.CodeDom.Compiler.GeneratedCodeAttribute("${CODEGEN_TOOL_NAME}", "${appVersion}")]`);
+    }
     lines.push(`${T}public partial class ${responseName} : Microsoft.Xrm.Sdk.OrganizationResponse`);
     lines.push(`${T}{`);
 
@@ -102,40 +105,17 @@ export function generateMessageFile(messagePair: SdkMessagePair, _namingService:
     return lines.join("\n");
 }
 
-export function generateMessagesFile(messagePairs: SdkMessagePair[], namingService: NamingService, settings: EbgSettings, appVersion: string): string {
+export function generateMessagesFile(messagePairs: SdkMessagePair[], settings: EbgSettings, appVersion: string): string {
     const lines = codeFileHeader(settings.namespace);
 
     for (const pair of messagePairs) {
-        const content = generateMessageFile(pair, namingService, settings, appVersion);
+        const content = generateMessageFile(pair, settings, appVersion);
 
-        const inner = extractInnerContent(content, settings.namespace);
+        const inner = extractNamespaceBody(content, settings.namespace);
         if (inner) lines.push(inner);
     }
 
     lines.push("}");
     lines.push("#pragma warning restore CS1591");
     return lines.join("\n");
-}
-
-function extractInnerContent(fileContent: string, namespace_: string): string {
-    const nsLine = `namespace ${namespace_}`;
-    const start = fileContent.indexOf(nsLine);
-    if (start === -1) return fileContent;
-
-    const braceStart = fileContent.indexOf("{", start);
-    if (braceStart === -1) return fileContent;
-
-    let depth = 0;
-    let end = braceStart;
-    for (let i = braceStart; i < fileContent.length; i++) {
-        if (fileContent[i] === "{") depth++;
-        else if (fileContent[i] === "}") {
-            depth--;
-            if (depth === 0) {
-                end = i;
-                break;
-            }
-        }
-    }
-    return fileContent.slice(braceStart + 1, end).trimEnd();
 }
