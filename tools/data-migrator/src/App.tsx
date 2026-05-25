@@ -12,6 +12,12 @@ import { DataverseClient } from "./utils/DataverseClient";
 import { isReferenceFieldType } from "./utils/fieldUtils";
 import { MigrationEngine } from "./utils/MigrationEngine";
 
+// Extends the published DataverseConnection type to include the environmentColor
+// property that PPTB returns at runtime (user-configurable per connection).
+type DataverseConnectionWithColor = ToolBoxAPI.DataverseConnection & {
+    environmentColor?: string;
+};
+
 function App() {
     const [isPPTB, setIsPPTB] = useState<boolean>(false);
     const [connectionUrl, setConnectionUrl] = useState<string>("");
@@ -67,18 +73,18 @@ function App() {
 
                 try {
                     // Get active (source) connection
-                    const activeConnection = await window.toolboxAPI.connections.getActiveConnection();
+                    const activeConnection = (await window.toolboxAPI.connections.getActiveConnection()) as DataverseConnectionWithColor | null;
                     setConnectionUrl(activeConnection?.url || "");
                     setConnectionName(activeConnection?.name || "");
                     setConnectionEnvironment(activeConnection?.environment || "");
-                    setConnectionEnvironmentColor((activeConnection as unknown as { environmentColor?: string })?.environmentColor || "");
+                    setConnectionEnvironmentColor(activeConnection?.environmentColor || "");
 
                     // Get secondary (target) connection
-                    const secondaryConnection = await window.toolboxAPI.connections.getSecondaryConnection();
+                    const secondaryConnection = (await window.toolboxAPI.connections.getSecondaryConnection()) as DataverseConnectionWithColor | null;
                     setSecondaryConnectionUrl(secondaryConnection?.url || "");
                     setSecondaryConnectionName(secondaryConnection?.name || "");
                     setSecondaryConnectionEnvironment(secondaryConnection?.environment || "");
-                    setSecondaryConnectionEnvironmentColor((secondaryConnection as unknown as { environmentColor?: string })?.environmentColor || "");
+                    setSecondaryConnectionEnvironmentColor(secondaryConnection?.environmentColor || "");
 
                     if (!secondaryConnection) {
                         setError("Please select a secondary connection as the target environment");
