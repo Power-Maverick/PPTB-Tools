@@ -246,23 +246,23 @@ body {
 }
 
 .connection-badge.env-dev {
-    border-left: 3px solid #107c10;
+    border-left: 3px solid #2e7d32;
 }
 
 .connection-badge.env-test {
-    border-left: 3px solid #f9a825;
+    border-left: 3px solid #0277bd;
 }
 
 .connection-badge.env-uat {
-    border-left: 3px solid #ff8c00;
+    border-left: 3px solid #f57c00;
 }
 
 .connection-badge.env-production {
-    border-left: 3px solid #d13438;
+    border-left: 3px solid #c62828;
 }
 
 .connection-badge.env-default {
-    border-left: 3px solid #4caf50;
+    border-left: 3px solid #2e7d32;
 }
 
 .connection-label {

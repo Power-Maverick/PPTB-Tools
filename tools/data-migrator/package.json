@@ -1,7 +1,7 @@
 {
   "name": "@power-maverick/tool-data-migrator",
   "displayName": "Data Migrator",
-  "version": "1.0.7",
+  "version": "1.0.9",
   "description": "Migrate data from one Dataverse environment to another with auto-mapping and smart operations",
   "icon": "icons/dataMigrator.svg",
   "contributors": [
@@ -49,7 +49,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@pptb/types": "^1.0.17",
+    "@pptb/types": "^1.2.2",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.4",
