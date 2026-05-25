@@ -242,6 +242,7 @@ function App() {
                     filterQuery || undefined,
                     undefined,
                     100, // Limit preview to 100 records
+                    selectedEntity.entitySetName,
                 );
             }
 

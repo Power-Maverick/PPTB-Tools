@@ -8,6 +8,8 @@ export interface DataverseEntity {
   displayName: string;
   /** Schema name of the entity */
   schemaName: string;
+  /** Entity set name (used for OData Web API endpoint) */
+  entitySetName?: string;
   /** Primary ID attribute name */
   primaryIdAttribute: string;
   /** Primary name attribute */
