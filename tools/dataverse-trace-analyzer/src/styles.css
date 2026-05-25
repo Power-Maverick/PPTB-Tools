@@ -837,7 +837,7 @@ body {
 }
 
 .log-item.highlighted.selected {
-    background-color: #e6f2ff;
+    background-color: var(--selected-bg);
     border-left-color: var(--primary-color);
 }
 
