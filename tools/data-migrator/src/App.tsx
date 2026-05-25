@@ -17,9 +17,11 @@ function App() {
     const [connectionUrl, setConnectionUrl] = useState<string>("");
     const [connectionName, setConnectionName] = useState<string>("");
     const [connectionEnvironment, setConnectionEnvironment] = useState<string>("");
+    const [connectionEnvironmentColor, setConnectionEnvironmentColor] = useState<string>("");
     const [secondaryConnectionUrl, setSecondaryConnectionUrl] = useState<string>("");
     const [secondaryConnectionName, setSecondaryConnectionName] = useState<string>("");
     const [secondaryConnectionEnvironment, setSecondaryConnectionEnvironment] = useState<string>("");
+    const [secondaryConnectionEnvironmentColor, setSecondaryConnectionEnvironmentColor] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>("");
 
@@ -69,12 +71,14 @@ function App() {
                     setConnectionUrl(activeConnection?.url || "");
                     setConnectionName(activeConnection?.name || "");
                     setConnectionEnvironment(activeConnection?.environment || "");
+                    setConnectionEnvironmentColor((activeConnection as unknown as { environmentColor?: string })?.environmentColor || "");
 
                     // Get secondary (target) connection
                     const secondaryConnection = await window.toolboxAPI.connections.getSecondaryConnection();
                     setSecondaryConnectionUrl(secondaryConnection?.url || "");
                     setSecondaryConnectionName(secondaryConnection?.name || "");
                     setSecondaryConnectionEnvironment(secondaryConnection?.environment || "");
+                    setSecondaryConnectionEnvironmentColor((secondaryConnection as unknown as { environmentColor?: string })?.environmentColor || "");
 
                     if (!secondaryConnection) {
                         setError("Please select a secondary connection as the target environment");
@@ -430,13 +434,19 @@ function App() {
                         <h1 className="app-title">Data Migrator</h1>
                         {connectionUrl && secondaryConnectionUrl && (
                             <div className="connection-flow">
-                                <div className={`connection-badge env-${connectionEnvironment ? connectionEnvironment.toLowerCase() : "default"}`}>
+                                <div
+                                    className={`connection-badge env-${connectionEnvironment ? connectionEnvironment.toLowerCase() : "default"}`}
+                                    style={connectionEnvironmentColor ? { borderLeftColor: connectionEnvironmentColor } : undefined}
+                                >
                                     <span className="connection-label">Source</span>
                                     {connectionName && <span className="connection-name">{connectionName}</span>}
                                     <span className="connection-url">{new URL(connectionUrl).hostname}</span>
                                 </div>
                                 <div className="flow-arrow">→</div>
-                                <div className={`connection-badge env-${secondaryConnectionEnvironment ? secondaryConnectionEnvironment.toLowerCase() : "default"}`}>
+                                <div
+                                    className={`connection-badge env-${secondaryConnectionEnvironment ? secondaryConnectionEnvironment.toLowerCase() : "default"}`}
+                                    style={secondaryConnectionEnvironmentColor ? { borderLeftColor: secondaryConnectionEnvironmentColor } : undefined}
+                                >
                                     <span className="connection-label">Target</span>
                                     {secondaryConnectionName && <span className="connection-name">{secondaryConnectionName}</span>}
                                     <span className="connection-url">{new URL(secondaryConnectionUrl).hostname}</span>
