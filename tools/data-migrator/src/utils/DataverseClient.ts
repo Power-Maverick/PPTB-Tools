@@ -31,7 +31,7 @@ export class DataverseClient {
     async fetchAllEntities(): Promise<DataverseEntity[]> {
         try {
             const entities = await window.dataverseAPI.getAllEntitiesMetadata(
-                ["DisplayName", "LogicalName", "SchemaName", "PrimaryIdAttribute", "PrimaryNameAttribute", "Description", "ObjectTypeCode"],
+                ["DisplayName", "LogicalName", "SchemaName", "EntitySetName", "PrimaryIdAttribute", "PrimaryNameAttribute", "Description", "ObjectTypeCode"],
                 this.connectionTarget,
             );
 
@@ -39,6 +39,7 @@ export class DataverseClient {
                 logicalName: entityMetadata.LogicalName,
                 displayName: extractLabel(entityMetadata.DisplayName) || entityMetadata.LogicalName,
                 schemaName: entityMetadata.SchemaName || entityMetadata.LogicalName,
+                entitySetName: entityMetadata.EntitySetName || undefined,
                 primaryIdAttribute: entityMetadata.PrimaryIdAttribute || "",
                 primaryNameAttribute: entityMetadata.PrimaryNameAttribute || "",
                 description: extractLabel(entityMetadata.Description),
@@ -127,11 +128,11 @@ export class DataverseClient {
     /**
      * Query records from an entity
      */
-    async queryRecords(entityLogicalName: string, selectFields: string[], filterQuery?: string, orderBy?: string, top?: number): Promise<any[]> {
+    async queryRecords(entityLogicalName: string, selectFields: string[], filterQuery?: string, orderBy?: string, top?: number, entitySetName?: string): Promise<any[]> {
         try {
-            const entitySetName = await window.dataverseAPI.getEntitySetName(entityLogicalName);
+            const resolvedEntitySetName = entitySetName || await window.dataverseAPI.getEntitySetName(entityLogicalName);
 
-            let query = `${entitySetName}?$select=${selectFields.join(",")}`;
+            let query = `${resolvedEntitySetName}?$select=${selectFields.join(",")}`;
 
             if (filterQuery) {
                 query += `&$filter=${filterQuery}`;
