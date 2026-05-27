@@ -202,7 +202,7 @@ export class DataverseClient {
 
   async fetchSystemUserById(userId: string): Promise<import("../models/interfaces").SystemUser | null> {
     // Validate GUID format to prevent injection
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+    if (!isGuid(userId)) {
       return null;
     }
     try {

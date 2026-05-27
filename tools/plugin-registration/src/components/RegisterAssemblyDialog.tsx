@@ -7,7 +7,7 @@ interface RegisterAssemblyDialogProps {
     existingAssembly?: PluginAssembly;
     packages?: PluginPackage[];
     onCreatePackage?: () => void;
-    onRegister: (content: string, name: string, isolationMode: number, description: string, packageId?: string) => Promise<void>;
+    onRegister: (content: string, name: string, isolationMode: number, description: string, packageId: string) => Promise<void>;
     onClose: () => void;
 }
 
@@ -70,7 +70,7 @@ export function RegisterAssemblyDialog({
         if (!content) { setFileError("Please select a .dll file."); return; }
         setSaving(true);
         try {
-            await onRegister(content, assemblyName, isolationMode, description, packageId || undefined);
+            await onRegister(content, assemblyName, isolationMode, description, packageId);
         } finally {
             setSaving(false);
         }
