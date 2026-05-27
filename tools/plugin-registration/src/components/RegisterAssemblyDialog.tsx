@@ -177,10 +177,10 @@ export function RegisterAssemblyDialog({
                             )}
                             {isUpdate && existingAssembly?._packageid_value &&
                                 !packages.find((p) => p.pluginpackageid === existingAssembly._packageid_value) && (
-                                <span style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>
-                                    Currently in package: {existingAssembly._packageid_value}
-                                </span>
-                            )}
+                                    <span style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>
+                                        Currently in package: {existingAssembly._packageid_value}
+                                    </span>
+                                )}
                         </div>
                     )}
                 </div>
