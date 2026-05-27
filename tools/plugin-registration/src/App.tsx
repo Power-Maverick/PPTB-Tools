@@ -2,22 +2,25 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AssemblyDetails } from "./components/AssemblyDetails";
 import { BottomGrid } from "./components/BottomGrid";
 import { ImageDetails } from "./components/ImageDetails";
+import { PackageDetails } from "./components/PackageDetails";
 import { PluginTree } from "./components/PluginTree";
 import { PluginTypeDetails } from "./components/PluginTypeDetails";
 import { RegisterAssemblyDialog } from "./components/RegisterAssemblyDialog";
 import { RegisterEndpointStepDialog } from "./components/RegisterEndpointStepDialog";
 import { RegisterImageDialog } from "./components/RegisterImageDialog";
+import { RegisterPackageDialog } from "./components/RegisterPackageDialog";
 import { RegisterServiceEndpointDialog } from "./components/RegisterServiceEndpointDialog";
 import { RegisterStepDialog } from "./components/RegisterStepDialog";
 import { ServiceEndpointDetails } from "./components/ServiceEndpointDetails";
 import { StepDetails } from "./components/StepDetails";
-import type { PluginAssembly, PluginType, ProcessingStep, ServiceEndpoint, StepImage, TreeNode } from "./models/interfaces";
+import type { PluginAssembly, PluginPackage, PluginType, ProcessingStep, ServiceEndpoint, StepImage, TreeNode } from "./models/interfaces";
 import { DataverseClient } from "./utils/DataverseClient";
 
 const client = new DataverseClient();
 
 function buildTreeNodes(
     assemblies: PluginAssembly[],
+    packages: PluginPackage[],
     pluginTypes: Map<string, PluginType[]>,
     steps: Map<string, ProcessingStep[]>,
     images: Map<string, StepImage[]>,
@@ -26,8 +29,10 @@ function buildTreeNodes(
     endpointSteps: Map<string, ProcessingStep[]>,
     showPlugins: boolean,
     showEndpoints: boolean,
+    viewMode: 'assemblies' | 'packages',
 ): TreeNode[] {
-    const assemblyNodes: TreeNode[] = assemblies.map((asm) => {
+    // Inner helper: build a single assembly node (recursive into types/steps/images)
+    const buildAssemblyNode = (asm: PluginAssembly): TreeNode => {
         const types = pluginTypes.get(asm.pluginassemblyid) ?? [];
         const typeNodes: TreeNode[] = types.map((pt) => {
             const ptSteps = steps.get(pt.plugintypeid) ?? [];
@@ -69,7 +74,51 @@ function buildTreeNodes(
             isExpanded: expandedIds.has(asm.pluginassemblyid),
             childrenLoaded: pluginTypes.has(asm.pluginassemblyid),
         };
+    };
+
+    // Standalone assemblies (no package association)
+    const standaloneAssemblyNodes: TreeNode[] = assemblies
+        .filter((asm) => !asm._packageid_value)
+        .map(buildAssemblyNode);
+
+    // Group packaged assemblies by package ID
+    const assemblyByPackageId = new Map<string, PluginAssembly[]>();
+    for (const asm of assemblies.filter((a) => !!a._packageid_value)) {
+        const pkgId = asm._packageid_value!;
+        if (!assemblyByPackageId.has(pkgId)) assemblyByPackageId.set(pkgId, []);
+        assemblyByPackageId.get(pkgId)!.push(asm);
+    }
+
+    // Package nodes (each contains its associated assembly nodes as children)
+    const knownPackageIds = new Set(packages.map((p) => p.pluginpackageid));
+    const packageNodes: TreeNode[] = packages.map((pkg) => {
+        const pkgAssemblies = assemblyByPackageId.get(pkg.pluginpackageid) ?? [];
+        return {
+            id: pkg.pluginpackageid,
+            type: "package" as const,
+            name: pkg.name,
+            data: pkg,
+            children: pkgAssemblies.map(buildAssemblyNode),
+            isExpanded: expandedIds.has(pkg.pluginpackageid),
+            childrenLoaded: true,
+        };
     });
+
+    // Orphaned: assemblies whose packageId doesn't match any loaded package
+    const orphanedAssemblies = assemblies.filter(
+        (a) => !!a._packageid_value && !knownPackageIds.has(a._packageid_value!),
+    );
+    const orphanedNodes: TreeNode[] = orphanedAssemblies.length > 0
+        ? [{
+            id: "__orphaned_packages__",
+            type: "package-group" as const,
+            name: "Unknown Package (orphaned)",
+            data: { groupName: "Unknown Package (orphaned)", groupType: "package" as const },
+            children: orphanedAssemblies.map(buildAssemblyNode),
+            isExpanded: expandedIds.has("__orphaned_packages__"),
+            childrenLoaded: true,
+        }]
+        : [];
 
     const endpointNodes: TreeNode[] = serviceEndpoints.map((ep) => {
         const epSteps = endpointSteps.get(ep.serviceendpointid) ?? [];
@@ -104,7 +153,16 @@ function buildTreeNodes(
     });
 
     const result: TreeNode[] = [];
-    if (showPlugins) result.push(...assemblyNodes);
+    if (showPlugins) {
+        if (viewMode === 'packages') {
+            result.push(...packageNodes);
+            result.push(...orphanedNodes);
+            result.push(...standaloneAssemblyNodes);
+        } else {
+            // Assemblies view: flat list of all assemblies regardless of package association
+            result.push(...assemblies.map(buildAssemblyNode));
+        }
+    }
     if (showEndpoints) result.push(...endpointNodes);
     return result;
 }
@@ -135,6 +193,7 @@ export default function App() {
 
     // Data maps
     const [assemblies, setAssemblies] = useState<PluginAssembly[]>([]);
+    const [packages, setPackages] = useState<PluginPackage[]>([]);
     const [pluginTypes, setPluginTypes] = useState<Map<string, PluginType[]>>(new Map());
     const [steps, setSteps] = useState<Map<string, ProcessingStep[]>>(new Map());
     const [images, setImages] = useState<Map<string, StepImage[]>>(new Map());
@@ -155,13 +214,20 @@ export default function App() {
     // Bulk enable/disable in progress
     const [bulkToggling, setBulkToggling] = useState(false);
 
+    // View mode: 'assemblies' (default, flat list) | 'packages' (grouped under package nodes)
+    const [viewMode, setViewMode] = useState<'assemblies' | 'packages'>('assemblies');
+
     // Register dropdown
     const [showRegisterDropdown, setShowRegisterDropdown] = useState(false);
+    const [showViewDropdown, setShowViewDropdown] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const viewDropdownRef = useRef<HTMLDivElement>(null);
 
     // Dialog state
     const [showRegisterAssembly, setShowRegisterAssembly] = useState(false);
     const [showUpdateAssembly, setShowUpdateAssembly] = useState(false);
+    const [showRegisterPackage, setShowRegisterPackage] = useState(false);
+    const [showUpdatePackage, setShowUpdatePackage] = useState(false);
     const [showRegisterStep, setShowRegisterStep] = useState(false);
     const [showUpdateStep, setShowUpdateStep] = useState(false);
     const [showRegisterImage, setShowRegisterImage] = useState(false);
@@ -172,11 +238,14 @@ export default function App() {
     const [showRegisterEndpointStep, setShowRegisterEndpointStep] = useState(false);
     const [showUpdateEndpointStep, setShowUpdateEndpointStep] = useState(false);
 
-    // Close register dropdown when clicking outside
+    // Close dropdowns when clicking outside
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
                 setShowRegisterDropdown(false);
+            }
+            if (viewDropdownRef.current && !viewDropdownRef.current.contains(e.target as Node)) {
+                setShowViewDropdown(false);
             }
         };
         document.addEventListener("mousedown", handleClick);
@@ -198,6 +267,7 @@ export default function App() {
         setError("");
         // Reset all state upfront so the tree clears immediately
         setAssemblies([]);
+        setPackages([]);
         setServiceEndpoints([]);
         setPluginTypes(new Map());
         setSteps(new Map());
@@ -206,9 +276,10 @@ export default function App() {
         setSelectedNode(null);
         setExpandedIds(new Set());
         // Fetch independently — one failure must not block the other
-        const [assembliesResult, endpointsResult] = await Promise.allSettled([
+        const [assembliesResult, endpointsResult, packagesResult] = await Promise.allSettled([
             client.fetchAssemblies(),
             client.fetchServiceEndpoints(),
+            client.fetchPackages(),
         ]);
         if (assembliesResult.status === "fulfilled") {
             setAssemblies(assembliesResult.value);
@@ -220,6 +291,12 @@ export default function App() {
             setServiceEndpoints(endpointsResult.value);
         } else {
             const msg = endpointsResult.reason instanceof Error ? endpointsResult.reason.message : String(endpointsResult.reason);
+            setError((prev) => (prev ? `${prev}\n${msg}` : msg));
+        }
+        if (packagesResult.status === "fulfilled") {
+            setPackages(packagesResult.value);
+        } else {
+            const msg = packagesResult.reason instanceof Error ? packagesResult.reason.message : String(packagesResult.reason);
             setError((prev) => (prev ? `${prev}\n${msg}` : msg));
         }
         setLoading(false);
@@ -282,6 +359,7 @@ export default function App() {
                     }
                 }
             }
+            // 'package' nodes: assemblies are already loaded — no async fetch needed
         },
         [pluginTypes, steps, images, endpointSteps],
     );
@@ -365,9 +443,9 @@ export default function App() {
     };
 
     // ── Assembly actions ──
-    const handleRegisterAssembly = async (content: string, name: string, isolationMode: number, description: string) => {
+    const handleRegisterAssembly = async (content: string, name: string, isolationMode: number, description: string, packageId?: string) => {
         try {
-            await client.registerAssembly(content, name, isolationMode, description);
+            await client.registerAssembly(content, name, isolationMode, description, packageId);
             notify("Assembly registered successfully.");
             setShowRegisterAssembly(false);
             void loadAll();
@@ -377,11 +455,11 @@ export default function App() {
         }
     };
 
-    const handleUpdateAssembly = async (content: string, _name: string, _isolationMode: number, description: string) => {
+    const handleUpdateAssembly = async (content: string, _name: string, _isolationMode: number, description: string, packageId?: string) => {
         if (selectedNode?.type !== "assembly") return;
         const asm = selectedNode.data as PluginAssembly;
         try {
-            await client.updateAssembly(asm.pluginassemblyid, description, content);
+            await client.updateAssembly(asm.pluginassemblyid, description, content, packageId);
             notify("Assembly updated.");
             setShowUpdateAssembly(false);
             void loadAll();
@@ -410,6 +488,51 @@ export default function App() {
         try {
             await client.deleteAssembly(asm.pluginassemblyid);
             notify("Assembly unregistered.");
+            setSelectedNode(null);
+            void loadAll();
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+        }
+    };
+
+    // ── Plugin Package actions ──
+    const handleCreatePackage = async (name: string, uniquename: string, version: string, content: string) => {
+        try {
+            await client.createPackage(name, uniquename, version, content);
+            notify("Package registered successfully.");
+            setShowRegisterPackage(false);
+            void loadAll();
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            throw err;
+        }
+    };
+
+    const handleUpdatePackage = async (_name: string, _uniquename: string, version: string, content: string) => {
+        if (selectedNode?.type !== "package") return;
+        const pkg = selectedNode.data as PluginPackage;
+        try {
+            await client.updatePackage(pkg.pluginpackageid, version, content || undefined);
+            notify("Package updated.");
+            setShowUpdatePackage(false);
+            void loadAll();
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            throw err;
+        }
+    };
+
+    const handleDeletePackage = async () => {
+        if (selectedNode?.type !== "package") return;
+        const pkg = selectedNode.data as PluginPackage;
+        if (pkg.ismanaged) {
+            notify("This package is part of a managed solution and cannot be deleted.", "error");
+            return;
+        }
+        if (!window.confirm(`Delete package "${pkg.name}"?\nThis will NOT delete associated assemblies — they will become standalone.`)) return;
+        try {
+            await client.deletePackage(pkg.pluginpackageid);
+            notify("Package deleted.");
             setSelectedNode(null);
             void loadAll();
         } catch (err: unknown) {
@@ -833,6 +956,7 @@ export default function App() {
 
     // ── Computed selection state ──
     const selectedAssembly = selectedNode?.type === "assembly" ? (selectedNode.data as PluginAssembly) : null;
+    const selectedPackage = selectedNode?.type === "package" ? (selectedNode.data as PluginPackage) : null;
     const selectedPluginType = getSelectedPluginType();
     const selectedStep = selectedNode?.type === "step" ? (selectedNode.data as ProcessingStep) : null;
     const selectedImage = selectedNode?.type === "image" ? (selectedNode.data as StepImage) : null;
@@ -879,15 +1003,16 @@ export default function App() {
     })();
 
     // Context-sensitive toolbar state
-    const canUpdate = !!(selectedAssembly || selectedStep || selectedImage || selectedEndpoint);
-    const canUnregister = !!(selectedAssembly || selectedStep || selectedImage || selectedEndpoint);
+    const canUpdate = !!(selectedAssembly || selectedStep || selectedImage || selectedEndpoint || selectedPackage);
+    const canUnregister = !!(selectedAssembly || selectedStep || selectedImage || selectedEndpoint || selectedPackage);
     const canRegisterStep = !!(selectedPluginType && !selectedPluginType.isworkflowactivity);
     const canRegisterImage = !!selectedStep;
     const isStepSelected = !!selectedStep;
     const stepIsEnabled = selectedStep?.statecode === 0;
 
     const handleUpdateSelected = () => {
-        if (selectedAssembly) setShowUpdateAssembly(true);
+        if (selectedPackage) setShowUpdatePackage(true);
+        else if (selectedAssembly) setShowUpdateAssembly(true);
         else if (selectedEndpointStep) setShowUpdateEndpointStep(true);
         else if (selectedStep) setShowUpdateStep(true);
         else if (selectedImage) setShowUpdateImage(true);
@@ -895,7 +1020,8 @@ export default function App() {
     };
 
     const handleUnregisterSelected = () => {
-        if (selectedAssembly) void handleUnregisterAssembly();
+        if (selectedPackage) void handleDeletePackage();
+        else if (selectedAssembly) void handleUnregisterAssembly();
         else if (selectedStep) void handleUnregisterStep();
         else if (selectedImage) void handleUnregisterImage();
         else if (selectedEndpoint) void handleUnregisterServiceEndpoint();
@@ -903,7 +1029,11 @@ export default function App() {
 
     // Double-click tree node → open update dialog
     const handleDoubleClickNode = (node: TreeNode) => {
-        if (node.type === "assembly") {
+        if (node.type === "package") {
+            setSelectedNode(node);
+            const pkg = node.data as PluginPackage;
+            if (!pkg.ismanaged) setShowUpdatePackage(true);
+        } else if (node.type === "assembly") {
             setSelectedNode(node);
             setShowUpdateAssembly(true);
         } else if (node.type === "step") {
@@ -936,7 +1066,7 @@ export default function App() {
     const bottomSteps = selectedPluginType ? (steps.get(selectedPluginType.plugintypeid) ?? []) : [];
     const bottomImages = selectedStep ? (images.get(selectedStep.sdkmessageprocessingstepid) ?? []) : [];
 
-    const rawTreeNodes = buildTreeNodes(assemblies, pluginTypes, steps, images, expandedIds, serviceEndpoints, endpointSteps, showPlugins, showEndpoints);
+    const rawTreeNodes = buildTreeNodes(assemblies, packages, pluginTypes, steps, images, expandedIds, serviceEndpoints, endpointSteps, showPlugins, showEndpoints, viewMode);
 
     const treeNodes = searchTerm
         ? filterTreeForSearch(rawTreeNodes, searchTerm.toLowerCase())
@@ -978,6 +1108,15 @@ export default function App() {
                                 }}
                             >
                                 New Assembly
+                            </div>
+                            <div
+                                className="toolbar-dropdown-item"
+                                onClick={() => {
+                                    setShowRegisterPackage(true);
+                                    setShowRegisterDropdown(false);
+                                }}
+                            >
+                                New Package
                             </div>
                             {canRegisterStep && (
                                 <div
@@ -1030,6 +1169,31 @@ export default function App() {
                             >
                                 New Service Endpoint
                             </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* View dropdown */}
+                <div className="toolbar-group" ref={viewDropdownRef}>
+                    <button className="toolbar-btn" onClick={() => setShowViewDropdown((v) => !v)}>
+                        View: {viewMode === 'packages' ? 'Packages' : 'Assemblies'} <span className="dropdown-arrow">▾</span>
+                    </button>
+                    {showViewDropdown && (
+                        <div className="toolbar-dropdown" role="menu">
+                            <button
+                                role="menuitem"
+                                className={`toolbar-dropdown-item${viewMode === 'assemblies' ? ' toolbar-dropdown-item--active' : ''}`}
+                                onClick={() => { setViewMode('assemblies'); setShowViewDropdown(false); setSelectedNode(null); }}
+                            >
+                                Assemblies
+                            </button>
+                            <button
+                                role="menuitem"
+                                className={`toolbar-dropdown-item${viewMode === 'packages' ? ' toolbar-dropdown-item--active' : ''}`}
+                                onClick={() => { setViewMode('packages'); setShowViewDropdown(false); setSelectedNode(null); }}
+                            >
+                                Packages
+                            </button>
                         </div>
                     )}
                 </div>
@@ -1147,6 +1311,14 @@ export default function App() {
                 {/* Right: details */}
                 <div className="right-panel">
                     {!selectedNode && <div className="details-placeholder">Select an item from the tree to view its properties.</div>}
+                    {selectedPackage && (
+                        <PackageDetails
+                            pkg={selectedPackage}
+                            assemblies={assemblies.filter((a) => a._packageid_value === selectedPackage.pluginpackageid)}
+                            onUpdate={() => setShowUpdatePackage(true)}
+                            onDelete={() => void handleDeletePackage()}
+                        />
+                    )}
                     {selectedAssembly && (
                         <AssemblyDetails
                             assembly={selectedAssembly}
@@ -1193,17 +1365,33 @@ export default function App() {
             </div>
 
             {/* Dialogs */}
+            <RegisterPackageDialog
+                isOpen={showRegisterPackage}
+                isUpdate={false}
+                onRegister={(name, uniquename, version, content) => handleCreatePackage(name, uniquename, version, content)}
+                onClose={() => setShowRegisterPackage(false)}
+            />
+            <RegisterPackageDialog
+                isOpen={showUpdatePackage}
+                isUpdate={true}
+                existingPackage={selectedPackage ?? undefined}
+                onRegister={(name, uniquename, version, content) => handleUpdatePackage(name, uniquename, version, content)}
+                onClose={() => setShowUpdatePackage(false)}
+            />
             <RegisterAssemblyDialog
                 isOpen={showRegisterAssembly}
                 isUpdate={false}
-                onRegister={(content, name, isolationMode, description) => handleRegisterAssembly(content, name, isolationMode, description)}
+                packages={packages}
+                onCreatePackage={() => { setShowRegisterAssembly(false); setShowRegisterPackage(true); }}
+                onRegister={(content, name, isolationMode, description, packageId) => handleRegisterAssembly(content, name, isolationMode, description, packageId)}
                 onClose={() => setShowRegisterAssembly(false)}
             />
             <RegisterAssemblyDialog
                 isOpen={showUpdateAssembly}
                 isUpdate={true}
                 existingAssembly={selectedAssembly ?? undefined}
-                onRegister={(content, name, isolationMode, description) => handleUpdateAssembly(content, name, isolationMode, description)}
+                packages={packages}
+                onRegister={(content, name, isolationMode, description, packageId) => handleUpdateAssembly(content, name, isolationMode, description, packageId)}
                 onClose={() => setShowUpdateAssembly(false)}
             />
             {(selectedPluginType || stepPluginType) && (
