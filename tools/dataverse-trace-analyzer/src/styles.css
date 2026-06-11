@@ -547,6 +547,7 @@ body {
     border-radius: 2px;
     font-size: 13px;
     background-color: var(--background);
+    color: var(--text-color);
     width: 100%;
 }
 
@@ -564,6 +565,8 @@ body {
     border: 1px solid var(--border-color);
     border-radius: 2px;
     padding: 8px;
+    background-color: var(--background);
+    color: var(--text-color);
 }
 
 .checkbox-item {
@@ -766,6 +769,8 @@ body {
     border-radius: 4px;
     font-size: 13px;
     font-family: inherit;
+    background-color: var(--background);
+    color: var(--text-color);
     transition: border-color 0.2s ease;
 }
 
