@@ -11,10 +11,15 @@ interface SolutionPickerProps {
 
 export function SolutionPicker({ solutionOptions, selectedValue, onSelectionChange, onTriggerScan, scanningInProgress }: SolutionPickerProps) {
     const [filterManaged, setFilterManaged] = useState<"all" | "managed" | "unmanaged">("all");
+    const [searchTerm, setSearchTerm] = useState("");
 
     const filteredSolutions = solutionOptions.filter((sol) => {
-        if (filterManaged === "managed") return sol.ismanaged;
-        if (filterManaged === "unmanaged") return !sol.ismanaged;
+        if (filterManaged === "managed" && !sol.ismanaged) return false;
+        if (filterManaged === "unmanaged" && sol.ismanaged) return false;
+        if (searchTerm.trim()) {
+            const term = searchTerm.toLowerCase();
+            return sol.friendlyname.toLowerCase().includes(term) || sol.uniquename.toLowerCase().includes(term);
+        }
         return true;
     });
 
@@ -37,6 +42,21 @@ export function SolutionPicker({ solutionOptions, selectedValue, onSelectionChan
                         <input type="radio" value="managed" checked={filterManaged === "managed"} onChange={(e) => setFilterManaged(e.target.value as "managed")} />
                         Managed Only
                     </label>
+                </div>
+            </div>
+
+            <div className="solution-search-group">
+                <label htmlFor="solution-search">Search Solutions:</label>
+                <div className="search-input-wrapper">
+                    <span className="search-icon">🔍</span>
+                    <input
+                        id="solution-search"
+                        type="text"
+                        placeholder="Filter by name or unique name..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        disabled={scanningInProgress}
+                    />
                 </div>
             </div>
 

@@ -184,6 +184,18 @@ body {
     margin-right: 8px;
 }
 
+.solution-search-group {
+    margin-bottom: 16px;
+}
+
+.solution-search-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+}
+
 .selector-group {
     margin-bottom: 16px;
 }
