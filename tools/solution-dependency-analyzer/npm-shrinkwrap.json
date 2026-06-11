@@ -1,12 +1,12 @@
 {
   "name": "@power-maverick/tool-solution-dependency-analyzer",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "@power-maverick/tool-solution-dependency-analyzer",
-      "version": "0.0.1",
+      "version": "0.0.3",
       "license": "GPL-2.0",
       "dependencies": {
         "@fluentui/react-components": "^9.56.2",
