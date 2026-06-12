@@ -62,6 +62,7 @@ function App() {
 
     // Step management for better UX - track which steps are expanded
     const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set([1]));
+    const [isLaunchingFxs, setIsLaunchingFxs] = useState<boolean>(false);
 
     const [migrationEngine] = useState<MigrationEngine>(() => new MigrationEngine());
 
@@ -344,6 +345,29 @@ function App() {
         );
     }
 
+    const handleOpenFetchXmlStudio = async () => {
+        if (!window.toolboxAPI?.invocation) return;
+
+        setIsLaunchingFxs(true);
+        setError("");
+
+        try {
+            const result = await window.toolboxAPI.invocation.launchTool(
+                "@mohsinonxrm/pptb-fetchxml-studio",
+                filterQuery ? { fetchxml: filterQuery } : undefined,
+            );
+
+            const fetchxml = result !== null ? (result as { fetchxml?: string }).fetchxml : undefined;
+            if (fetchxml) {
+                setFilterQuery(fetchxml);
+            }
+        } catch (err) {
+            setError(`Cannot open FetchXML Studio: ${err instanceof Error ? err.message : String(err)}`);
+        } finally {
+            setIsLaunchingFxs(false);
+        }
+    };
+
     const handleSaveConfiguration = () => {
         // Convert Maps to arrays for JSON serialization
         const serializedLookupMappings = lookupMappings.map((mapping) => ({
@@ -554,7 +578,17 @@ function App() {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <label>FetchXML Query</label>
+                                                    <div className="fetchxml-label-row">
+                                                        <label>FetchXML Query</label>
+                                                        <button
+                                                            className="btn-secondary btn-fxs"
+                                                            onClick={handleOpenFetchXmlStudio}
+                                                            disabled={isLaunchingFxs}
+                                                            title="Open FetchXML Studio to build or edit this query"
+                                                        >
+                                                            {isLaunchingFxs ? "Opening..." : <><span aria-hidden="true">🔬</span> Open in FetchXML Studio</>}
+                                                        </button>
+                                                    </div>
                                                     <textarea
                                                         value={filterQuery}
                                                         onChange={(e) => setFilterQuery(e.target.value)}

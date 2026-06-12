@@ -581,6 +581,28 @@ select.modern-input:focus {
     background: rgba(255, 255, 255, 0.5);
 }
 
+/* FetchXML label row with inline action button */
+.fetchxml-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.fetchxml-label-row label {
+    margin-bottom: 0;
+}
+
+.btn-fxs {
+    padding: 4px 12px;
+    font-size: 12px;
+}
+
+.btn-fxs:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 /* Settings Grid */
 .settings-grid {
     display: grid;
