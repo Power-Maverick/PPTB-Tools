@@ -40,7 +40,7 @@ export function RegisterAssemblyDialog({
 
     if (!isOpen) return null;
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         setFileError("");
         const file = e.target.files?.[0];
         if (!file) return;
@@ -50,14 +50,17 @@ export function RegisterAssemblyDialog({
         }
         const name = file.name.replace(/\.dll$/i, "");
         setAssemblyName(name);
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const result = ev.target?.result as string;
-            // result is like "data:application/octet-stream;base64,XXXX"
-            const base64 = result.split(",")[1] ?? "";
-            setContent(base64);
-        };
-        reader.readAsDataURL(file);
+        try {
+            const buffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            let binary = "";
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]!);
+            }
+            setContent(btoa(binary));
+        } catch {
+            setFileError("Failed to read the file.");
+        }
     };
 
     const handleSubmit = async () => {
