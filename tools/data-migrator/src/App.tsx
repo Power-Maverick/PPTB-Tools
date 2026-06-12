@@ -224,13 +224,15 @@ function App() {
 
         try {
             const client = new DataverseClient("primary");
-            const selectFields = fieldMappings.filter((m) => m.isEnabled).map((m) => {
-                // Dataverse OData Web API represents lookup fields as _fieldname_value in $select
-                if (isReferenceFieldType(m.fieldType)) {
-                    return `_${m.sourceField}_value`;
-                }
-                return m.sourceField;
-            });
+            const selectFields = fieldMappings
+                .filter((m) => m.isEnabled)
+                .map((m) => {
+                    // Dataverse OData Web API represents lookup fields as _fieldname_value in $select
+                    if (isReferenceFieldType(m.fieldType)) {
+                        return `_${m.sourceField}_value`;
+                    }
+                    return m.sourceField;
+                });
 
             // Add primary ID and primary name fields
             if (!selectFields.includes(selectedEntity.primaryIdAttribute)) {
@@ -259,9 +261,7 @@ function App() {
 
             // Normalize lookup fields: OData returns _fieldname_value keys, but the preview table
             // renders cells using the bare logical name. Copy the value so both keys are present.
-            const enabledLookupFields = fieldMappings
-                .filter((m) => m.isEnabled && isReferenceFieldType(m.fieldType))
-                .map((m) => m.sourceField);
+            const enabledLookupFields = fieldMappings.filter((m) => m.isEnabled && isReferenceFieldType(m.fieldType)).map((m) => m.sourceField);
 
             const preview: PreviewRecord[] = sourceRecords.map((record) => {
                 const normalizedData = { ...record };
@@ -352,12 +352,9 @@ function App() {
         setError("");
 
         try {
-            const result = await window.toolboxAPI.invocation.launchTool(
-                "@mohsinonxrm/pptb-fetchxml-studio",
-                filterQuery ? { fetchxml: filterQuery } : undefined,
-            );
+            const result = await window.toolboxAPI.invocation.launchTool("local-mohsinonxrm-pptb-fetchxml-studio", filterQuery ? { fetchXml: filterQuery } : undefined);
 
-            const fetchxml = result !== null ? (result as { fetchxml?: string }).fetchxml : undefined;
+            const fetchxml = result !== null ? (result as { fetchXml?: string }).fetchXml : undefined;
             if (fetchxml) {
                 setFilterQuery(fetchxml);
             }
@@ -586,7 +583,13 @@ function App() {
                                                             disabled={isLaunchingFxs}
                                                             title="Open FetchXML Studio to build or edit this query"
                                                         >
-                                                            {isLaunchingFxs ? "Opening..." : <><span aria-hidden="true">🔬</span> Open in FetchXML Studio</>}
+                                                            {isLaunchingFxs ? (
+                                                                "Opening..."
+                                                            ) : (
+                                                                <>
+                                                                    <span aria-hidden="true">🔬</span> Open in FetchXML Studio
+                                                                </>
+                                                            )}
                                                         </button>
                                                     </div>
                                                     <textarea
