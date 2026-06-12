@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { FilterOption } from "../models/interfaces";
 
 interface FilterModalProps {
@@ -57,6 +58,26 @@ export function FilterModal({
     messageOptions,
     entityOptions,
 }: FilterModalProps) {
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                e.preventDefault();
+                onClose();
+            } else if (e.key === "Enter") {
+                const target = e.target as HTMLElement;
+                if (target.tagName !== "SELECT" && target.tagName !== "TEXTAREA") {
+                    e.preventDefault();
+                    onApply();
+                }
+            }
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [isOpen, onClose, onApply]);
+
     if (!isOpen) return null;
 
     return (

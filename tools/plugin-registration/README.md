@@ -1,6 +1,6 @@
 # Plugin Registration
 
-Register and manage Microsoft Dataverse plugin assemblies, custom workflow activities, and SDK message processing steps. Exclusively for PPTB.
+Register and manage Microsoft Dataverse plugin assemblies, custom workflow activities, SDK message processing steps, service endpoints, and webhooks. Exclusively for PPTB.
 
 ## Overview
 
@@ -12,10 +12,14 @@ The Plugin Registration tool brings the classic Microsoft Dataverse Plugin Regis
 - **PPTB-Only Integration**: Designed exclusively for Power Platform ToolBox (uses @pptb/types v1.0.20)
 - **Plugin Assembly Management**: Register, update, and unregister plugin assemblies (.dll files)
 - **Plugin Type Browsing**: View all plugin classes within each registered assembly
-- **Step Registration**: Register and manage SDK Message Processing Steps with full configuration
+- **Step Registration**: Register and manage SDK Message Processing Steps with full configuration including Unsecure Config, Secure Config, and Supported Deployment
 - **Step Images**: Register pre/post entity images for processing steps
 - **Enable/Disable Steps**: Toggle step activation status without removing them
-- **Tree View UI**: Hierarchical view of assemblies → plugin types → steps → images
+- **Service Endpoint Management**: Register and manage all 9 Dataverse contract types — One Way, Queue, REST, Two Way, Topic, Persistent Queue, Event Hub, Webhook, and Event Grid
+- **Webhook Management**: Register webhooks with HttpHeader, WebhookKey, or HttpQueryString authentication
+- **Endpoint Step Registration**: Register SDK message processing steps bound to service endpoints
+- **Tree View UI**: Hierarchical view of assemblies → plugin types → steps → images, plus service endpoints and their steps
+- **Plugins / Endpoints Filter**: Toolbar checkboxes to show or hide Plugins and Endpoints independently
 - **Dark/Light Theme Support**: Follows PPTB theme settings automatically
 
 ## Use Cases
@@ -26,13 +30,17 @@ The Plugin Registration tool brings the classic Microsoft Dataverse Plugin Regis
 - Register custom workflow activities
 - Manage plugin step lifecycle (enable, disable, unregister)
 - Update plugin assemblies when a new version is compiled
+- Register webhooks and Azure Service Bus endpoints for event-driven integrations
+- Attach SDK message processing steps to service endpoints (webhook/Service Bus triggers)
+- Configure unsecure and secure configuration strings on plugin steps
 
 ## UI
 
 The tool uses a split-panel layout:
 
-- **Left panel**: Tree view of all registered assemblies, their plugin types, processing steps, and images
+- **Left panel**: Tree view of all registered assemblies, their plugin types, processing steps, and images — followed by service endpoints and their steps
 - **Right panel**: Detailed information and action buttons for the selected item
+- **Toolbar filter**: Checkboxes to show/hide Plugins and Endpoints sections independently
 
 ### Supported Actions
 
@@ -42,6 +50,8 @@ The tool uses a split-panel layout:
 | Plugin Type | Register Step |
 | Processing Step | Register Image, Enable, Disable, Update Step, Unregister Step |
 | Step Image | Update Image, Unregister Image |
+| Service Endpoint / Webhook | Register Step, Update, Unregister, Save Description |
+| Endpoint Step | Enable, Disable, Update Step, Unregister Step |
 
 ## Getting Started
 
@@ -69,14 +79,17 @@ npm run dev
 ```
 src/
 ├── components/
-│   ├── PluginTree.tsx          # Tree view component
-│   ├── AssemblyDetails.tsx     # Assembly details & actions
-│   ├── PluginTypeDetails.tsx   # Plugin type details
-│   ├── StepDetails.tsx         # Processing step details & actions
-│   ├── ImageDetails.tsx        # Step image details & actions
-│   ├── RegisterAssemblyDialog.tsx  # Register/update assembly dialog
-│   ├── RegisterStepDialog.tsx      # Register/update step dialog
-│   └── RegisterImageDialog.tsx     # Register/update image dialog
+│   ├── PluginTree.tsx                    # Tree view component (plugins + endpoints)
+│   ├── AssemblyDetails.tsx               # Assembly details & actions
+│   ├── PluginTypeDetails.tsx             # Plugin type details
+│   ├── StepDetails.tsx                   # Processing step details & actions
+│   ├── ImageDetails.tsx                  # Step image details & actions
+│   ├── ServiceEndpointDetails.tsx        # Service endpoint / webhook details & actions
+│   ├── RegisterAssemblyDialog.tsx        # Register/update assembly dialog
+│   ├── RegisterStepDialog.tsx            # Register/update step dialog (with config fields)
+│   ├── RegisterImageDialog.tsx           # Register/update image dialog
+│   ├── RegisterServiceEndpointDialog.tsx # Register/update service endpoint or webhook
+│   └── RegisterEndpointStepDialog.tsx    # Register step bound to a service endpoint
 ├── models/
 │   └── interfaces.ts           # TypeScript interfaces
 ├── utils/
@@ -96,6 +109,8 @@ src/
 | `sdkmessageprocessingstepimage` | Stores pre/post entity images for steps |
 | `sdkmessage` | SDK messages (Create, Update, Delete, etc.) |
 | `sdkmessagefilter` | Entity-specific filters for messages |
+| `serviceendpoint` | Stores webhook and Service Bus endpoint configuration |
+| `sdkmessageprocessingstepsecureconfig` | Stores secure configuration strings for steps |
 
 ## Reference
 

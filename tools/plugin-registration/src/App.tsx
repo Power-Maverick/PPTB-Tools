@@ -5,10 +5,13 @@ import { ImageDetails } from "./components/ImageDetails";
 import { PluginTree } from "./components/PluginTree";
 import { PluginTypeDetails } from "./components/PluginTypeDetails";
 import { RegisterAssemblyDialog } from "./components/RegisterAssemblyDialog";
+import { RegisterEndpointStepDialog } from "./components/RegisterEndpointStepDialog";
 import { RegisterImageDialog } from "./components/RegisterImageDialog";
+import { RegisterServiceEndpointDialog } from "./components/RegisterServiceEndpointDialog";
 import { RegisterStepDialog } from "./components/RegisterStepDialog";
+import { ServiceEndpointDetails } from "./components/ServiceEndpointDetails";
 import { StepDetails } from "./components/StepDetails";
-import type { PluginAssembly, PluginType, ProcessingStep, StepImage, TreeNode } from "./models/interfaces";
+import type { PluginAssembly, PluginType, ProcessingStep, ServiceEndpoint, StepImage, TreeNode } from "./models/interfaces";
 import { DataverseClient } from "./utils/DataverseClient";
 
 const client = new DataverseClient();
@@ -19,8 +22,12 @@ function buildTreeNodes(
     steps: Map<string, ProcessingStep[]>,
     images: Map<string, StepImage[]>,
     expandedIds: Set<string>,
+    serviceEndpoints: ServiceEndpoint[],
+    endpointSteps: Map<string, ProcessingStep[]>,
+    showPlugins: boolean,
+    showEndpoints: boolean,
 ): TreeNode[] {
-    return assemblies.map((asm) => {
+    const assemblyNodes: TreeNode[] = assemblies.map((asm) => {
         const types = pluginTypes.get(asm.pluginassemblyid) ?? [];
         const typeNodes: TreeNode[] = types.map((pt) => {
             const ptSteps = steps.get(pt.plugintypeid) ?? [];
@@ -28,13 +35,13 @@ function buildTreeNodes(
                 const stepImages = images.get(step.sdkmessageprocessingstepid) ?? [];
                 const imageNodes: TreeNode[] = stepImages.map((img) => ({
                     id: img.sdkmessageprocessingstepimageid,
-                    type: "image",
+                    type: "image" as const,
                     name: img.name,
                     data: img,
                 }));
                 return {
                     id: step.sdkmessageprocessingstepid,
-                    type: "step",
+                    type: "step" as const,
                     name: step.name,
                     data: step,
                     children: imageNodes,
@@ -44,7 +51,7 @@ function buildTreeNodes(
             });
             return {
                 id: pt.plugintypeid,
-                type: "plugintype",
+                type: "plugintype" as const,
                 name: pt.typename,
                 data: pt,
                 children: stepNodes,
@@ -55,7 +62,7 @@ function buildTreeNodes(
         });
         return {
             id: asm.pluginassemblyid,
-            type: "assembly",
+            type: "assembly" as const,
             name: asm.name,
             data: asm,
             children: typeNodes,
@@ -63,6 +70,43 @@ function buildTreeNodes(
             childrenLoaded: pluginTypes.has(asm.pluginassemblyid),
         };
     });
+
+    const endpointNodes: TreeNode[] = serviceEndpoints.map((ep) => {
+        const epSteps = endpointSteps.get(ep.serviceendpointid) ?? [];
+        const stepNodes: TreeNode[] = epSteps.map((step) => {
+            const stepImages = images.get(step.sdkmessageprocessingstepid) ?? [];
+            const imageNodes: TreeNode[] = stepImages.map((img) => ({
+                id: img.sdkmessageprocessingstepimageid,
+                type: "image" as const,
+                name: img.name,
+                data: img,
+            }));
+            return {
+                id: step.sdkmessageprocessingstepid,
+                type: "step" as const,
+                name: step.name,
+                data: step,
+                children: imageNodes,
+                isExpanded: expandedIds.has(step.sdkmessageprocessingstepid),
+                childrenLoaded: images.has(step.sdkmessageprocessingstepid),
+            };
+        });
+        return {
+            id: ep.serviceendpointid,
+            type: "serviceendpoint" as const,
+            name: ep.name,
+            data: ep,
+            children: stepNodes,
+            isExpanded: expandedIds.has(ep.serviceendpointid),
+            childrenLoaded: endpointSteps.has(ep.serviceendpointid),
+            isWebhook: ep.contract === 8,
+        };
+    });
+
+    const result: TreeNode[] = [];
+    if (showPlugins) result.push(...assemblyNodes);
+    if (showEndpoints) result.push(...endpointNodes);
+    return result;
 }
 
 /** Filter tree nodes for search. Images are excluded from matching but shown as children of matched steps. */
@@ -94,6 +138,8 @@ export default function App() {
     const [pluginTypes, setPluginTypes] = useState<Map<string, PluginType[]>>(new Map());
     const [steps, setSteps] = useState<Map<string, ProcessingStep[]>>(new Map());
     const [images, setImages] = useState<Map<string, StepImage[]>>(new Map());
+    const [serviceEndpoints, setServiceEndpoints] = useState<ServiceEndpoint[]>([]);
+    const [endpointSteps, setEndpointSteps] = useState<Map<string, ProcessingStep[]>>(new Map());
 
     // Tree state
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -101,6 +147,13 @@ export default function App() {
 
     // Search
     const [searchTerm, setSearchTerm] = useState("");
+
+    // Filter toggles
+    const [showPlugins, setShowPlugins] = useState(true);
+    const [showEndpoints, setShowEndpoints] = useState(true);
+
+    // Bulk enable/disable in progress
+    const [bulkToggling, setBulkToggling] = useState(false);
 
     // Register dropdown
     const [showRegisterDropdown, setShowRegisterDropdown] = useState(false);
@@ -113,6 +166,11 @@ export default function App() {
     const [showUpdateStep, setShowUpdateStep] = useState(false);
     const [showRegisterImage, setShowRegisterImage] = useState(false);
     const [showUpdateImage, setShowUpdateImage] = useState(false);
+    const [showRegisterWebhook, setShowRegisterWebhook] = useState(false);
+    const [showRegisterServiceEndpoint, setShowRegisterServiceEndpoint] = useState(false);
+    const [showUpdateEndpoint, setShowUpdateEndpoint] = useState(false);
+    const [showRegisterEndpointStep, setShowRegisterEndpointStep] = useState(false);
+    const [showUpdateEndpointStep, setShowUpdateEndpointStep] = useState(false);
 
     // Close register dropdown when clicking outside
     useEffect(() => {
@@ -135,29 +193,43 @@ export default function App() {
         setLoading(false);
     }, []);
 
-    const loadAssemblies = useCallback(async () => {
+    const loadAll = useCallback(async () => {
         setLoading(true);
         setError("");
-        try {
-            const data = await client.fetchAssemblies();
-            setAssemblies(data);
-            setPluginTypes(new Map());
-            setSteps(new Map());
-            setImages(new Map());
-            setSelectedNode(null);
-            setExpandedIds(new Set());
-        } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : String(err));
-        } finally {
-            setLoading(false);
+        // Reset all state upfront so the tree clears immediately
+        setAssemblies([]);
+        setServiceEndpoints([]);
+        setPluginTypes(new Map());
+        setSteps(new Map());
+        setImages(new Map());
+        setEndpointSteps(new Map());
+        setSelectedNode(null);
+        setExpandedIds(new Set());
+        // Fetch independently — one failure must not block the other
+        const [assembliesResult, endpointsResult] = await Promise.allSettled([
+            client.fetchAssemblies(),
+            client.fetchServiceEndpoints(),
+        ]);
+        if (assembliesResult.status === "fulfilled") {
+            setAssemblies(assembliesResult.value);
+        } else {
+            const msg = assembliesResult.reason instanceof Error ? assembliesResult.reason.message : String(assembliesResult.reason);
+            setError(msg);
         }
+        if (endpointsResult.status === "fulfilled") {
+            setServiceEndpoints(endpointsResult.value);
+        } else {
+            const msg = endpointsResult.reason instanceof Error ? endpointsResult.reason.message : String(endpointsResult.reason);
+            setError((prev) => (prev ? `${prev}\n${msg}` : msg));
+        }
+        setLoading(false);
     }, []);
 
     useEffect(() => {
         if (isPPTB) {
-            void loadAssemblies();
+            void loadAll();
         }
-    }, [isPPTB, loadAssemblies]);
+    }, [isPPTB, loadAll]);
 
     // Load children data when a node is selected (for bottom grid)
     const handleSelectNode = useCallback(
@@ -199,9 +271,19 @@ export default function App() {
                         loadErr(err);
                     }
                 }
+            } else if (node.type === "serviceendpoint") {
+                const epId = node.id;
+                if (!endpointSteps.has(epId)) {
+                    try {
+                        const s = await client.fetchStepsForEndpoint(epId);
+                        setEndpointSteps((prev) => new Map(prev).set(epId, s));
+                    } catch (err) {
+                        loadErr(err);
+                    }
+                }
             }
         },
-        [pluginTypes, steps, images],
+        [pluginTypes, steps, images, endpointSteps],
     );
 
     const handleToggleExpand = useCallback(
@@ -222,6 +304,15 @@ export default function App() {
                 try {
                     const types = await client.fetchPluginTypes(nodeId);
                     setPluginTypes((prev: Map<string, PluginType[]>) => new Map(prev).set(nodeId, types));
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+            const ep = serviceEndpoints.find((e) => e.serviceendpointid === nodeId);
+            if (ep && !endpointSteps.has(nodeId)) {
+                try {
+                    const s = await client.fetchStepsForEndpoint(nodeId);
+                    setEndpointSteps((prev) => new Map(prev).set(nodeId, s));
                 } catch (err) {
                     console.error(err);
                 }
@@ -250,8 +341,21 @@ export default function App() {
                     break;
                 }
             }
+            // Also check endpoint steps for image loading
+            for (const [, ss] of endpointSteps) {
+                const step = ss.find((s: ProcessingStep) => s.sdkmessageprocessingstepid === nodeId);
+                if (step && !images.has(nodeId)) {
+                    try {
+                        const imgs = await client.fetchImages(nodeId);
+                        setImages((prev: Map<string, StepImage[]>) => new Map(prev).set(nodeId, imgs));
+                    } catch (err) {
+                        console.error(err);
+                    }
+                    break;
+                }
+            }
         },
-        [assemblies, pluginTypes, steps, images],
+        [assemblies, pluginTypes, steps, images, serviceEndpoints, endpointSteps],
     );
 
     const notify = (message: string, type: "success" | "error" = "success") => {
@@ -277,14 +381,10 @@ export default function App() {
                 notify(`Assembly registered with ${types.length} plugin type(s).`);
             }
 
-            // Reload assemblies and auto-expand the new one
-            const data = await client.fetchAssemblies();
-            setAssemblies(data);
+            // Refresh the full tree, then pre-populate the new assembly's types and auto-expand it
+            await loadAll();
             setPluginTypes(new Map<string, PluginType[]>([[newId, types]]));
-            setSteps(new Map());
-            setImages(new Map());
             setExpandedIds(new Set([newId]));
-            setSelectedNode(null);
         } catch (err: unknown) {
             notify(err instanceof Error ? err.message : String(err), "error");
             throw err; // re-throw so dialog can show inline error
@@ -312,7 +412,7 @@ export default function App() {
                 notify("Assembly updated.");
             }
 
-            void loadAssemblies();
+            void loadAll();
         } catch (err: unknown) {
             notify(err instanceof Error ? err.message : String(err), "error");
             throw err;
@@ -325,7 +425,7 @@ export default function App() {
         try {
             await client.updateAssembly(asm.pluginassemblyid, description);
             notify("Assembly description saved.");
-            void loadAssemblies();
+            void loadAll();
         } catch (err: unknown) {
             notify(err instanceof Error ? err.message : String(err), "error");
         }
@@ -339,7 +439,7 @@ export default function App() {
             await client.deleteAssembly(asm.pluginassemblyid);
             notify("Assembly unregistered.");
             setSelectedNode(null);
-            void loadAssemblies();
+            void loadAll();
         } catch (err: unknown) {
             notify(err instanceof Error ? err.message : String(err), "error");
         }
@@ -351,9 +451,22 @@ export default function App() {
         return null;
     };
 
-    const handleRegisterStep = async (stepData: Partial<ProcessingStep> & { messageId: string; filterId?: string; pluginTypeId: string }) => {
+    const handleRegisterStep = async (stepData: Partial<ProcessingStep> & { messageId: string; filterId?: string; pluginTypeId: string; configuration?: string; secureconfig?: string; supporteddeployment?: number }) => {
         try {
-            await client.registerStep(stepData);
+            // If secureconfig provided, create the secure config record first and bind it
+            const stepPayload: typeof stepData & { secureconfigid?: string } = { ...stepData };
+            let createdScId: string | undefined;
+            if (stepData.secureconfig) {
+                createdScId = await client.createSecureConfig(stepData.secureconfig);
+                stepPayload.secureconfigid = createdScId;
+            }
+            try {
+                await client.registerStep(stepPayload);
+            } catch (registerErr) {
+                // Clean up orphaned secure config record if step creation failed
+                if (createdScId) await client.deleteSecureConfig(createdScId).catch(() => undefined);
+                throw registerErr;
+            }
             notify("Step registered successfully.");
             setShowRegisterStep(false);
             const ptId = stepData.pluginTypeId;
@@ -365,17 +478,36 @@ export default function App() {
         }
     };
 
-    const handleUpdateStep = async (stepData: Partial<ProcessingStep> & { messageId: string; filterId?: string; pluginTypeId: string }) => {
+    const handleUpdateStep = async (stepData: Partial<ProcessingStep> & { messageId: string; filterId?: string; pluginTypeId: string; configuration?: string; secureconfig?: string; supporteddeployment?: number }) => {
         if (selectedNode?.type !== "step") return;
         const step = selectedNode.data as ProcessingStep;
         try {
-            await client.updateStep(step.sdkmessageprocessingstepid, stepData);
+            // Handle secure config changes
+            const stepPayload: typeof stepData & { secureconfigid?: string } = { ...stepData };
+            let createdScId: string | undefined;
+            if (stepData.secureconfig) {
+                if (step.secureconfigid) {
+                    await client.updateSecureConfig(step.secureconfigid, stepData.secureconfig);
+                } else {
+                    createdScId = await client.createSecureConfig(stepData.secureconfig);
+                    stepPayload.secureconfigid = createdScId;
+                }
+            }
+            try {
+                await client.updateStep(step.sdkmessageprocessingstepid, stepPayload);
+            } catch (updateErr) {
+                // Clean up orphaned secure config record if step update failed
+                if (createdScId) await client.deleteSecureConfig(createdScId).catch(() => undefined);
+                throw updateErr;
+            }
             notify("Step updated.");
             setShowUpdateStep(false);
             const ptId = step.plugintypeid ?? stepData.pluginTypeId;
             if (ptId) {
                 const s = await client.fetchSteps(ptId);
                 setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
+                const updated = s.find((st) => st.sdkmessageprocessingstepid === step.sdkmessageprocessingstepid);
+                if (updated) setSelectedNode((prev) => prev ? { ...prev, data: updated } : prev);
             }
         } catch (err: unknown) {
             notify(err instanceof Error ? err.message : String(err), "error");
@@ -393,6 +525,8 @@ export default function App() {
             if (ptId) {
                 const s = await client.fetchSteps(ptId);
                 setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
+                const updated = s.find((st) => st.sdkmessageprocessingstepid === step.sdkmessageprocessingstepid);
+                if (updated) setSelectedNode((prev) => prev ? { ...prev, data: updated } : prev);
             }
         } catch (err: unknown) {
             notify(err instanceof Error ? err.message : String(err), "error");
@@ -427,6 +561,13 @@ export default function App() {
             if (ptId) {
                 const s = await client.fetchSteps(ptId);
                 setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
+                const updated = s.find((st) => st.sdkmessageprocessingstepid === step.sdkmessageprocessingstepid);
+                if (updated) setSelectedNode((prev) => prev ? { ...prev, data: updated } : prev);
+            } else if (step.serviceendpointid) {
+                const s = await client.fetchStepsForEndpoint(step.serviceendpointid);
+                setEndpointSteps((prev) => new Map(prev).set(step.serviceendpointid!, s));
+                const updated = s.find((st) => st.sdkmessageprocessingstepid === step.sdkmessageprocessingstepid);
+                if (updated) setSelectedNode((prev) => prev ? { ...prev, data: updated } : prev);
             }
         } catch (err: unknown) {
             notify(err instanceof Error ? err.message : String(err), "error");
@@ -443,9 +584,218 @@ export default function App() {
             if (ptId) {
                 const s = await client.fetchSteps(ptId);
                 setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
+                const updated = s.find((st) => st.sdkmessageprocessingstepid === step.sdkmessageprocessingstepid);
+                if (updated) setSelectedNode((prev) => prev ? { ...prev, data: updated } : prev);
+            } else if (step.serviceendpointid) {
+                const s = await client.fetchStepsForEndpoint(step.serviceendpointid);
+                setEndpointSteps((prev) => new Map(prev).set(step.serviceendpointid!, s));
+                const updated = s.find((st) => st.sdkmessageprocessingstepid === step.sdkmessageprocessingstepid);
+                if (updated) setSelectedNode((prev) => prev ? { ...prev, data: updated } : prev);
             }
         } catch (err: unknown) {
             notify(err instanceof Error ? err.message : String(err), "error");
+        }
+    };
+
+    const bulkToggleStepsForPluginType = async (action: "enable" | "disable") => {
+        if (selectedNode?.type !== "plugintype") return;
+        const pt = selectedNode.data as PluginType;
+        const verb = action === "enable" ? "enabled" : "disabled";
+        setBulkToggling(true);
+        try {
+            const cached = steps.get(pt.plugintypeid);
+            const ptSteps = cached ?? (await client.fetchSteps(pt.plugintypeid));
+            if (!cached) setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(pt.plugintypeid, ptSteps));
+            if (ptSteps.length === 0) { notify("No steps found."); return; }
+            const op = (id: string) => (action === "enable" ? client.enableStep(id) : client.disableStep(id));
+            const results = await Promise.allSettled(ptSteps.map((s) => op(s.sdkmessageprocessingstepid)));
+            const failed = results.filter((r) => r.status === "rejected").length;
+            if (failed > 0) {
+                notify(`${ptSteps.length - failed} step(s) ${verb}. ${failed} failed.`, "error");
+            } else {
+                notify(`All ${ptSteps.length} step(s) ${verb}.`);
+            }
+            const refreshed = await client.fetchSteps(pt.plugintypeid);
+            setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(pt.plugintypeid, refreshed));
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+        } finally {
+            setBulkToggling(false);
+        }
+    };
+
+    const handleEnableAllStepsForPluginType = () => bulkToggleStepsForPluginType("enable");
+    const handleDisableAllStepsForPluginType = () => bulkToggleStepsForPluginType("disable");
+
+    const bulkToggleStepsForAssembly = async (action: "enable" | "disable") => {
+        if (selectedNode?.type !== "assembly") return;
+        const asm = selectedNode.data as PluginAssembly;
+        const verb = action === "enable" ? "enabled" : "disabled";
+        setBulkToggling(true);
+        try {
+            const cachedTypes = pluginTypes.get(asm.pluginassemblyid);
+            const pts = cachedTypes ?? (await client.fetchPluginTypes(asm.pluginassemblyid));
+            if (!cachedTypes) setPluginTypes((prev: Map<string, PluginType[]>) => new Map(prev).set(asm.pluginassemblyid, pts));
+            if (pts.length === 0) { notify("No plugin types found."); return; }
+            const stepsEntries = await Promise.all(
+                pts.map(async (pt: PluginType) => {
+                    const cached = steps.get(pt.plugintypeid);
+                    const ptSteps = cached ?? (await client.fetchSteps(pt.plugintypeid));
+                    return { ptId: pt.plugintypeid, ptSteps };
+                }),
+            );
+            setSteps((prev: Map<string, ProcessingStep[]>) => {
+                const next = new Map(prev);
+                for (const { ptId, ptSteps } of stepsEntries) {
+                    if (!prev.has(ptId)) next.set(ptId, ptSteps);
+                }
+                return next;
+            });
+            const allSteps = stepsEntries.flatMap(({ ptSteps }) => ptSteps);
+            if (allSteps.length === 0) { notify("No steps found."); return; }
+            const op = (id: string) => (action === "enable" ? client.enableStep(id) : client.disableStep(id));
+            const results = await Promise.allSettled(allSteps.map((s) => op(s.sdkmessageprocessingstepid)));
+            const failed = results.filter((r) => r.status === "rejected").length;
+            if (failed > 0) {
+                notify(`${allSteps.length - failed} step(s) ${verb}. ${failed} failed.`, "error");
+            } else {
+                notify(`All ${allSteps.length} step(s) ${verb}.`);
+            }
+            const refreshed = await Promise.all(pts.map(async (pt: PluginType) => ({ ptId: pt.plugintypeid, ptSteps: await client.fetchSteps(pt.plugintypeid) })));
+            setSteps((prev: Map<string, ProcessingStep[]>) => {
+                const next = new Map(prev);
+                for (const { ptId, ptSteps } of refreshed) next.set(ptId, ptSteps);
+                return next;
+            });
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+        } finally {
+            setBulkToggling(false);
+        }
+    };
+
+    const handleEnableAllStepsForAssembly = () => bulkToggleStepsForAssembly("enable");
+    const handleDisableAllStepsForAssembly = () => bulkToggleStepsForAssembly("disable");
+
+    // ── Service Endpoint actions ──
+    const handleRegisterServiceEndpoint = async (data: Partial<ServiceEndpoint>) => {
+        try {
+            await client.registerServiceEndpoint(data);
+            notify("Service endpoint registered successfully.");
+            setShowRegisterWebhook(false);
+            setShowRegisterServiceEndpoint(false);
+            void loadAll();
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            throw err;
+        }
+    };
+
+    const handleUpdateServiceEndpoint = async (data: Partial<ServiceEndpoint>) => {
+        if (selectedNode?.type !== "serviceendpoint") return;
+        const ep = selectedNode.data as ServiceEndpoint;
+        try {
+            await client.updateServiceEndpoint(ep.serviceendpointid, data);
+            notify("Service endpoint updated.");
+            setShowUpdateEndpoint(false);
+            void loadAll();
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            throw err;
+        }
+    };
+
+    const handleSaveEndpointDescription = async (description: string) => {
+        if (selectedNode?.type !== "serviceendpoint") return;
+        const ep = selectedNode.data as ServiceEndpoint;
+        try {
+            await client.updateServiceEndpoint(ep.serviceendpointid, { description });
+            notify("Description saved.");
+            void loadAll();
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+        }
+    };
+
+    const handleUnregisterServiceEndpoint = async () => {
+        if (selectedNode?.type !== "serviceendpoint") return;
+        const ep = selectedNode.data as ServiceEndpoint;
+        if (!window.confirm(`Unregister "${ep.name}"? This will also remove all associated steps.`)) return;
+        try {
+            await client.deleteServiceEndpoint(ep.serviceendpointid);
+            notify("Service endpoint unregistered.");
+            setSelectedNode(null);
+            void loadAll();
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+        }
+    };
+
+    const handleRegisterEndpointStep = async (stepData: {
+        name: string;
+        description?: string;
+        rank?: number;
+        mode?: number;
+        stage?: number;
+        filteringattributes?: string;
+        asyncautodelete?: boolean;
+        messageId: string;
+        filterId?: string;
+        endpointId: string;
+        configuration?: string;
+        supporteddeployment?: number;
+    }) => {
+        try {
+            await client.registerStepForEndpoint(stepData);
+            notify("Step registered successfully.");
+            setShowRegisterEndpointStep(false);
+            const s = await client.fetchStepsForEndpoint(stepData.endpointId);
+            setEndpointSteps((prev) => new Map(prev).set(stepData.endpointId, s));
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            throw err;
+        }
+    };
+
+    const handleUpdateEndpointStep = async (stepData: {
+        name: string;
+        description?: string;
+        rank?: number;
+        mode?: number;
+        stage?: number;
+        filteringattributes?: string;
+        asyncautodelete?: boolean;
+        messageId: string;
+        filterId?: string;
+        endpointId: string;
+        configuration?: string;
+        supporteddeployment?: number;
+    }) => {
+        if (selectedNode?.type !== "step") return;
+        const step = selectedNode.data as ProcessingStep;
+        try {
+            await client.updateStep(step.sdkmessageprocessingstepid, {
+                name: stepData.name,
+                description: stepData.description,
+                rank: stepData.rank,
+                mode: stepData.mode,
+                stage: stepData.stage,
+                filteringattributes: stepData.filteringattributes,
+                asyncautodelete: stepData.asyncautodelete,
+                messageId: stepData.messageId,
+                filterId: stepData.filterId,
+                configuration: stepData.configuration,
+                supporteddeployment: stepData.supporteddeployment,
+            });
+            notify("Step updated.");
+            setShowUpdateEndpointStep(false);
+            const s = await client.fetchStepsForEndpoint(stepData.endpointId);
+            setEndpointSteps((prev) => new Map(prev).set(stepData.endpointId, s));
+            const updated = s.find((st) => st.sdkmessageprocessingstepid === step.sdkmessageprocessingstepid);
+            if (updated) setSelectedNode((prev) => prev ? { ...prev, data: updated } : prev);
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            throw err;
         }
     };
 
@@ -514,6 +864,16 @@ export default function App() {
     const selectedPluginType = getSelectedPluginType();
     const selectedStep = selectedNode?.type === "step" ? (selectedNode.data as ProcessingStep) : null;
     const selectedImage = selectedNode?.type === "image" ? (selectedNode.data as StepImage) : null;
+    const selectedEndpoint = selectedNode?.type === "serviceendpoint" ? (selectedNode.data as ServiceEndpoint) : null;
+    // A step belonging to a service endpoint (has serviceendpointid set)
+    const selectedEndpointStep = (selectedNode?.type === "step" && (selectedNode.data as ProcessingStep).serviceendpointid)
+        ? (selectedNode.data as ProcessingStep)
+        : null;
+    // Find the parent endpoint for a selected endpoint step
+    const parentEndpoint: ServiceEndpoint | null = (() => {
+        if (!selectedEndpointStep) return null;
+        return serviceEndpoints.find((e) => e.serviceendpointid === selectedEndpointStep.serviceendpointid) ?? null;
+    })();
 
     const stepPluginType: PluginType | null = (() => {
         if (selectedNode?.type === "step") {
@@ -547,8 +907,8 @@ export default function App() {
     })();
 
     // Context-sensitive toolbar state
-    const canUpdate = !!(selectedAssembly || selectedStep || selectedImage);
-    const canUnregister = !!(selectedAssembly || selectedStep || selectedImage);
+    const canUpdate = !!(selectedAssembly || selectedStep || selectedImage || selectedEndpoint);
+    const canUnregister = !!(selectedAssembly || selectedStep || selectedImage || selectedEndpoint);
     const canRegisterStep = !!(selectedPluginType && !selectedPluginType.isworkflowactivity);
     const canRegisterImage = !!selectedStep;
     const isStepSelected = !!selectedStep;
@@ -556,14 +916,17 @@ export default function App() {
 
     const handleUpdateSelected = () => {
         if (selectedAssembly) setShowUpdateAssembly(true);
+        else if (selectedEndpointStep) setShowUpdateEndpointStep(true);
         else if (selectedStep) setShowUpdateStep(true);
         else if (selectedImage) setShowUpdateImage(true);
+        else if (selectedEndpoint) setShowUpdateEndpoint(true);
     };
 
     const handleUnregisterSelected = () => {
         if (selectedAssembly) void handleUnregisterAssembly();
         else if (selectedStep) void handleUnregisterStep();
         else if (selectedImage) void handleUnregisterImage();
+        else if (selectedEndpoint) void handleUnregisterServiceEndpoint();
     };
 
     // Double-click tree node → open update dialog
@@ -573,10 +936,18 @@ export default function App() {
             setShowUpdateAssembly(true);
         } else if (node.type === "step") {
             setSelectedNode(node);
-            setShowUpdateStep(true);
+            const step = node.data as ProcessingStep;
+            if (step.serviceendpointid) {
+                setShowUpdateEndpointStep(true);
+            } else {
+                setShowUpdateStep(true);
+            }
         } else if (node.type === "image") {
             setSelectedNode(node);
             setShowUpdateImage(true);
+        } else if (node.type === "serviceendpoint") {
+            setSelectedNode(node);
+            setShowUpdateEndpoint(true);
         }
     };
 
@@ -593,7 +964,7 @@ export default function App() {
     const bottomSteps = selectedPluginType ? (steps.get(selectedPluginType.plugintypeid) ?? []) : [];
     const bottomImages = selectedStep ? (images.get(selectedStep.sdkmessageprocessingstepid) ?? []) : [];
 
-    const rawTreeNodes = buildTreeNodes(assemblies, pluginTypes, steps, images, expandedIds);
+    const rawTreeNodes = buildTreeNodes(assemblies, pluginTypes, steps, images, expandedIds, serviceEndpoints, endpointSteps, showPlugins, showEndpoints);
 
     const treeNodes = searchTerm
         ? filterTreeForSearch(rawTreeNodes, searchTerm.toLowerCase())
@@ -658,6 +1029,35 @@ export default function App() {
                                     New Image
                                 </div>
                             )}
+                            {selectedEndpoint && (
+                                <div
+                                    className="toolbar-dropdown-item"
+                                    onClick={() => {
+                                        setShowRegisterEndpointStep(true);
+                                        setShowRegisterDropdown(false);
+                                    }}
+                                >
+                                    New Endpoint Step
+                                </div>
+                            )}
+                            <div
+                                className="toolbar-dropdown-item"
+                                onClick={() => {
+                                    setShowRegisterWebhook(true);
+                                    setShowRegisterDropdown(false);
+                                }}
+                            >
+                                New Webhook
+                            </div>
+                            <div
+                                className="toolbar-dropdown-item"
+                                onClick={() => {
+                                    setShowRegisterServiceEndpoint(true);
+                                    setShowRegisterDropdown(false);
+                                }}
+                            >
+                                New Service Endpoint
+                            </div>
                         </div>
                     )}
                 </div>
@@ -676,9 +1076,22 @@ export default function App() {
                 <div className="toolbar-separator" />
 
                 <div className="toolbar-group">
-                    <button className="toolbar-btn" onClick={() => void loadAssemblies()} disabled={loading}>
+                    <button className="toolbar-btn" onClick={() => void loadAll()} disabled={loading}>
                         {loading ? "Refreshing…" : "Refresh"}
                     </button>
+                </div>
+
+                <div className="toolbar-separator" />
+
+                <div className="toolbar-group toolbar-filter-group">
+                    <label className="toolbar-filter-label">
+                        <input type="checkbox" checked={showPlugins} onChange={(e) => setShowPlugins(e.target.checked)} />
+                        Plugins
+                    </label>
+                    <label className="toolbar-filter-label">
+                        <input type="checkbox" checked={showEndpoints} onChange={(e) => setShowEndpoints(e.target.checked)} />
+                        Endpoints
+                    </label>
                 </div>
 
                 {isStepSelected && (
@@ -690,6 +1103,33 @@ export default function App() {
                             </button>
                             <button className="toolbar-btn" onClick={() => void handleDisableStep()} disabled={!stepIsEnabled}>
                                 Disable
+                            </button>
+                        </div>
+                    </>
+                )}
+                {(selectedPluginType || selectedAssembly) && (
+                    <>
+                        <div className="toolbar-separator" />
+                        <div className="toolbar-group">
+                            <button
+                                className="toolbar-btn"
+                                disabled={bulkToggling}
+                                onClick={() => {
+                                    if (selectedPluginType) void handleEnableAllStepsForPluginType();
+                                    else void handleEnableAllStepsForAssembly();
+                                }}
+                            >
+                                {bulkToggling ? <><span className="toolbar-spinner" /> Enabling…</> : "Enable All"}
+                            </button>
+                            <button
+                                className="toolbar-btn"
+                                disabled={bulkToggling}
+                                onClick={() => {
+                                    if (selectedPluginType) void handleDisableAllStepsForPluginType();
+                                    else void handleDisableAllStepsForAssembly();
+                                }}
+                            >
+                                {bulkToggling ? <><span className="toolbar-spinner" /> Disabling…</> : "Disable All"}
                             </button>
                         </div>
                     </>
@@ -763,6 +1203,15 @@ export default function App() {
                             onUnregister={() => void handleUnregisterImage()}
                         />
                     )}
+                    {selectedEndpoint && (
+                        <ServiceEndpointDetails
+                            endpoint={selectedEndpoint}
+                            onSave={(desc) => handleSaveEndpointDescription(desc)}
+                            onUpdate={() => setShowUpdateEndpoint(true)}
+                            onUnregister={() => void handleUnregisterServiceEndpoint()}
+                            onRegisterStep={() => setShowRegisterEndpointStep(true)}
+                        />
+                    )}
                 </div>
             </div>
 
@@ -821,6 +1270,47 @@ export default function App() {
                     existingImage={selectedImage}
                     onRegister={(imageData) => handleUpdateImage(imageData)}
                     onClose={() => setShowUpdateImage(false)}
+                />
+            )}
+            <RegisterServiceEndpointDialog
+                isOpen={showRegisterWebhook}
+                isUpdate={false}
+                isWebhook={true}
+                onSave={(data) => handleRegisterServiceEndpoint(data)}
+                onClose={() => setShowRegisterWebhook(false)}
+            />
+            <RegisterServiceEndpointDialog
+                isOpen={showRegisterServiceEndpoint}
+                isUpdate={false}
+                isWebhook={false}
+                onSave={(data) => handleRegisterServiceEndpoint(data)}
+                onClose={() => setShowRegisterServiceEndpoint(false)}
+            />
+            <RegisterServiceEndpointDialog
+                isOpen={showUpdateEndpoint}
+                isUpdate={true}
+                isWebhook={selectedEndpoint?.contract === 8}
+                existingEndpoint={selectedEndpoint ?? undefined}
+                onSave={(data) => handleUpdateServiceEndpoint(data)}
+                onClose={() => setShowUpdateEndpoint(false)}
+            />
+            {(selectedEndpoint ?? parentEndpoint) && (
+                <RegisterEndpointStepDialog
+                    isOpen={showRegisterEndpointStep}
+                    isUpdate={false}
+                    endpoint={(selectedEndpoint ?? parentEndpoint)!}
+                    onRegister={(stepData) => handleRegisterEndpointStep(stepData)}
+                    onClose={() => setShowRegisterEndpointStep(false)}
+                />
+            )}
+            {selectedEndpointStep && parentEndpoint && (
+                <RegisterEndpointStepDialog
+                    isOpen={showUpdateEndpointStep}
+                    isUpdate={true}
+                    endpoint={parentEndpoint}
+                    existingStep={selectedEndpointStep}
+                    onRegister={(stepData) => handleUpdateEndpointStep(stepData)}
+                    onClose={() => setShowUpdateEndpointStep(false)}
                 />
             )}
         </div>

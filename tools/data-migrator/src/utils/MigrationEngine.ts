@@ -1,5 +1,6 @@
 import type { AutoMappingResult, BusinessUnitRecord, MigrationConfig, MigrationProgress, MigrationRecord, PreviewRecord, TeamRecord, UserRecord } from "../models/interfaces";
 import { DataverseClient } from "./DataverseClient";
+import { isReferenceFieldType } from "./fieldUtils";
 
 type EntityMetadataResponse = {
     PrimaryIdAttribute?: string;
@@ -154,7 +155,10 @@ export class MigrationEngine {
                 const sampleRecord = selectedRecords[0].data;
                 
                 for (const mapping of enabledMappings) {
-                    if (!(mapping.sourceField in sampleRecord)) {
+                    // Lookup fields are stored as _fieldname_value in OData query results
+                    const lookupValueField = `_${mapping.sourceField}_value`;
+                    const fieldPresent = mapping.sourceField in sampleRecord || (isReferenceFieldType(mapping.fieldType) && lookupValueField in sampleRecord);
+                    if (!fieldPresent) {
                         missingFields.add(mapping.sourceField);
                     }
                 }

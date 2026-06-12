@@ -23,7 +23,8 @@
     "finalize-package": "npm shrinkwrap",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "publish-package": "npm publish --access public"
+    "version-stable": "npm version patch --no-git-tag-version",
+    "publish-package": "npm run build && npm run version-stable && npm publish --access public"
   },
   "files": [
     "dist",

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { SavedFilter } from "../models/interfaces";
 
 interface LoadFilterModalProps {
@@ -9,6 +10,20 @@ interface LoadFilterModalProps {
 }
 
 export function LoadFilterModal({ isOpen, onClose, onLoad, onDelete, savedFilters }: LoadFilterModalProps) {
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                e.preventDefault();
+                onClose();
+            }
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [isOpen, onClose]);
+
     if (!isOpen) return null;
 
     const handleLoad = (filter: SavedFilter) => {

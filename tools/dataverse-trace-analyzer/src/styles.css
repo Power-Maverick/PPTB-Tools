@@ -11,6 +11,7 @@
     --text-secondary: #605e5c;
     --text-muted: #8a8886;
     --background-muted: #f3f2f1;
+    --selected-bg: #cce4f6;
     --error-bg: #fde7e9;
     --error-border: #f1aeb5;
     --shadow-sm: 0 1.6px 3.6px rgba(0, 0, 0, 0.132), 0 0.3px 0.9px rgba(0, 0, 0, 0.108);
@@ -30,6 +31,7 @@ body.dark-theme {
     --text-secondary: #b0b0b0;
     --text-muted: #8a8886;
     --background-muted: #2d2d2d;
+    --selected-bg: #1d3d5c;
     --error-bg: #4a2c2e;
     --error-border: #6d3a3e;
     --shadow-sm: 0 1.6px 3.6px rgba(0, 0, 0, 0.4), 0 0.3px 0.9px rgba(0, 0, 0, 0.3);
@@ -184,8 +186,8 @@ body {
 }
 
 .log-item.selected {
-    background-color: var(--background-muted);
-    color: var(--background);
+    background-color: var(--selected-bg);
+    color: var(--text-color);
     border-left: 3px solid var(--primary-hover);
     padding-left: 9px;
 }
@@ -545,6 +547,7 @@ body {
     border-radius: 2px;
     font-size: 13px;
     background-color: var(--background);
+    color: var(--text-color);
     width: 100%;
 }
 
@@ -562,6 +565,8 @@ body {
     border: 1px solid var(--border-color);
     border-radius: 2px;
     padding: 8px;
+    background-color: var(--background);
+    color: var(--text-color);
 }
 
 .checkbox-item {
@@ -764,6 +769,8 @@ body {
     border-radius: 4px;
     font-size: 13px;
     font-family: inherit;
+    background-color: var(--background);
+    color: var(--text-color);
     transition: border-color 0.2s ease;
 }
 
@@ -835,12 +842,26 @@ body {
 }
 
 .log-item.highlighted.selected {
-    background-color: #e6f2ff;
+    background-color: var(--selected-bg);
     border-left-color: var(--primary-color);
 }
 
 .log-item.highlighted:hover {
     background-color: #ffec99;
+}
+
+body.dark-theme .log-item.highlighted {
+    background-color: #4a3c00;
+    border-left-color: var(--warning-color);
+}
+
+body.dark-theme .log-item.highlighted.selected {
+    background-color: var(--selected-bg);
+    border-left-color: var(--primary-color);
+}
+
+body.dark-theme .log-item.highlighted:hover {
+    background-color: #5a4a00;
 }
 
 /* Auto Refresh Modal */

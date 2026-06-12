@@ -9,16 +9,25 @@ import { PreviewData } from "./components/PreviewData";
 import { AutoMappingResult, DataverseEntity, FieldMapping, LookupMapping, MigrationConfig, MigrationOperation, MigrationProgress, PreviewRecord } from "./models/interfaces";
 import "./styles/App.css";
 import { DataverseClient } from "./utils/DataverseClient";
+import { isReferenceFieldType } from "./utils/fieldUtils";
 import { MigrationEngine } from "./utils/MigrationEngine";
+
+// Extends the published DataverseConnection type to include the environmentColor
+// property that PPTB returns at runtime (user-configurable per connection).
+type DataverseConnectionWithColor = ToolBoxAPI.DataverseConnection & {
+    environmentColor?: string;
+};
 
 function App() {
     const [isPPTB, setIsPPTB] = useState<boolean>(false);
     const [connectionUrl, setConnectionUrl] = useState<string>("");
     const [connectionName, setConnectionName] = useState<string>("");
     const [connectionEnvironment, setConnectionEnvironment] = useState<string>("");
+    const [connectionEnvironmentColor, setConnectionEnvironmentColor] = useState<string>("");
     const [secondaryConnectionUrl, setSecondaryConnectionUrl] = useState<string>("");
     const [secondaryConnectionName, setSecondaryConnectionName] = useState<string>("");
     const [secondaryConnectionEnvironment, setSecondaryConnectionEnvironment] = useState<string>("");
+    const [secondaryConnectionEnvironmentColor, setSecondaryConnectionEnvironmentColor] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>("");
 
@@ -64,16 +73,18 @@ function App() {
 
                 try {
                     // Get active (source) connection
-                    const activeConnection = await window.toolboxAPI.connections.getActiveConnection();
+                    const activeConnection = (await window.toolboxAPI.connections.getActiveConnection()) as DataverseConnectionWithColor | null;
                     setConnectionUrl(activeConnection?.url || "");
                     setConnectionName(activeConnection?.name || "");
                     setConnectionEnvironment(activeConnection?.environment || "");
+                    setConnectionEnvironmentColor(activeConnection?.environmentColor || "");
 
                     // Get secondary (target) connection
-                    const secondaryConnection = await window.toolboxAPI.connections.getSecondaryConnection();
+                    const secondaryConnection = (await window.toolboxAPI.connections.getSecondaryConnection()) as DataverseConnectionWithColor | null;
                     setSecondaryConnectionUrl(secondaryConnection?.url || "");
                     setSecondaryConnectionName(secondaryConnection?.name || "");
                     setSecondaryConnectionEnvironment(secondaryConnection?.environment || "");
+                    setSecondaryConnectionEnvironmentColor(secondaryConnection?.environmentColor || "");
 
                     if (!secondaryConnection) {
                         setError("Please select a secondary connection as the target environment");
@@ -163,7 +174,7 @@ function App() {
             setFieldMappings(mappings);
 
             // Initialize lookup mappings for reference fields
-            const lookupFields = fields.filter((f) => f.type.includes("Lookup") || f.type.includes("Owner") || f.type.includes("Customer"));
+            const lookupFields = fields.filter((f) => isReferenceFieldType(f.type));
 
             const lookups: LookupMapping[] = lookupFields.map((field) => ({
                 fieldName: field.logicalName,
@@ -212,7 +223,13 @@ function App() {
 
         try {
             const client = new DataverseClient("primary");
-            const selectFields = fieldMappings.filter((m) => m.isEnabled).map((m) => m.sourceField);
+            const selectFields = fieldMappings.filter((m) => m.isEnabled).map((m) => {
+                // Dataverse OData Web API represents lookup fields as _fieldname_value in $select
+                if (isReferenceFieldType(m.fieldType)) {
+                    return `_${m.sourceField}_value`;
+                }
+                return m.sourceField;
+            });
 
             // Add primary ID and primary name fields
             if (!selectFields.includes(selectedEntity.primaryIdAttribute)) {
@@ -235,16 +252,33 @@ function App() {
                     filterQuery || undefined,
                     undefined,
                     100, // Limit preview to 100 records
+                    selectedEntity.entitySetName,
                 );
             }
 
-            const preview: PreviewRecord[] = sourceRecords.map((record) => ({
-                action: (operations[0] || "create").toUpperCase() as "CREATE" | "UPDATE" | "DELETE",
-                data: record,
-                primaryId: record[selectedEntity.primaryIdAttribute] || "",
-                primaryName: record[selectedEntity.primaryNameAttribute] || "",
-                isSelected: true, // Default all records to selected
-            }));
+            // Normalize lookup fields: OData returns _fieldname_value keys, but the preview table
+            // renders cells using the bare logical name. Copy the value so both keys are present.
+            const enabledLookupFields = fieldMappings
+                .filter((m) => m.isEnabled && isReferenceFieldType(m.fieldType))
+                .map((m) => m.sourceField);
+
+            const preview: PreviewRecord[] = sourceRecords.map((record) => {
+                const normalizedData = { ...record };
+                for (const fieldName of enabledLookupFields) {
+                    const odataKey = `_${fieldName}_value`;
+                    // OData never returns both keys, but guard against overwriting if it ever does
+                    if (odataKey in normalizedData && !(fieldName in normalizedData)) {
+                        normalizedData[fieldName] = normalizedData[odataKey];
+                    }
+                }
+                return {
+                    action: (operations[0] || "create").toUpperCase() as "CREATE" | "UPDATE" | "DELETE",
+                    data: normalizedData,
+                    primaryId: normalizedData[selectedEntity.primaryIdAttribute] || "",
+                    primaryName: normalizedData[selectedEntity.primaryNameAttribute] || "",
+                    isSelected: true, // Default all records to selected
+                };
+            });
 
             setPreviewRecords(preview);
             setShowPreview(true);
@@ -407,13 +441,19 @@ function App() {
                         <h1 className="app-title">Data Migrator</h1>
                         {connectionUrl && secondaryConnectionUrl && (
                             <div className="connection-flow">
-                                <div className={`connection-badge env-${connectionEnvironment ? connectionEnvironment.toLowerCase() : "default"}`}>
+                                <div
+                                    className={`connection-badge env-${connectionEnvironment ? connectionEnvironment.toLowerCase() : "default"}`}
+                                    style={connectionEnvironmentColor ? { borderLeftColor: connectionEnvironmentColor } : undefined}
+                                >
                                     <span className="connection-label">Source</span>
                                     {connectionName && <span className="connection-name">{connectionName}</span>}
                                     <span className="connection-url">{new URL(connectionUrl).hostname}</span>
                                 </div>
                                 <div className="flow-arrow">→</div>
-                                <div className={`connection-badge env-${secondaryConnectionEnvironment ? secondaryConnectionEnvironment.toLowerCase() : "default"}`}>
+                                <div
+                                    className={`connection-badge env-${secondaryConnectionEnvironment ? secondaryConnectionEnvironment.toLowerCase() : "default"}`}
+                                    style={secondaryConnectionEnvironmentColor ? { borderLeftColor: secondaryConnectionEnvironmentColor } : undefined}
+                                >
                                     <span className="connection-label">Target</span>
                                     {secondaryConnectionName && <span className="connection-name">{secondaryConnectionName}</span>}
                                     <span className="connection-url">{new URL(secondaryConnectionUrl).hostname}</span>

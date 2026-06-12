@@ -1,3 +1,5 @@
 {
-    "svg.preview.background": "editor"
+    "svg.preview.background": "editor",
+    "codeQL.githubDatabase.download": "never",
+    "sarif-viewer.connectToGithubCodeScanning": "off"
 }

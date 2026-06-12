@@ -1,19 +1,29 @@
 import { useState, useEffect, useRef } from "react";
-import type { PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, SystemUser } from "../models/interfaces";
+import type { ServiceEndpoint, ProcessingStep, SdkMessage, SdkMessageFilter } from "../models/interfaces";
 import { DataverseClient } from "../utils/DataverseClient";
 import { AttributePickerDialog } from "./AttributePickerDialog";
-import { UserPickerDialog } from "./UserPickerDialog";
 
-interface RegisterStepDialogProps {
+interface RegisterEndpointStepDialogProps {
     isOpen: boolean;
     isUpdate: boolean;
-    pluginType: PluginType;
+    endpoint: ServiceEndpoint;
     existingStep?: ProcessingStep;
-    onRegister: (stepData: Partial<ProcessingStep> & { messageId: string; filterId?: string; pluginTypeId: string; configuration?: string; secureconfig?: string; supporteddeployment?: number }) => Promise<void>;
+    onRegister: (stepData: {
+        name: string;
+        description?: string;
+        rank?: number;
+        mode?: number;
+        stage?: number;
+        filteringattributes?: string;
+        asyncautodelete?: boolean;
+        messageId: string;
+        filterId?: string;
+        endpointId: string;
+        configuration?: string;
+        supporteddeployment?: number;
+    }) => Promise<void>;
     onClose: () => void;
 }
-
-type ImpersonationMode = "calling" | "system" | "user";
 
 /** Async mode is only allowed on Post-Operation (stage 40) */
 function asyncAllowed(stage: number): boolean {
@@ -22,14 +32,14 @@ function asyncAllowed(stage: number): boolean {
 
 const client = new DataverseClient();
 
-export function RegisterStepDialog({
+export function RegisterEndpointStepDialog({
     isOpen,
     isUpdate,
-    pluginType,
+    endpoint,
     existingStep,
     onRegister,
     onClose,
-}: RegisterStepDialogProps) {
+}: RegisterEndpointStepDialogProps) {
     const [messages, setMessages] = useState<SdkMessage[]>([]);
     const [filters, setFilters] = useState<SdkMessageFilter[]>([]);
     const [selectedMessageId, setSelectedMessageId] = useState(existingStep?.sdkmessageid ?? "");
@@ -42,33 +52,17 @@ export function RegisterStepDialog({
     const [filteringAttributes, setFilteringAttributes] = useState(existingStep?.filteringattributes ?? "");
     const [asyncAutoDelete, setAsyncAutoDelete] = useState(existingStep?.asyncautodelete ?? false);
     const [configuration, setUnsecureconfig] = useState(existingStep?.configuration ?? "");
-    const [secureconfig, setSecureconfig] = useState(existingStep?.secureconfig ?? "");
-    const [showSecureConfig, setShowSecureConfig] = useState(false);
     const [supporteddeployment, setSupporteddeployment] = useState(existingStep?.supporteddeployment ?? 0);
     const [submitError, setSubmitError] = useState("");
-
-    // ── Run in User's Context ──
-    const [impersonationMode, setImpersonationMode] = useState<ImpersonationMode>("calling");
-    const [selectedUser, setSelectedUser] = useState<SystemUser | null>(null);
-    const [systemUserId, setSystemUserId] = useState("");
-    const [systemUserLoading, setSystemUserLoading] = useState(false);
-    const [systemUserError, setSystemUserError] = useState("");
-    const [showUserPicker, setShowUserPicker] = useState(false);
-
     const [showAttrPicker, setShowAttrPicker] = useState(false);
     const [saving, setSaving] = useState(false);
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [loadingFilters, setLoadingFilters] = useState(false);
 
-    // Holds the filter ID to restore after the filter list loads (used on open in update mode).
-    // Initialized to "" — only set inside the isOpen effect, which always runs before the filter effect.
     const pendingFilterIdRef = useRef("");
-
-    // Incrementing this key forces the filter-loading effect to re-run even when selectedMessageId
-    // does not change (e.g. re-opening the update dialog for the same step).
     const [filterLoadKey, setFilterLoadKey] = useState(0);
 
-    // ── Reset all form fields when the dialog opens (or existingStep changes) ──
+    // Reset form when dialog opens or existingStep changes
     useEffect(() => {
         if (!isOpen) return;
         pendingFilterIdRef.current = existingStep?.sdkmessagefilterid ?? "";
@@ -81,12 +75,8 @@ export function RegisterStepDialog({
         setFilteringAttributes(existingStep?.filteringattributes ?? "");
         setAsyncAutoDelete(existingStep?.asyncautodelete ?? false);
         setUnsecureconfig(existingStep?.configuration ?? "");
-        setSecureconfig(existingStep?.secureconfig ?? "");
-        setShowSecureConfig(false);
         setSupporteddeployment(existingStep?.supporteddeployment ?? 0);
         setSubmitError("");
-        // Force the filter-loading effect to re-run regardless of whether selectedMessageId changed,
-        // so the filter dropdown is always restored when re-opening the dialog for the same step.
         setFilterLoadKey((k) => k + 1);
     }, [isOpen, existingStep]);
 
@@ -100,14 +90,12 @@ export function RegisterStepDialog({
             .finally(() => setLoadingMessages(false));
     }, [isOpen]);
 
-    // Load entity filters when message changes OR when filterLoadKey increments (dialog re-opened).
-    // pendingFilterIdRef carries the filter to restore; it is consumed (set to "") after use so
-    // subsequent user-driven message changes start with an empty selection.
+    // Load filters when message changes
     useEffect(() => {
         if (!selectedMessageId) { setFilters([]); setSelectedFilterId(""); return; }
         setLoadingFilters(true);
         const filterToRestore = pendingFilterIdRef.current;
-        pendingFilterIdRef.current = ""; // consume
+        pendingFilterIdRef.current = "";
         client.fetchMessageFilters(selectedMessageId)
             .then((loadedFilters) => {
                 setFilters(loadedFilters);
@@ -117,68 +105,16 @@ export function RegisterStepDialog({
             .finally(() => setLoadingFilters(false));
     }, [selectedMessageId, filterLoadKey]);
 
-    // Auto-generate name (new steps only)
+    // Auto-generate step name (new steps only)
     useEffect(() => {
         if (isUpdate) return;
         const msg = messages.find((m) => m.sdkmessageid === selectedMessageId);
         const filter = filters.find((f) => f.sdkmessagefilterid === selectedFilterId);
         const entity = filter?.primaryobjecttypecode ?? "any";
         if (msg) {
-            setName(`${pluginType.typename}: ${msg.name} of ${entity}`);
+            setName(`${endpoint.name}: ${msg.name} of ${entity}`);
         }
-    }, [selectedMessageId, selectedFilterId, messages, filters, pluginType.typename, isUpdate]);
-
-    // Initialise Run in User's Context when dialog opens
-    useEffect(() => {
-        if (!isOpen) return;
-        const existingId = existingStep?.impersonatinguserid;
-        if (!existingId) {
-            setImpersonationMode("calling");
-            setSelectedUser(null);
-            setSystemUserId("");
-            setSystemUserError("");
-            return;
-        }
-        setImpersonationMode("user");
-        setSelectedUser({ systemuserid: existingId, fullname: "Loading…", domainname: "" });
-        client.fetchSystemUserById(existingId)
-            .then((user) => {
-                if (!user) {
-                    setSelectedUser({ systemuserid: existingId, fullname: existingId, domainname: "" });
-                    return;
-                }
-                if (user.fullname === "SYSTEM") {
-                    setImpersonationMode("system");
-                    setSystemUserId(user.systemuserid);
-                    setSelectedUser(null);
-                } else {
-                    setImpersonationMode("user");
-                    setSelectedUser(user);
-                }
-            })
-            .catch(() => {
-                setSelectedUser({ systemuserid: existingId, fullname: existingId, domainname: "" });
-            });
-    }, [isOpen, existingStep]);
-
-    // Fetch SYSTEM user GUID when "system" mode is selected and we don't have it yet
-    useEffect(() => {
-        if (impersonationMode !== "system" || systemUserId) return;
-        setSystemUserLoading(true);
-        setSystemUserError("");
-        client.fetchSystemUserByFullName("SYSTEM")
-            .then((user) => {
-                if (user) {
-                    setSystemUserId(user.systemuserid);
-                } else {
-                    setSystemUserError("SYSTEM user was not found in this environment.");
-                }
-            })
-            .catch((err: unknown) => {
-                setSystemUserError(err instanceof Error ? err.message : "Failed to load SYSTEM user.");
-            })
-            .finally(() => setSystemUserLoading(false));
-    }, [impersonationMode, systemUserId]);
+    }, [selectedMessageId, selectedFilterId, messages, filters, endpoint.name, isUpdate]);
 
     if (!isOpen) return null;
 
@@ -189,31 +125,12 @@ export function RegisterStepDialog({
     const canBrowseAttrs = isUpdateMessage && !!entityName && entityName !== "none" && entityName !== "any";
     const asyncEnabled = asyncAllowed(stage);
 
-    const getImpersonatingUserId = (): string | undefined => {
-        if (impersonationMode === "calling") return undefined;
-        if (impersonationMode === "system") return systemUserId || undefined;
-        return selectedUser?.systemuserid || undefined;
-    };
-
     const handleStageChange = (newStage: number) => {
         setStage(newStage);
-        // Async mode is only valid for Post-Operation
         if (!asyncAllowed(newStage) && mode === 1) {
             setMode(0);
             setAsyncAutoDelete(false);
         }
-    };
-
-    const handleModeChange = (newMode: ImpersonationMode) => {
-        setImpersonationMode(newMode);
-        if (newMode === "user" && !selectedUser) {
-            setShowUserPicker(true);
-        }
-    };
-
-    const handleUserSelected = (user: SystemUser) => {
-        setSelectedUser(user);
-        setShowUserPicker(false);
     };
 
     const handleSubmit = async () => {
@@ -229,12 +146,10 @@ export function RegisterStepDialog({
                 stage,
                 filteringattributes: filteringAttributes,
                 asyncautodelete: asyncAutoDelete,
-                impersonatinguserid: getImpersonatingUserId(),
                 messageId: selectedMessageId,
                 filterId: selectedFilterId || undefined,
-                pluginTypeId: pluginType.plugintypeid,
+                endpointId: endpoint.serviceendpointid,
                 configuration: configuration || undefined,
-                secureconfig: secureconfig || undefined,
                 supporteddeployment,
             });
         } catch (err: unknown) {
@@ -261,8 +176,8 @@ export function RegisterStepDialog({
                     </div>
                     <div className="dialog-body">
                         <div className="form-row">
-                            <label className="form-label">Plugin Type</label>
-                            <div className="form-read-only">{pluginType.typename}</div>
+                            <label className="form-label">Service Endpoint</label>
+                            <div className="form-read-only">{endpoint.name}</div>
                         </div>
                         <div className="form-row">
                             <label className="form-label">Message *</label>
@@ -339,68 +254,6 @@ export function RegisterStepDialog({
                                 onChange={(e) => setRank(Number(e.target.value))}
                             />
                         </div>
-
-                        {/* ── Run in User's Context ── */}
-                        <div className="form-row">
-                            <label className="form-label">Run in User's Context</label>
-                            <select
-                                className="form-select"
-                                value={impersonationMode}
-                                onChange={(e) => handleModeChange(e.target.value as ImpersonationMode)}
-                            >
-                                <option value="calling">Calling User</option>
-                                <option value="system">SYSTEM</option>
-                                <option value="user">Select from System User…</option>
-                            </select>
-                        </div>
-                        {impersonationMode === "system" && (
-                            <div className="form-row">
-                                {systemUserLoading && (
-                                    <div className="form-hint">Loading SYSTEM user…</div>
-                                )}
-                                {systemUserError && (
-                                    <div className="form-hint form-hint-error">{systemUserError}</div>
-                                )}
-                                {!systemUserLoading && !systemUserError && systemUserId && (
-                                    <div className="user-context-display">
-                                        <div className="user-context-info">
-                                            <span className="user-context-name">SYSTEM</span>
-                                            <span className="user-context-id">{systemUserId}</span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        {impersonationMode === "user" && (
-                            <div className="form-row">
-                                {selectedUser ? (
-                                    <div className="user-context-display">
-                                        <div className="user-context-info">
-                                            <span className="user-context-name">{selectedUser.fullname}</span>
-                                            {selectedUser.domainname && (
-                                                <span className="user-context-id">{selectedUser.domainname}</span>
-                                            )}
-                                        </div>
-                                        <button
-                                            type="button"
-                                            className="btn-browse"
-                                            onClick={() => setShowUserPicker(true)}
-                                        >
-                                            Change…
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        className="btn-browse"
-                                        onClick={() => setShowUserPicker(true)}
-                                    >
-                                        Browse…
-                                    </button>
-                                )}
-                            </div>
-                        )}
-
                         <div className="form-row">
                             <label className="form-label">Description</label>
                             <textarea
@@ -417,27 +270,6 @@ export function RegisterStepDialog({
                                 onChange={(e) => setUnsecureconfig(e.target.value)}
                                 placeholder="Optional unsecure configuration..."
                             />
-                        </div>
-                        <div className="form-row">
-                            <label className="form-label">Secure Configuration</label>
-                            <div className="form-row-with-browse">
-                                <textarea
-                                    className="form-textarea"
-                                    style={{ flex: 1, fontFamily: showSecureConfig ? undefined : "password", WebkitTextSecurity: showSecureConfig ? undefined : "disc" } as React.CSSProperties}
-                                    value={secureconfig}
-                                    onChange={(e) => setSecureconfig(e.target.value)}
-                                    placeholder="Optional secure configuration..."
-                                />
-                                <button
-                                    type="button"
-                                    className="btn-browse"
-                                    onClick={() => setShowSecureConfig((v) => !v)}
-                                    title={showSecureConfig ? "Hide" : "Show"}
-                                    style={{ alignSelf: "flex-start" }}
-                                >
-                                    {showSecureConfig ? "Hide" : "Show"}
-                                </button>
-                            </div>
                         </div>
                         <div className="form-row">
                             <label className="form-label">Supported Deployment</label>
@@ -476,11 +308,11 @@ export function RegisterStepDialog({
                             <div className="form-checkbox-row">
                                 <input
                                     type="checkbox"
-                                    id="asyncAutoDelete"
+                                    id="epAsyncAutoDelete"
                                     checked={asyncAutoDelete}
                                     onChange={(e) => setAsyncAutoDelete(e.target.checked)}
                                 />
-                                <label htmlFor="asyncAutoDelete" className="form-label" style={{ marginBottom: 0 }}>
+                                <label htmlFor="epAsyncAutoDelete" className="form-label" style={{ marginBottom: 0 }}>
                                     Async Auto Delete
                                 </label>
                             </div>
@@ -507,16 +339,6 @@ export function RegisterStepDialog({
                 selectedAttributes={filteringAttributes ? filteringAttributes.split(",").map((s) => s.trim()).filter(Boolean) : []}
                 onConfirm={handleAttrPickerConfirm}
                 onClose={() => setShowAttrPicker(false)}
-            />
-            <UserPickerDialog
-                isOpen={showUserPicker}
-                onSelect={handleUserSelected}
-                onClose={() => {
-                    setShowUserPicker(false);
-                    if (!selectedUser) {
-                        setImpersonationMode("calling");
-                    }
-                }}
             />
         </>
     );

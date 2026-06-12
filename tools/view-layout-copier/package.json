@@ -1,7 +1,7 @@
 {
   "name": "@power-maverick/tool-view-layout-copier",
   "displayName": "View Layout Copier",
-  "version": "1.0.1",
+  "version": "1.0.5",
   "description": "Copy layout from one view to multiple views of the same entity in a single operation",
   "contributors": [
     {
@@ -16,15 +16,16 @@
   "license": "GPL-2.0",
   "configurations": {
     "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/view-layout-copier",
-    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/view-layout-copier/README.md",
-    "iconUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/view-layout-copier/icons/layoutReplicator.png"
+    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/view-layout-copier/README.md"
   },
   "type": "module",
   "scripts": {
     "build": "vite build",
     "dev": "vite",
     "preview": "vite preview",
-    "finalize-package": "npm shrinkwrap"
+    "finalize-package": "npm shrinkwrap",
+    "version-stable": "npm version patch --no-git-tag-version",
+    "publish-package": "npm run build && npm run version-stable && npm publish --access public"
   },
   "files": [
     "dist",

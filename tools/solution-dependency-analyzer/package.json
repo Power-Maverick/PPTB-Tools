@@ -1,7 +1,7 @@
 {
   "name": "@power-maverick/tool-solution-dependency-analyzer",
   "displayName": "Solution Dependency Analyzer",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "Analyze and visualize solution dependencies with circular dependency detection",
   "icon": "icons/dependencyAnalyzer.svg",
   "contributors": [
@@ -22,7 +22,8 @@
     "dev": "vite",
     "preview": "vite preview",
     "finalize-package": "npm shrinkwrap",
-    "publish-package": "npm publish --access public"
+    "version-stable": "npm version patch --no-git-tag-version",
+    "publish-package": "npm run build && npm run version-stable && npm publish --access public"
   },
   "files": [
     "dist",

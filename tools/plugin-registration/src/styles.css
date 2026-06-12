@@ -143,11 +143,36 @@ body {
     border-color: var(--button-danger-bg);
 }
 
+.toolbar-spinner {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--button-bg);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
 .toolbar-separator {
     width: 1px;
     height: 22px;
     background-color: var(--border-color);
     margin: 0 4px;
+}
+
+.toolbar-filter-group {
+    gap: 8px;
+    padding: 0 4px;
+}
+
+.toolbar-filter-label {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    color: var(--text-primary);
 }
 
 .toolbar-dropdown {
@@ -336,6 +361,8 @@ body {
 .node-icon-image       { background-color: var(--node-image-bg); }
 .node-icon-entity      { background-color: #0078d4; }
 .node-icon-message     { background-color: #038387; }
+.node-icon-endpoint    { background-color: #0078d4; }
+.node-icon-webhook     { background-color: #7719aa; }
 
 .tree-node-type {
     font-size: 11px;

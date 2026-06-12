@@ -202,21 +202,29 @@ function App() {
             return;
         }
 
+        // Immediately reflect the selection so the clicked item is highlighted
+        // right away rather than waiting for the async API call to complete.
+        setSelectedLog(log);
+
+        // Highlight similar records (same correlation ID) immediately as well.
+        const similarLogIds = new Set<string>();
+        if (log.correlationid) {
+            traceLogs.forEach(tl => {
+                if (tl.correlationid === log.correlationid && tl.plugintracelogid !== log.plugintracelogid) {
+                    similarLogIds.add(tl.plugintracelogid);
+                }
+            });
+        }
+        setHighlightedLogIds(similarLogIds);
+
         try {
             const client = new DataverseClient();
             const detailedLog = await client.getTraceLogDetails(log.plugintracelogid);
-            setSelectedLog(detailedLog);
-            
-            // Highlight similar records (same correlation ID)
-            const similarLogIds = new Set<string>();
-            if (log.correlationid) {
-                traceLogs.forEach(tl => {
-                    if (tl.correlationid === log.correlationid && tl.plugintracelogid !== log.plugintracelogid) {
-                        similarLogIds.add(tl.plugintracelogid);
-                    }
-                });
-            }
-            setHighlightedLogIds(similarLogIds);
+            // Only apply the detailed data if the user hasn't clicked a different
+            // item while the request was in flight.
+            setSelectedLog(prev =>
+                prev?.plugintracelogid === log.plugintracelogid ? detailedLog : prev
+            );
         } catch (error: any) {
             showError(`Failed to load trace log details: ${error.message}`);
         }
