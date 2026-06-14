@@ -1,7 +1,7 @@
 {
   "name": "@power-maverick/tool-pcf-builder",
   "displayName": "PCF Builder",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Build, manage and deploy Power Apps Component Framework (PCF) controls",
   "contributors": [
     {

@@ -304,6 +304,47 @@ textarea {
     gap: 12px;
 }
 
+.loader-backdrop {
+    z-index: 1100;
+}
+
+.loader-card {
+    min-width: 260px;
+    max-width: 420px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-soft);
+    padding: 22px 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.loader-spinner {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 3px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+    border-top-color: var(--color-primary);
+    animation: loader-spin 0.8s linear infinite;
+}
+
+.loader-message {
+    font-size: 0.94rem;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+@keyframes loader-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 @media (max-width: 720px) {
     .app-root {
         padding: 24px 12px;

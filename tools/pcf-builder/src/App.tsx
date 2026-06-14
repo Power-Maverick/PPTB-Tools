@@ -3,18 +3,18 @@ import { CommandOutput } from "./components/CommandOutput";
 import { ControlAction, ControlPanel } from "./components/ControlPanel";
 import { InputModal } from "./components/InputModal";
 import {
+    OPTION_VALUE_PREFIX_ERROR,
+    OPTION_VALUE_PREFIX_MAX,
+    OPTION_VALUE_PREFIX_MIN,
+    PUBLISHER_NAME_ERROR,
+    PUBLISHER_NAME_REGEX,
+    PUBLISHER_PREFIX_ERROR,
+    PUBLISHER_PREFIX_REGEX,
     SolutionAction,
     SolutionPanel,
-    PUBLISHER_NAME_REGEX,
-    PUBLISHER_NAME_ERROR,
-    PUBLISHER_PREFIX_REGEX,
-    PUBLISHER_PREFIX_ERROR,
-    OPTION_VALUE_PREFIX_MIN,
-    OPTION_VALUE_PREFIX_MAX,
-    OPTION_VALUE_PREFIX_ERROR,
 } from "./components/SolutionPanel";
 import { TabDefinition, TabSwitcher } from "./components/TabSwitcher";
-import { PCFControlConfig, PCFSolutionConfig, PublisherDetails, ManualPublisherInput } from "./models/interfaces";
+import { ManualPublisherInput, PCFControlConfig, PCFSolutionConfig, PublisherDetails } from "./models/interfaces";
 import "./styles.css";
 import type { FileSystemAPI } from "./utils/hydration";
 import {
@@ -171,6 +171,7 @@ function App() {
     const [publishersLoading, setPublishersLoading] = useState(false);
     const [selectedPublisher, setSelectedPublisher] = useState<PublisherDetails | null>(null);
     const [manualPublisher, setManualPublisher] = useState<ManualPublisherInput>(DEFAULT_MANUAL_PUBLISHER);
+    const [loaderMessage, setLoaderMessage] = useState<string | null>(null);
 
     const terminalIdRef = useRef<string | null>(null);
     const lastHydratedPathRef = useRef<string>("");
@@ -197,6 +198,14 @@ function App() {
         },
         [setPromptState],
     );
+
+    const showCustomLoader = useCallback((message: string) => {
+        setLoaderMessage(message);
+    }, []);
+
+    const hideCustomLoader = useCallback(() => {
+        setLoaderMessage(null);
+    }, []);
 
     useEffect(() => {
         console.info("[PCF Builder] controlConfig state updated", controlConfig);
@@ -272,7 +281,7 @@ function App() {
 
         try {
             if (showLoader) {
-                await window.toolboxAPI.utils.showLoading(options.pendingLabel ?? "Working...");
+                showCustomLoader(options.pendingLabel ?? "Working...");
             }
 
             const result = await window.toolboxAPI.terminal.execute(terminalIdRef.current, options.command);
@@ -282,10 +291,6 @@ function App() {
             const wasAborted = abortedActionRef.current === actionId;
             if (!wasAborted) {
                 setCommandOutput(output);
-            }
-
-            if (showLoader) {
-                await window.toolboxAPI.utils.hideLoading().catch(() => undefined);
             }
 
             const exitCode = typeof result.exitCode === "number" ? result.exitCode : 0;
@@ -304,9 +309,6 @@ function App() {
                 type: isSuccess ? (options.successType ?? "success") : "error",
             });
         } catch (err) {
-            if (showLoader) {
-                await window.toolboxAPI?.utils.hideLoading().catch(() => undefined);
-            }
             const wasAborted = abortedActionRef.current === actionId;
             const message = err instanceof Error ? err.message : String(err);
             outputText = message;
@@ -324,6 +326,9 @@ function App() {
             }
             didSucceed = false;
         } finally {
+            if (showLoader) {
+                hideCustomLoader();
+            }
             setAction(null);
         }
 
@@ -755,8 +760,7 @@ function App() {
             return;
         }
 
-        const escXml = (str: string) =>
-            str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        const escXml = (str: string) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
         const publisherStart = content.indexOf("<Publisher>");
         const publisherEnd = content.indexOf("</Publisher>") + "</Publisher>".length;
@@ -1299,7 +1303,7 @@ function App() {
                 setSolutionAction("deploy");
                 appendDeployLog(`Uploading ${solutionConfig.solutionName}.zip...`);
 
-                await window.toolboxAPI?.utils.showLoading("Deploying solution...").catch(() => undefined);
+                showCustomLoader("Deploying solution...");
 
                 const trackImportJob = async (jobId: string) => {
                     const pollDelay = 2000;
@@ -1376,7 +1380,7 @@ function App() {
                     });
                 } finally {
                     setSolutionAction(null);
-                    await window.toolboxAPI?.utils.hideLoading().catch(() => undefined);
+                    hideCustomLoader();
                 }
                 return;
             }
@@ -1462,6 +1466,15 @@ function App() {
                             setPromptState(null);
                         }}
                     />
+                )}
+
+                {loaderMessage && (
+                    <div className="modal-backdrop loader-backdrop" role="status" aria-live="polite" aria-busy="true">
+                        <div className="loader-card">
+                            <div className="loader-spinner" aria-hidden="true" />
+                            <div className="loader-message">{loaderMessage}</div>
+                        </div>
+                    </div>
                 )}
             </div>
         </div>
