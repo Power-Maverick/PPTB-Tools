@@ -1,8 +1,9 @@
 {
   "name": "@power-maverick/tool-pcf-builder",
   "displayName": "PCF Builder",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "Build, manage and deploy Power Apps Component Framework (PCF) controls",
+  "icon": "icons/pcfBuilder.svg",
   "contributors": [
     {
       "name": "Power Maverick",
@@ -12,8 +13,7 @@
   "license": "GPL-2.0",
   "configurations": {
     "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/pcf-builder",
-    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/pcf-builder/README.md",
-    "iconUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/pcf-builder/icons/pcfBuilder.png"
+    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/pcf-builder/README.md"
   },
   "type": "module",
   "scripts": {
