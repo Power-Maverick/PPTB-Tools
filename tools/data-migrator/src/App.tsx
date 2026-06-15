@@ -62,6 +62,7 @@ function App() {
 
     // Step management for better UX - track which steps are expanded
     const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set([1]));
+    const [isLaunchingFxs, setIsLaunchingFxs] = useState<boolean>(false);
 
     const [migrationEngine] = useState<MigrationEngine>(() => new MigrationEngine());
 
@@ -223,13 +224,15 @@ function App() {
 
         try {
             const client = new DataverseClient("primary");
-            const selectFields = fieldMappings.filter((m) => m.isEnabled).map((m) => {
-                // Dataverse OData Web API represents lookup fields as _fieldname_value in $select
-                if (isReferenceFieldType(m.fieldType)) {
-                    return `_${m.sourceField}_value`;
-                }
-                return m.sourceField;
-            });
+            const selectFields = fieldMappings
+                .filter((m) => m.isEnabled)
+                .map((m) => {
+                    // Dataverse OData Web API represents lookup fields as _fieldname_value in $select
+                    if (isReferenceFieldType(m.fieldType)) {
+                        return `_${m.sourceField}_value`;
+                    }
+                    return m.sourceField;
+                });
 
             // Add primary ID and primary name fields
             if (!selectFields.includes(selectedEntity.primaryIdAttribute)) {
@@ -258,9 +261,7 @@ function App() {
 
             // Normalize lookup fields: OData returns _fieldname_value keys, but the preview table
             // renders cells using the bare logical name. Copy the value so both keys are present.
-            const enabledLookupFields = fieldMappings
-                .filter((m) => m.isEnabled && isReferenceFieldType(m.fieldType))
-                .map((m) => m.sourceField);
+            const enabledLookupFields = fieldMappings.filter((m) => m.isEnabled && isReferenceFieldType(m.fieldType)).map((m) => m.sourceField);
 
             const preview: PreviewRecord[] = sourceRecords.map((record) => {
                 const normalizedData = { ...record };
@@ -343,6 +344,26 @@ function App() {
             </div>
         );
     }
+
+    const handleOpenFetchXmlStudio = async () => {
+        if (!window.toolboxAPI?.invocation) return;
+
+        setIsLaunchingFxs(true);
+        setError("");
+
+        try {
+            const result = await window.toolboxAPI.invocation.launchTool("local-mohsinonxrm-pptb-fetchxml-studio", filterQuery ? { fetchXml: filterQuery } : undefined);
+
+            const fetchxml = result !== null ? (result as { fetchXml?: string }).fetchXml : undefined;
+            if (fetchxml) {
+                setFilterQuery(fetchxml);
+            }
+        } catch (err) {
+            setError(`Cannot open FetchXML Studio: ${err instanceof Error ? err.message : String(err)}`);
+        } finally {
+            setIsLaunchingFxs(false);
+        }
+    };
 
     const handleSaveConfiguration = () => {
         // Convert Maps to arrays for JSON serialization
@@ -554,7 +575,23 @@ function App() {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <label>FetchXML Query</label>
+                                                    <div className="fetchxml-label-row">
+                                                        <label>FetchXML Query</label>
+                                                        <button
+                                                            className="btn-secondary btn-fxs"
+                                                            onClick={handleOpenFetchXmlStudio}
+                                                            disabled={isLaunchingFxs}
+                                                            title="Open FetchXML Studio to build or edit this query"
+                                                        >
+                                                            {isLaunchingFxs ? (
+                                                                "Opening..."
+                                                            ) : (
+                                                                <>
+                                                                    <span aria-hidden="true">🔬</span> Open in FetchXML Studio
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </div>
                                                     <textarea
                                                         value={filterQuery}
                                                         onChange={(e) => setFilterQuery(e.target.value)}
