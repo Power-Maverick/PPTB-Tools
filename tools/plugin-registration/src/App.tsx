@@ -445,9 +445,8 @@ export default function App() {
     // ── Assembly actions ──
     const handleRegisterAssembly = async (content: string, name: string, isolationMode: number, description: string, packageId?: string) => {
         try {
-            await client.registerAssembly(content, name, isolationMode, description, packageId);
+            const newId = await client.registerAssembly(content, name, isolationMode, description, packageId);
             notify("Assembly registered successfully.");
-            const newId = await client.registerAssembly(content, name, isolationMode, description);
             setShowRegisterAssembly(false);
 
             // Verify plugin types were discovered by the server
@@ -477,7 +476,6 @@ export default function App() {
         try {
             await client.updateAssembly(asm.pluginassemblyid, description, content, packageId);
             notify("Assembly updated.");
-            await client.updateAssembly(asm.pluginassemblyid, description, content);
             setShowUpdateAssembly(false);
 
             if (content) {
