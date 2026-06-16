@@ -76,11 +76,6 @@ function buildTreeNodes(
         };
     };
 
-    // Standalone assemblies (no package association)
-    const standaloneAssemblyNodes: TreeNode[] = assemblies
-        .filter((asm) => !asm._packageid_value)
-        .map(buildAssemblyNode);
-
     // Group packaged assemblies by package ID
     const assemblyByPackageId = new Map<string, PluginAssembly[]>();
     for (const asm of assemblies.filter((a) => !!a._packageid_value)) {
@@ -90,7 +85,6 @@ function buildTreeNodes(
     }
 
     // Package nodes (each contains its associated assembly nodes as children)
-    const knownPackageIds = new Set(packages.map((p) => p.pluginpackageid));
     const packageNodes: TreeNode[] = packages.map((pkg) => {
         const pkgAssemblies = assemblyByPackageId.get(pkg.pluginpackageid) ?? [];
         return {
@@ -103,22 +97,6 @@ function buildTreeNodes(
             childrenLoaded: true,
         };
     });
-
-    // Orphaned: assemblies whose packageId doesn't match any loaded package
-    const orphanedAssemblies = assemblies.filter(
-        (a) => !!a._packageid_value && !knownPackageIds.has(a._packageid_value!),
-    );
-    const orphanedNodes: TreeNode[] = orphanedAssemblies.length > 0
-        ? [{
-            id: "__orphaned_packages__",
-            type: "package-group" as const,
-            name: "Unknown Package (orphaned)",
-            data: { groupName: "Unknown Package (orphaned)", groupType: "package" as const },
-            children: orphanedAssemblies.map(buildAssemblyNode),
-            isExpanded: expandedIds.has("__orphaned_packages__"),
-            childrenLoaded: true,
-        }]
-        : [];
 
     const endpointNodes: TreeNode[] = serviceEndpoints.map((ep) => {
         const epSteps = endpointSteps.get(ep.serviceendpointid) ?? [];
@@ -156,14 +134,12 @@ function buildTreeNodes(
     if (showPlugins) {
         if (viewMode === 'packages') {
             result.push(...packageNodes);
-            result.push(...orphanedNodes);
-            result.push(...standaloneAssemblyNodes);
         } else {
             // Assemblies view: flat list of all assemblies regardless of package association
             result.push(...assemblies.map(buildAssemblyNode));
         }
     }
-    if (showEndpoints) result.push(...endpointNodes);
+    if (showEndpoints && viewMode === 'assemblies') result.push(...endpointNodes);
     return result;
 }
 
@@ -1344,7 +1320,6 @@ export default function App() {
                     {selectedPackage && (
                         <PackageDetails
                             pkg={selectedPackage}
-                            assemblies={assemblies.filter((a) => a._packageid_value === selectedPackage.pluginpackageid)}
                             onUpdate={() => setShowUpdatePackage(true)}
                             onDelete={() => void handleDeletePackage()}
                         />
