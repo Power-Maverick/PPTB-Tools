@@ -1,0 +1,11 @@
+{
+    "invocation": {
+        "version": "1.0.0",
+        "capabilities": ["fetchxml"],
+        "prefill": {
+            "properties": {
+                "fetchxml": { "type": "string" }
+            }
+        }
+    }
+}

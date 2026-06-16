@@ -121,7 +121,7 @@ export class DataverseClient {
             const response = await window.dataverseAPI.queryData(query);
 
             const logs: PluginTraceLog[] = response.value.map((log: any) => ({
-                plugintracelogid: log.plugintracelogid,
+                plugintracelogid: (log.plugintracelogid as string)?.toLowerCase(),
                 typename: log.typename || "",
                 messageblock: log.messageblock || "",
                 messagename: log.messagename || "",
@@ -167,7 +167,7 @@ export class DataverseClient {
             );
 
             return {
-                plugintracelogid: log.plugintracelogid as string,
+                plugintracelogid: (log.plugintracelogid as string)?.toLowerCase(),
                 typename: (log.typename as string) || "",
                 messageblock: (log.messageblock as string) || "",
                 messagename: (log.messagename as string) || "",

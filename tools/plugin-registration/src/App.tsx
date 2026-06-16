@@ -447,8 +447,24 @@ export default function App() {
         try {
             await client.registerAssembly(content, name, isolationMode, description, packageId);
             notify("Assembly registered successfully.");
+            const newId = await client.registerAssembly(content, name, isolationMode, description);
             setShowRegisterAssembly(false);
-            void loadAll();
+
+            // Verify plugin types were discovered by the server
+            const types = await client.fetchPluginTypes(newId);
+            if (types.length === 0) {
+                notify(
+                    "Assembly registered but no plugin types were found. Ensure the DLL contains public classes implementing IPlugin or CodeActivity.",
+                    "error",
+                );
+            } else {
+                notify(`Assembly registered with ${types.length} plugin type(s).`);
+            }
+
+            // Refresh the full tree, then pre-populate the new assembly's types and auto-expand it
+            await loadAll();
+            setPluginTypes(new Map<string, PluginType[]>([[newId, types]]));
+            setExpandedIds(new Set([newId]));
         } catch (err: unknown) {
             notify(err instanceof Error ? err.message : String(err), "error");
             throw err; // re-throw so dialog can show inline error
@@ -461,7 +477,23 @@ export default function App() {
         try {
             await client.updateAssembly(asm.pluginassemblyid, description, content, packageId);
             notify("Assembly updated.");
+            await client.updateAssembly(asm.pluginassemblyid, description, content);
             setShowUpdateAssembly(false);
+
+            if (content) {
+                const types = await client.fetchPluginTypes(asm.pluginassemblyid);
+                if (types.length === 0) {
+                    notify(
+                        "Assembly updated but no plugin types were found. The DLL may not contain valid plugin classes.",
+                        "error",
+                    );
+                } else {
+                    notify(`Assembly updated with ${types.length} plugin type(s).`);
+                }
+            } else {
+                notify("Assembly updated.");
+            }
+
             void loadAll();
         } catch (err: unknown) {
             notify(err instanceof Error ? err.message : String(err), "error");

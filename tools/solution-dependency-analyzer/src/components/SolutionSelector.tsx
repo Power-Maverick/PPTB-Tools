@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { SolutionRecord } from "../models/interfaces";
+import { SearchableSelect, SearchableSelectOption } from "./SearchableSelect";
 
 interface SolutionPickerProps {
     solutionOptions: SolutionRecord[];
@@ -17,6 +18,11 @@ export function SolutionPicker({ solutionOptions, selectedValue, onSelectionChan
         if (filterManaged === "unmanaged") return !sol.ismanaged;
         return true;
     });
+
+    const solutionSelectOptions: SearchableSelectOption[] = filteredSolutions.map((sol) => ({
+        value: sol.solutionid,
+        label: `${sol.friendlyname} (v${sol.version}) - ${sol.ismanaged ? "🔒 Managed" : "📝 Unmanaged"}`,
+    }));
 
     return (
         <div className="solution-picker-section">
@@ -42,14 +48,14 @@ export function SolutionPicker({ solutionOptions, selectedValue, onSelectionChan
 
             <div className="selector-group">
                 <label htmlFor="solution-dropdown">Choose Solution:</label>
-                <select id="solution-dropdown" value={selectedValue} onChange={(e) => onSelectionChange(e.target.value)} disabled={scanningInProgress}>
-                    <option value="">-- Select a Solution --</option>
-                    {filteredSolutions.map((sol) => (
-                        <option key={sol.solutionid} value={sol.solutionid}>
-                            {sol.friendlyname} (v{sol.version}) - {sol.ismanaged ? "🔒 Managed" : "📝 Unmanaged"}
-                        </option>
-                    ))}
-                </select>
+                <SearchableSelect
+                    id="solution-dropdown"
+                    options={solutionSelectOptions}
+                    selectedValue={selectedValue}
+                    placeholder="-- Select a Solution --"
+                    disabled={scanningInProgress}
+                    onSelectionChange={onSelectionChange}
+                />
             </div>
 
             <button className="analyze-button" onClick={onTriggerScan} disabled={!selectedValue || scanningInProgress}>

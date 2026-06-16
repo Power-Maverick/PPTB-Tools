@@ -12,14 +12,22 @@ import { DataverseClient } from "./utils/DataverseClient";
 import { isReferenceFieldType } from "./utils/fieldUtils";
 import { MigrationEngine } from "./utils/MigrationEngine";
 
+// Extends the published DataverseConnection type to include the environmentColor
+// property that PPTB returns at runtime (user-configurable per connection).
+type DataverseConnectionWithColor = ToolBoxAPI.DataverseConnection & {
+    environmentColor?: string;
+};
+
 function App() {
     const [isPPTB, setIsPPTB] = useState<boolean>(false);
     const [connectionUrl, setConnectionUrl] = useState<string>("");
     const [connectionName, setConnectionName] = useState<string>("");
     const [connectionEnvironment, setConnectionEnvironment] = useState<string>("");
+    const [connectionEnvironmentColor, setConnectionEnvironmentColor] = useState<string>("");
     const [secondaryConnectionUrl, setSecondaryConnectionUrl] = useState<string>("");
     const [secondaryConnectionName, setSecondaryConnectionName] = useState<string>("");
     const [secondaryConnectionEnvironment, setSecondaryConnectionEnvironment] = useState<string>("");
+    const [secondaryConnectionEnvironmentColor, setSecondaryConnectionEnvironmentColor] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>("");
 
@@ -54,6 +62,7 @@ function App() {
 
     // Step management for better UX - track which steps are expanded
     const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set([1]));
+    const [isLaunchingFxs, setIsLaunchingFxs] = useState<boolean>(false);
 
     const [migrationEngine] = useState<MigrationEngine>(() => new MigrationEngine());
 
@@ -65,16 +74,18 @@ function App() {
 
                 try {
                     // Get active (source) connection
-                    const activeConnection = await window.toolboxAPI.connections.getActiveConnection();
+                    const activeConnection = (await window.toolboxAPI.connections.getActiveConnection()) as DataverseConnectionWithColor | null;
                     setConnectionUrl(activeConnection?.url || "");
                     setConnectionName(activeConnection?.name || "");
                     setConnectionEnvironment(activeConnection?.environment || "");
+                    setConnectionEnvironmentColor(activeConnection?.environmentColor || "");
 
                     // Get secondary (target) connection
-                    const secondaryConnection = await window.toolboxAPI.connections.getSecondaryConnection();
+                    const secondaryConnection = (await window.toolboxAPI.connections.getSecondaryConnection()) as DataverseConnectionWithColor | null;
                     setSecondaryConnectionUrl(secondaryConnection?.url || "");
                     setSecondaryConnectionName(secondaryConnection?.name || "");
                     setSecondaryConnectionEnvironment(secondaryConnection?.environment || "");
+                    setSecondaryConnectionEnvironmentColor(secondaryConnection?.environmentColor || "");
 
                     if (!secondaryConnection) {
                         setError("Please select a secondary connection as the target environment");
@@ -213,13 +224,15 @@ function App() {
 
         try {
             const client = new DataverseClient("primary");
-            const selectFields = fieldMappings.filter((m) => m.isEnabled).map((m) => {
-                // Dataverse OData Web API represents lookup fields as _fieldname_value in $select
-                if (isReferenceFieldType(m.fieldType)) {
-                    return `_${m.sourceField}_value`;
-                }
-                return m.sourceField;
-            });
+            const selectFields = fieldMappings
+                .filter((m) => m.isEnabled)
+                .map((m) => {
+                    // Dataverse OData Web API represents lookup fields as _fieldname_value in $select
+                    if (isReferenceFieldType(m.fieldType)) {
+                        return `_${m.sourceField}_value`;
+                    }
+                    return m.sourceField;
+                });
 
             // Add primary ID and primary name fields
             if (!selectFields.includes(selectedEntity.primaryIdAttribute)) {
@@ -242,14 +255,13 @@ function App() {
                     filterQuery || undefined,
                     undefined,
                     100, // Limit preview to 100 records
+                    selectedEntity.entitySetName,
                 );
             }
 
             // Normalize lookup fields: OData returns _fieldname_value keys, but the preview table
             // renders cells using the bare logical name. Copy the value so both keys are present.
-            const enabledLookupFields = fieldMappings
-                .filter((m) => m.isEnabled && isReferenceFieldType(m.fieldType))
-                .map((m) => m.sourceField);
+            const enabledLookupFields = fieldMappings.filter((m) => m.isEnabled && isReferenceFieldType(m.fieldType)).map((m) => m.sourceField);
 
             const preview: PreviewRecord[] = sourceRecords.map((record) => {
                 const normalizedData = { ...record };
@@ -332,6 +344,26 @@ function App() {
             </div>
         );
     }
+
+    const handleOpenFetchXmlStudio = async () => {
+        if (!window.toolboxAPI?.invocation) return;
+
+        setIsLaunchingFxs(true);
+        setError("");
+
+        try {
+            const result = await window.toolboxAPI.invocation.launchTool("local-mohsinonxrm-pptb-fetchxml-studio", filterQuery ? { fetchXml: filterQuery } : undefined);
+
+            const fetchxml = result !== null ? (result as { fetchXml?: string }).fetchXml : undefined;
+            if (fetchxml) {
+                setFilterQuery(fetchxml);
+            }
+        } catch (err) {
+            setError(`Cannot open FetchXML Studio: ${err instanceof Error ? err.message : String(err)}`);
+        } finally {
+            setIsLaunchingFxs(false);
+        }
+    };
 
     const handleSaveConfiguration = () => {
         // Convert Maps to arrays for JSON serialization
@@ -430,13 +462,19 @@ function App() {
                         <h1 className="app-title">Data Migrator</h1>
                         {connectionUrl && secondaryConnectionUrl && (
                             <div className="connection-flow">
-                                <div className={`connection-badge env-${connectionEnvironment ? connectionEnvironment.toLowerCase() : "default"}`}>
+                                <div
+                                    className={`connection-badge env-${connectionEnvironment ? connectionEnvironment.toLowerCase() : "default"}`}
+                                    style={connectionEnvironmentColor ? { borderLeftColor: connectionEnvironmentColor } : undefined}
+                                >
                                     <span className="connection-label">Source</span>
                                     {connectionName && <span className="connection-name">{connectionName}</span>}
                                     <span className="connection-url">{new URL(connectionUrl).hostname}</span>
                                 </div>
                                 <div className="flow-arrow">→</div>
-                                <div className={`connection-badge env-${secondaryConnectionEnvironment ? secondaryConnectionEnvironment.toLowerCase() : "default"}`}>
+                                <div
+                                    className={`connection-badge env-${secondaryConnectionEnvironment ? secondaryConnectionEnvironment.toLowerCase() : "default"}`}
+                                    style={secondaryConnectionEnvironmentColor ? { borderLeftColor: secondaryConnectionEnvironmentColor } : undefined}
+                                >
                                     <span className="connection-label">Target</span>
                                     {secondaryConnectionName && <span className="connection-name">{secondaryConnectionName}</span>}
                                     <span className="connection-url">{new URL(secondaryConnectionUrl).hostname}</span>
@@ -537,7 +575,23 @@ function App() {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <label>FetchXML Query</label>
+                                                    <div className="fetchxml-label-row">
+                                                        <label>FetchXML Query</label>
+                                                        <button
+                                                            className="btn-secondary btn-fxs"
+                                                            onClick={handleOpenFetchXmlStudio}
+                                                            disabled={isLaunchingFxs}
+                                                            title="Open FetchXML Studio to build or edit this query"
+                                                        >
+                                                            {isLaunchingFxs ? (
+                                                                "Opening..."
+                                                            ) : (
+                                                                <>
+                                                                    <span aria-hidden="true">🔬</span> Open in FetchXML Studio
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </div>
                                                     <textarea
                                                         value={filterQuery}
                                                         onChange={(e) => setFilterQuery(e.target.value)}
