@@ -373,7 +373,7 @@ function App() {
         setError("");
 
         try {
-            const result = await window.toolboxAPI.invocation.launchTool("local-mohsinonxrm-pptb-fetchxml-studio", filterQuery ? { fetchXml: filterQuery } : undefined);
+            const result = await window.toolboxAPI.invocation.launchTool("@mohsinonxrm/pptb-fetchxml-studio", filterQuery ? { fetchXml: filterQuery } : undefined);
 
             const fetchxml = result !== null ? (result as { fetchXml?: string }).fetchXml : undefined;
             if (fetchxml) {
