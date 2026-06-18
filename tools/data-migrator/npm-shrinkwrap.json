@@ -1,12 +1,12 @@
 {
   "name": "@power-maverick/tool-data-migrator",
-  "version": "1.0.15-beta.2",
+  "version": "1.0.15-beta.4",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "@power-maverick/tool-data-migrator",
-      "version": "1.0.15-beta.2",
+      "version": "1.0.15-beta.4",
       "license": "GPL-2.0",
       "dependencies": {
         "@fluentui/react-components": "^9.56.2",
@@ -15,7 +15,7 @@
         "react-dom": "^18.3.1"
       },
       "devDependencies": {
-        "@pptb/types": "^1.2.2",
+        "@pptb/types": "^1.2.3-beta.0",
         "@types/react": "^18.3.1",
         "@types/react-dom": "^18.3.0",
         "@vitejs/plugin-react": "^4.3.4",
@@ -2434,9 +2434,9 @@
       }
     },
     "node_modules/@pptb/types": {
-      "version": "1.2.2",
-      "resolved": "https://registry.npmjs.org/@pptb/types/-/types-1.2.2.tgz",
-      "integrity": "sha512-L4QVBvaozm/JVEIB5yrqFkJEjBjlVXtnYeKYQZabrqztGwQaIeVqLuIRiSzulLPTWWrNDuUTP9GRC0PpfOcsjw==",
+      "version": "1.2.3-beta.0",
+      "resolved": "https://registry.npmjs.org/@pptb/types/-/types-1.2.3-beta.0.tgz",
+      "integrity": "sha512-KgIz66qUVdsBVWOo4ZyfazGYVurZ3lwSUB2ctx9B0UDJYSdx9L1V7oW8CvLQBxyhpe5fCrF8a2PHEUUmc+xsEw==",
       "dev": true,
       "license": "GPL-3.0",
       "bin": {

@@ -30,6 +30,7 @@ function App() {
     const [secondaryConnectionEnvironmentColor, setSecondaryConnectionEnvironmentColor] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>("");
+    const [launchContext, setLaunchContext] = useState<Record<string, unknown> | null>(null);
 
     // Entities
     const [entities, setEntities] = useState<DataverseEntity[]>([]);
@@ -87,6 +88,10 @@ function App() {
                     setSecondaryConnectionEnvironment(secondaryConnection?.environment || "");
                     setSecondaryConnectionEnvironmentColor(secondaryConnection?.environmentColor || "");
 
+                    // Identify if launch context exists
+                    const launchContext = await window.toolboxAPI.invocation.getLaunchContext();
+                    setLaunchContext(launchContext);
+
                     if (!secondaryConnection) {
                         setError("Please select a secondary connection as the target environment");
                     }
@@ -121,6 +126,22 @@ function App() {
             const client = new DataverseClient("primary");
             const entityList = await client.fetchAllEntities();
             setEntities(entityList.sort((a, b) => a.displayName.localeCompare(b.displayName)));
+
+            // Pre-select entity if launch context is available
+            if (launchContext) {
+                const preselectedEntityName = launchContext?.entityLogicalName;
+                const preselectedFetchXML = launchContext?.fetchXml;
+                if (preselectedEntityName) {
+                    const preselectedEntity = entityList.find((e) => e.logicalName === preselectedEntityName);
+                    if (preselectedEntity) {
+                        await handleEntitySelect(preselectedEntity);
+                    }
+                }
+                if (preselectedFetchXML) {
+                    setFilterType("fetchxml");
+                    setFilterQuery(preselectedFetchXML as string);
+                }
+            }
         } catch (error: any) {
             setError(`Failed to load entities: ${error.message}`);
         } finally {
