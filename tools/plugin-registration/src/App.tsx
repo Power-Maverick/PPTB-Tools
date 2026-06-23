@@ -1185,21 +1185,19 @@ export default function App() {
                         View: {viewMode === 'packages' ? 'Packages' : 'Assemblies'} <span className="dropdown-arrow">▾</span>
                     </button>
                     {showViewDropdown && (
-                        <div className="toolbar-dropdown" role="menu">
-                            <button
-                                role="menuitem"
+                        < div className="toolbar-dropdown">
+                            <div
                                 className={`toolbar-dropdown-item${viewMode === 'assemblies' ? ' toolbar-dropdown-item--active' : ''}`}
                                 onClick={() => { setViewMode('assemblies'); setShowViewDropdown(false); setSelectedNode(null); }}
                             >
                                 Assemblies
-                            </button>
-                            <button
-                                role="menuitem"
+                            </div>
+                            <div
                                 className={`toolbar-dropdown-item${viewMode === 'packages' ? ' toolbar-dropdown-item--active' : ''}`}
                                 onClick={() => { setViewMode('packages'); setShowViewDropdown(false); setSelectedNode(null); }}
                             >
                                 Packages
-                            </button>
+                            </div>
                         </div>
                     )}
                 </div>
