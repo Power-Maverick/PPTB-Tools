@@ -1,87 +1,145 @@
-import { Entity, View } from "../models/interfaces";
+import { Solution, TableInfo, ViewInfo } from "../models/interfaces";
+
+/** Escape OData string literals to prevent query injection */
+function escapeODataString(value: string): string {
+    return value.replace(/'/g, "''");
+}
+
+function extractLabel(value: any): string {
+    return value?.UserLocalizedLabel?.Label || value?.LocalizedLabels?.[0]?.Label || "";
+}
+
+export interface ViewUpdatePayload {
+    fetchxml?: string;
+    layoutxml?: string;
+    layoutjson?: string;
+}
 
 export class DataverseClient {
-    constructor() {
-        // No longer need credentials - using window.dataverseAPI
+    /** List visible solutions in the environment, alphabetized by display name */
+    async listSolutions(): Promise<Solution[]> {
+        const entitySetName = await window.dataverseAPI.getEntitySetName("solution");
+        const response = await window.dataverseAPI.queryData(`${entitySetName}?$select=solutionid,friendlyname,uniquename,version,ismanaged&$filter=isvisible eq true&$orderby=friendlyname asc`);
+
+        return response.value.map((s: any) => ({
+            id: s.solutionid,
+            uniqueName: s.uniquename,
+            displayName: s.friendlyname,
+            version: s.version,
+            isManaged: s.ismanaged === true,
+        }));
     }
 
-    async listEntities(): Promise<Entity[]> {
-        try {
-            // Use getAllEntitiesMetadata from dataverseAPI
-            const response = await window.dataverseAPI.getAllEntitiesMetadata(["LogicalName", "DisplayName", "ObjectTypeCode", "IsValidForAdvancedFind", "IsCustomizable"]);
-
-            // Filter for valid and customizable entities
-            return response.value
-                .filter((entity: any) => entity.IsValidForAdvancedFind === true && entity.IsCustomizable?.Value === true)
-                .map((entity: any) => ({
-                    logicalName: entity.LogicalName,
-                    displayName: entity.DisplayName?.LocalizedLabels?.[0]?.Label || entity.LogicalName,
-                    objectTypeCode: entity.ObjectTypeCode,
-                }))
-                .sort((a, b) => a.logicalName.localeCompare(b.logicalName));
-        } catch (error: any) {
-            console.error("Failed to fetch entities:", error);
-            throw new Error(`Failed to fetch entities: ${error.message}`);
-        }
+    /** Get the MetadataIds of the tables contained in a solution */
+    async listSolutionTableIds(solutionId: string): Promise<Set<string>> {
+        const entitySetName = await window.dataverseAPI.getEntitySetName("solutioncomponent");
+        const response = await window.dataverseAPI.queryData(`${entitySetName}?$select=objectid&$filter=_solutionid_value eq ${escapeODataString(solutionId)} and componenttype eq 1`);
+        return new Set(response.value.map((c: any) => String(c.objectid).toLowerCase()));
     }
 
-    async listViews(entityLogicalName: string): Promise<View[]> {
-        try {
-            // Get entity set name for OData query
-            const entitySetName = await window.dataverseAPI.getEntitySetName("savedquery");
+    /** List all tables usable by this tool, alphabetized by display name */
+    async listTables(): Promise<TableInfo[]> {
+        const response = await window.dataverseAPI.getAllEntitiesMetadata([
+            "LogicalName",
+            "SchemaName",
+            "DisplayName",
+            "ObjectTypeCode",
+            "MetadataId",
+            "PrimaryNameAttribute",
+            "IsValidForAdvancedFind",
+            "IsCustomizable",
+        ]);
 
-            // Use queryData with OData filter for savedqueries
-            const response = await window.dataverseAPI.queryData(
-                `${entitySetName}?$select=savedqueryid,name,fetchxml,layoutxml,returnedtypecode,querytype&$filter=returnedtypecode eq '${entityLogicalName}' and statecode eq 0&$orderby=name`,
-            );
-
-            const views: View[] = response.value.map((view: any) => ({
-                savedqueryid: view.savedqueryid,
-                name: view.name,
-                fetchxml: view.fetchxml,
-                layoutxml: view.layoutxml,
-                returnedtypecode: view.returnedtypecode,
-                querytype: view.querytype,
-            }));
-
-            return views;
-        } catch (error: any) {
-            console.error("Failed to fetch views:", error);
-            throw new Error(`Failed to fetch views: ${error.message}`);
-        }
+        return response.value
+            .filter((e: any) => e.IsValidForAdvancedFind === true && e.IsCustomizable?.Value === true)
+            .map((e: any) => ({
+                logicalName: e.LogicalName,
+                schemaName: e.SchemaName || e.LogicalName,
+                displayName: extractLabel(e.DisplayName) || e.LogicalName,
+                objectTypeCode: e.ObjectTypeCode,
+                metadataId: String(e.MetadataId).toLowerCase(),
+                primaryNameAttribute: e.PrimaryNameAttribute || "name",
+            }))
+            .sort((a: TableInfo, b: TableInfo) => a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" }));
     }
 
-    async getView(viewId: string): Promise<View> {
-        try {
-            // Use retrieve to get a specific savedquery
-            const view = await window.dataverseAPI.retrieve("savedquery", viewId, ["savedqueryid", "name", "fetchxml", "layoutxml", "returnedtypecode", "querytype"]);
+    /** List system views (savedquery) and personal views (userquery) for a table */
+    async listViews(tableLogicalName: string): Promise<ViewInfo[]> {
+        const escapedName = escapeODataString(tableLogicalName);
 
-            return {
-                savedqueryid: view.savedqueryid as string,
-                name: view.name as string,
-                fetchxml: view.fetchxml as string,
-                layoutxml: view.layoutxml as string,
-                returnedtypecode: view.returnedtypecode as string,
-                querytype: view.querytype as number,
-            };
-        } catch (error: any) {
-            console.error("Failed to fetch view:", error);
-            throw new Error(`Failed to fetch view: ${error.message}`);
-        }
+        const savedQuerySet = await window.dataverseAPI.getEntitySetName("savedquery");
+        const systemViewsPromise = (async () => {
+            const filter = `$filter=returnedtypecode eq '${escapedName}' and statecode eq 0&$orderby=name asc`;
+            try {
+                return await window.dataverseAPI.queryData(`${savedQuerySet}?$select=savedqueryid,name,description,fetchxml,layoutxml,layoutjson,querytype,isdefault&${filter}`);
+            } catch {
+                // Older environments may not expose layoutjson — retry without it
+                return await window.dataverseAPI.queryData(`${savedQuerySet}?$select=savedqueryid,name,description,fetchxml,layoutxml,querytype,isdefault&${filter}`);
+            }
+        })();
+
+        // Personal views are optional — the user may lack read privileges on userquery
+        const personalViewsPromise = (async () => {
+            try {
+                const userQuerySet = await window.dataverseAPI.getEntitySetName("userquery");
+                return await window.dataverseAPI.queryData(
+                    `${userQuerySet}?$select=userqueryid,name,description,fetchxml,layoutxml,querytype&$filter=returnedtypecode eq '${escapedName}' and statecode eq 0&$orderby=name asc`,
+                );
+            } catch (error) {
+                console.warn("Could not load personal views:", error);
+                return { value: [] };
+            }
+        })();
+
+        const [systemViews, personalViews] = await Promise.all([systemViewsPromise, personalViewsPromise]);
+
+        const views: ViewInfo[] = [
+            ...systemViews.value.map((v: any) => ({
+                id: v.savedqueryid,
+                name: v.name,
+                description: v.description || undefined,
+                fetchxml: v.fetchxml,
+                layoutxml: v.layoutxml,
+                layoutjson: v.layoutjson ?? null,
+                querytype: v.querytype ?? 0,
+                isDefault: v.isdefault === true,
+                isPersonal: false,
+            })),
+            ...personalViews.value.map((v: any) => ({
+                id: v.userqueryid,
+                name: v.name,
+                description: v.description || undefined,
+                fetchxml: v.fetchxml,
+                layoutxml: v.layoutxml,
+                layoutjson: null,
+                querytype: v.querytype ?? 0,
+                isDefault: false,
+                isPersonal: true,
+            })),
+        ];
+
+        // Views without a layout (e.g. some offline templates) can't participate in layout copying
+        return views.filter((v) => !!v.layoutxml);
     }
 
-    async updateViewLayout(entityLogicalName: string, viewId: string, layoutXml: string): Promise<void> {
-        try {
-            // Use update to modify the savedquery's layoutxml
-            await window.dataverseAPI.update("savedquery", viewId, {
-                layoutxml: layoutXml,
-            });
-
-            // Publish the customizations after update
-            await window.dataverseAPI.publishCustomizations(entityLogicalName);
-        } catch (error: any) {
-            console.error("Failed to update view layout:", error);
-            throw new Error(`Failed to update view layout: ${error.message}`);
+    /** Map of attribute logical name -> display name, for the layout preview */
+    async listAttributeDisplayNames(tableLogicalName: string): Promise<Map<string, string>> {
+        const response: any = await window.dataverseAPI.getEntityRelatedMetadata(tableLogicalName, "Attributes", ["LogicalName", "DisplayName"]);
+        const map = new Map<string, string>();
+        for (const attr of response.value ?? []) {
+            map.set(attr.LogicalName, extractLabel(attr.DisplayName) || attr.LogicalName);
         }
+        return map;
+    }
+
+    /** Update a system or personal view with the merged layout/fetch changes */
+    async updateView(view: ViewInfo, payload: ViewUpdatePayload): Promise<void> {
+        const entityName = view.isPersonal ? "userquery" : "savedquery";
+        await window.dataverseAPI.update(entityName, view.id, payload as Record<string, unknown>);
+    }
+
+    /** Publish the table once after all system view updates (personal views don't need publishing) */
+    async publishTable(tableLogicalName: string): Promise<void> {
+        await window.dataverseAPI.publishCustomizations(tableLogicalName);
     }
 }

@@ -1,8 +1,9 @@
 {
   "name": "@power-maverick/tool-view-layout-copier",
   "displayName": "View Layout Copier",
-  "version": "1.0.5",
-  "description": "Copy layout from one view to multiple views of the same entity in a single operation",
+  "version": "1.1.0",
+  "description": "Copy column layout, sort order and components configuration from one view to multiple views of the same table in a single operation",
+  "icon": "icons/layoutReplicator.svg",
   "contributors": [
     {
       "name": "Power Maverick",

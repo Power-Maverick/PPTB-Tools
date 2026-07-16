@@ -35,14 +35,22 @@ const registerToolboxEvents = () => {
     }
 };
 
-// Apply initial theme
-resolveTheme();
+const bootstrap = async () => {
+    // Outside PPTB during development, run against an in-memory mock so the
+    // tool can be exercised locally with `npm run dev`.
+    if (import.meta.env.DEV && !window.dataverseAPI) {
+        const { installMockAPI } = await import("./mock/mockAPI");
+        installMockAPI();
+    }
 
-// Register event handler
-registerToolboxEvents();
+    resolveTheme();
+    registerToolboxEvents();
 
-createRoot(document.getElementById("root")!).render(
-    <StrictMode>
-        <App />
-    </StrictMode>,
-);
+    createRoot(document.getElementById("root")!).render(
+        <StrictMode>
+            <App />
+        </StrictMode>,
+    );
+};
+
+bootstrap();

@@ -1,363 +1,402 @@
-import { useEffect, useState } from "react";
-import { Entity, View } from "./models/interfaces";
-import { DataverseClient } from "./utils/DataverseClient";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CopyPanel } from "./components/CopyPanel";
+import { LayoutPreview } from "./components/LayoutPreview";
+import { SolutionPicker } from "./components/SolutionPicker";
+import { TableSidebar } from "./components/TableSidebar";
+import { ViewListPanel } from "./components/ViewListPanel";
+import { CopyOptions, CopyResultItem, Solution, TableInfo, ViewInfo } from "./models/interfaces";
+import { isLookupView, viewTypeRank } from "./models/viewTypes";
+import { DataverseClient, ViewUpdatePayload } from "./utils/DataverseClient";
+import { buildTargetLayoutXml, mergeFetchXml, parseLayoutColumns } from "./utils/layoutUtils";
 
-interface UpdateProgress {
-    viewId: string;
-    viewName: string;
-    status: "pending" | "success" | "error";
-    message?: string;
-}
+const client = new DataverseClient();
 
 function App() {
-    const [isPPTB, setIsPPTB] = useState<boolean>(false);
+    const isDemoMode = (window as any).__PPTB_MOCK__ === true;
+
     const [connectionUrl, setConnectionUrl] = useState<string>("");
-    const [loading, setLoading] = useState<boolean>(true);
+    const [fatalError, setFatalError] = useState<string>("");
     const [error, setError] = useState<string>("");
+    const errorTimer = useRef<number>();
 
-    // Step 1: Entity Selection
-    const [entities, setEntities] = useState<Entity[]>([]);
-    const [selectedEntity, setSelectedEntity] = useState<string>("");
+    // Solutions + tables
+    const [solutions, setSolutions] = useState<Solution[]>([]);
+    const [selectedSolutionId, setSelectedSolutionId] = useState<string>("");
+    const [tables, setTables] = useState<TableInfo[]>([]);
+    const [solutionTableIds, setSolutionTableIds] = useState<Set<string> | null>(null);
+    const [loadingTables, setLoadingTables] = useState<boolean>(true);
 
-    // Step 2: View Selection
-    const [views, setViews] = useState<View[]>([]);
-    const [sourceView, setSourceView] = useState<string>("");
-    const [sourceViewLayout, setSourceViewLayout] = useState<string>("");
-    const [targetViews, setTargetViews] = useState<string[]>([]);
+    // Selected table + its views
+    const [selectedTable, setSelectedTable] = useState<string>("");
+    const [views, setViews] = useState<ViewInfo[]>([]);
+    const [attributeNames, setAttributeNames] = useState<Map<string, string>>(new Map());
+    const [loadingViews, setLoadingViews] = useState<boolean>(false);
 
-    // Step 3: Copy Progress
+    // Copy configuration
+    const [sourceViewId, setSourceViewId] = useState<string>("");
+    const [targetIds, setTargetIds] = useState<Set<string>>(new Set());
+    const [options, setOptions] = useState<CopyOptions>({ columnLayout: true, sortOrder: true, components: true });
     const [isCopying, setIsCopying] = useState<boolean>(false);
-    const [updateProgress, setUpdateProgress] = useState<UpdateProgress[]>([]);
+    const [results, setResults] = useState<CopyResultItem[]>([]);
+    const [publishStatus, setPublishStatus] = useState<"pending" | "success" | "error" | null>(null);
+    const [publishMessage, setPublishMessage] = useState<string>("");
 
-    // Detect environment and initialize
+    const clearResults = () => {
+        setResults([]);
+        setPublishStatus(null);
+        setPublishMessage("");
+    };
+
+    const table = tables.find((t) => t.logicalName === selectedTable);
+    const sourceView = views.find((v) => v.id === sourceViewId);
+
+    const showError = useCallback((message: string) => {
+        setError(message);
+        window.clearTimeout(errorTimer.current);
+        errorTimer.current = window.setTimeout(() => setError(""), 8000);
+    }, []);
+
+    // ---------------------------------------------------------------- boot
     useEffect(() => {
-        const initializeEnvironment = async () => {
-            // Check if we're in PPTB
-            if (window.toolboxAPI) {
-                setIsPPTB(true);
+        const initialize = async () => {
+            if (!window.dataverseAPI) {
+                setFatalError("Not running in Power Platform ToolBox (PPTB). This tool requires PPTB.");
+                setLoadingTables(false);
+                return;
+            }
 
-                try {
-                    const activeConnection = await window.toolboxAPI.connections.getActiveConnection();
-                    setConnectionUrl(activeConnection?.url || "");
-                } catch (error) {
-                    console.error("Failed to get connection:", error);
-                }
+            try {
+                const activeConnection = await window.toolboxAPI?.connections.getActiveConnection();
+                setConnectionUrl(activeConnection?.url || "");
+            } catch (e) {
+                console.error("Failed to get connection:", e);
+            }
 
-                setLoading(false);
-            } else {
-                setError("Not running in Power Platform ToolBox (PPTB). This tool requires PPTB.");
-                setLoading(false);
+            try {
+                const [solutionList, tableList] = await Promise.all([client.listSolutions(), client.listTables()]);
+                setSolutions(solutionList);
+                setTables(tableList);
+            } catch (e: any) {
+                setFatalError(`Failed to load environment metadata: ${e.message}`);
+            } finally {
+                setLoadingTables(false);
             }
         };
 
-        initializeEnvironment();
+        initialize();
+        return () => window.clearTimeout(errorTimer.current);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Load entities when connection is available
-    useEffect(() => {
-        if (connectionUrl) {
-            loadEntities();
-        }
-    }, [connectionUrl]);
-
-    // Load views when entity is selected
-    useEffect(() => {
-        if (selectedEntity) {
-            loadViews();
-        } else {
-            setViews([]);
-            setSourceView("");
-            setTargetViews([]);
-        }
-    }, [selectedEntity]);
-
-    // Load source view layout when source view is selected
-    useEffect(() => {
-        if (sourceView) {
-            loadSourceViewLayout();
-        } else {
-            setSourceViewLayout("");
-        }
-    }, [sourceView]);
-
-    const loadEntities = async () => {
-        try {
-            setLoading(true);
-            const client = new DataverseClient();
-
-            const entityList = await client.listEntities();
-            setEntities(entityList);
-        } catch (error: any) {
-            showError(`Failed to load entities: ${error.message}`);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadViews = async () => {
-        try {
-            setLoading(true);
-            const client = new DataverseClient();
-
-            const viewList = await client.listViews(selectedEntity);
-            setViews(viewList);
-        } catch (error: any) {
-            showError(`Failed to load views: ${error.message}`);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadSourceViewLayout = async () => {
-        try {
-            const client = new DataverseClient();
-
-            const view = await client.getView(sourceView);
-            setSourceViewLayout(view.layoutxml);
-        } catch (error: any) {
-            showError(`Failed to load source view layout: ${error.message}`);
-        }
-    };
-
-    const showError = (message: string) => {
-        setError(message);
-        setTimeout(() => setError(""), 5000);
-    };
-
-    const showNotification = async (title: string, body: string, type: "success" | "error" | "info" = "success") => {
-        if (isPPTB && window.toolboxAPI) {
-            await window.toolboxAPI.utils.showNotification({
-                title,
-                body,
-                type,
-            });
-        }
-    };
-
-    const handleSourceViewChange = (viewId: string) => {
-        setSourceView(viewId);
-        // Remove from target views if it was there
-        setTargetViews(targetViews.filter((id) => id !== viewId));
-    };
-
-    const handleTargetViewToggle = (viewId: string) => {
-        if (viewId === sourceView) return; // Can't select source as target
-
-        if (targetViews.includes(viewId)) {
-            setTargetViews(targetViews.filter((id) => id !== viewId));
-        } else {
-            setTargetViews([...targetViews, viewId]);
-        }
-    };
-
-    const handleCopyLayout = async () => {
-        if (!sourceView || targetViews.length === 0) {
-            showError("Please select a source view and at least one target view");
+    // ------------------------------------------------------- solution filter
+    const handleSolutionSelect = async (solutionId: string) => {
+        setSelectedSolutionId(solutionId);
+        if (!solutionId) {
+            setSolutionTableIds(null);
             return;
         }
-
-        if (!sourceViewLayout) {
-            showError("Source view layout is not available");
-            return;
+        try {
+            setLoadingTables(true);
+            const ids = await client.listSolutionTableIds(solutionId);
+            setSolutionTableIds(ids);
+            // Clear the selected table if it fell out of the filtered list
+            const stillVisible = tables.some((t) => t.logicalName === selectedTable && ids.has(t.metadataId));
+            if (selectedTable && !stillVisible) {
+                setSelectedTable("");
+            }
+        } catch (e: any) {
+            showError(`Failed to load solution tables: ${e.message}`);
+        } finally {
+            setLoadingTables(false);
         }
+    };
 
+    // --------------------------------------------------------- table select
+    useEffect(() => {
+        setViews([]);
+        setAttributeNames(new Map());
+        setSourceViewId("");
+        setTargetIds(new Set());
+        clearResults();
+
+        if (!selectedTable) return;
+
+        let cancelled = false;
+        const load = async () => {
+            try {
+                setLoadingViews(true);
+                const [viewList, attrNames] = await Promise.all([client.listViews(selectedTable), client.listAttributeDisplayNames(selectedTable)]);
+                if (cancelled) return;
+                viewList.sort((a, b) => viewTypeRank(a) - viewTypeRank(b) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+                setViews(viewList);
+                setAttributeNames(attrNames);
+            } catch (e: any) {
+                if (!cancelled) showError(`Failed to load views: ${e.message}`);
+            } finally {
+                if (!cancelled) setLoadingViews(false);
+            }
+        };
+        load();
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedTable]);
+
+    // -------------------------------------------------------- copy handlers
+    const handleSourceSelect = (viewId: string) => {
+        setSourceViewId(viewId);
+        clearResults();
+        setTargetIds((prev) => {
+            if (!prev.has(viewId)) return prev;
+            const next = new Set(prev);
+            next.delete(viewId);
+            return next;
+        });
+    };
+
+    const handleTargetToggle = (viewId: string) => {
+        clearResults();
+        setTargetIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(viewId)) {
+                next.delete(viewId);
+            } else {
+                next.add(viewId);
+            }
+            return next;
+        });
+    };
+
+    const lookupWarningViews = useMemo(() => {
+        if (!sourceView || !table) return [];
+        let firstColumn = "";
+        try {
+            firstColumn = parseLayoutColumns(sourceView.layoutxml).filter((c) => !c.isHidden)[0]?.name ?? "";
+        } catch {
+            return [];
+        }
+        if (firstColumn === table.primaryNameAttribute) return [];
+        return views.filter((v) => targetIds.has(v.id) && isLookupView(v)).map((v) => v.name);
+    }, [sourceView, table, targetIds, views]);
+
+    const handleCopy = async () => {
+        if (!sourceView || !table || targetIds.size === 0) return;
+
+        const targets = views.filter((v) => targetIds.has(v.id));
+        const progress: CopyResultItem[] = targets.map((v) => ({ viewId: v.id, viewName: v.name, status: "pending" }));
+        clearResults();
+        setResults(progress);
         setIsCopying(true);
-        const progress: UpdateProgress[] = targetViews.map((viewId) => ({
-            viewId,
-            viewName: views.find((v) => v.savedqueryid === viewId)?.name || viewId,
-            status: "pending",
-        }));
-        setUpdateProgress(progress);
 
-        const client = new DataverseClient();
+        let requiredColumns: string[] = [];
+        try {
+            requiredColumns = parseLayoutColumns(sourceView.layoutxml).map((c) => c.name);
+        } catch (e: any) {
+            showError(`Could not parse the source view layout: ${e.message}`);
+            setIsCopying(false);
+            setResults([]);
+            return;
+        }
 
         let successCount = 0;
-        let errorCount = 0;
+        let systemViewUpdated = false;
 
-        for (let i = 0; i < targetViews.length; i++) {
-            const viewId = targetViews[i];
-            const viewName = views.find((v) => v.savedqueryid === viewId)?.name || viewId;
-
+        for (let i = 0; i < targets.length; i++) {
+            const target = targets[i];
             try {
-                await client.updateViewLayout(selectedEntity, viewId, sourceViewLayout);
-                progress[i] = {
-                    viewId,
-                    viewName,
-                    status: "success",
-                    message: "Layout updated successfully",
-                };
-                successCount++;
-            } catch (error: any) {
-                progress[i] = {
-                    viewId,
-                    viewName,
-                    status: "error",
-                    message: error.message,
-                };
-                errorCount++;
-            }
+                const payload: ViewUpdatePayload = {};
+                const notes: string[] = [];
 
-            setUpdateProgress([...progress]);
+                if (options.columnLayout) {
+                    payload.layoutxml = buildTargetLayoutXml(sourceView.layoutxml, target.layoutxml);
+                }
+
+                // Even when only the layout is copied, the target fetchxml must
+                // contain every attribute the layout references.
+                const merge = mergeFetchXml(sourceView.fetchxml, target.fetchxml, options.columnLayout ? requiredColumns : [], options.sortOrder);
+                if (merge.changed) {
+                    payload.fetchxml = merge.fetchXml;
+                }
+                if (merge.addedAttributes.length > 0) {
+                    notes.push(`added ${merge.addedAttributes.length} column${merge.addedAttributes.length === 1 ? "" : "s"} to the query`);
+                }
+                if (merge.addedLinkEntities.length > 0) {
+                    notes.push(`added related table link (${merge.addedLinkEntities.join(", ")}) without its filters`);
+                }
+                if (merge.droppedOrders.length > 0) {
+                    notes.push(`skipped sort on ${merge.droppedOrders.join(", ")} (related table not in target)`);
+                }
+
+                if (options.components && sourceView.layoutjson && !target.isPersonal) {
+                    payload.layoutjson = sourceView.layoutjson;
+                }
+
+                if (Object.keys(payload).length === 0) {
+                    progress[i] = { ...progress[i], status: "success", message: "Nothing to change" };
+                } else {
+                    await client.updateView(target, payload);
+                    if (!target.isPersonal) systemViewUpdated = true;
+                    progress[i] = { ...progress[i], status: "success", message: notes.length > 0 ? notes.join("; ") : undefined };
+                }
+                successCount++;
+            } catch (e: any) {
+                progress[i] = { ...progress[i], status: "error", message: e.message };
+            }
+            setResults([...progress]);
+        }
+
+        let publishFailed = false;
+        if (systemViewUpdated) {
+            setPublishStatus("pending");
+            setPublishMessage(`Publishing ${table.displayName}…`);
+            try {
+                await client.publishTable(table.logicalName);
+                setPublishStatus("success");
+                setPublishMessage(`${table.displayName} published`);
+            } catch (e: any) {
+                publishFailed = true;
+                setPublishStatus("error");
+                setPublishMessage(`Publish failed: ${e.message}. Publish the table manually.`);
+                showError(`Views were updated but publishing failed: ${e.message}. Publish the table manually.`);
+            }
+        } else if (successCount > 0) {
+            setPublishStatus("success");
+            setPublishMessage("No publish needed — personal views apply immediately");
         }
 
         setIsCopying(false);
 
-        if (errorCount === 0) {
-            await showNotification("Success", `Layout copied to ${successCount} view(s) successfully`, "success");
-        } else {
-            await showNotification("Completed with errors", `Success: ${successCount}, Failed: ${errorCount}`, "error");
+        // Refresh the views so previews/subsequent copies use the new definitions
+        try {
+            const refreshed = await client.listViews(table.logicalName);
+            refreshed.sort((a, b) => viewTypeRank(a) - viewTypeRank(b) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+            setViews(refreshed);
+        } catch {
+            /* non-fatal */
+        }
+
+        const errorCount = targets.length - successCount;
+        if (window.toolboxAPI?.utils?.showNotification) {
+            if (errorCount === 0 && !publishFailed) {
+                await window.toolboxAPI.utils.showNotification({ title: "Layout copied", body: `Copied to ${successCount} view(s) and published.`, type: "success" });
+            } else {
+                await window.toolboxAPI.utils.showNotification({ title: "Completed with errors", body: `Success: ${successCount}, Failed: ${errorCount}`, type: "error" });
+            }
         }
     };
 
     const handleReset = () => {
-        setSelectedEntity("");
-        setSourceView("");
-        setTargetViews([]);
-        setUpdateProgress([]);
+        setSourceViewId("");
+        setTargetIds(new Set());
+        clearResults();
     };
 
-    if (loading && !connectionUrl) {
+    // ---------------------------------------------------------------- render
+    if (fatalError) {
         return (
-            <div className="container">
-                <div className="loading">Loading...</div>
-            </div>
-        );
-    }
-
-    if (error && !isPPTB) {
-        return (
-            <div className="container">
-                <div className="error">{error}</div>
+            <div className="app">
+                <div className="fatal-error">{fatalError}</div>
             </div>
         );
     }
 
     return (
-        <div className="container">
-            {error && <div className="error">{error}</div>}
+        <div className="app">
+            <header className="app-header">
+                <div className="app-title">
+                    <span className="app-title-text">View Layout Copier</span>
+                    {isDemoMode && <span className="tag tag-demo">Demo mode — sample data</span>}
+                </div>
+                {connectionUrl && (
+                    <div className="connection-info" title={connectionUrl}>
+                        {connectionUrl.replace(/^https?:\/\//, "")}
+                    </div>
+                )}
+            </header>
 
-            <div className="content-wrapper">
-                {/* Entity Selection */}
-                <div className="section">
-                    <div className="section-title">Select Entity</div>
-                    <div className="form-group">
-                        <select id="entitySelect" value={selectedEntity} onChange={(e) => setSelectedEntity(e.target.value)} disabled={entities.length === 0 || loading}>
-                            <option value="">-- Select an Entity --</option>
-                            {entities.map((entity) => (
-                                <option key={entity.logicalName} value={entity.logicalName}>
-                                    {entity.displayName} ({entity.logicalName})
-                                </option>
-                            ))}
-                        </select>
+            {error && (
+                <div className="error-banner" role="alert">
+                    {error}
+                </div>
+            )}
+
+            <div className="app-body">
+                <div className="left-col">
+                    <TableSidebar
+                        tables={tables}
+                        solutionTableIds={solutionTableIds}
+                        selectedTable={selectedTable}
+                        onSelect={setSelectedTable}
+                        loading={loadingTables}
+                        headerSlot={<SolutionPicker solutions={solutions} selectedId={selectedSolutionId} onSelect={handleSolutionSelect} disabled={loadingTables && solutions.length === 0} />}
+                    />
+                    <div className="sidebar-copy">
+                        <CopyPanel
+                            options={options}
+                            onOptionsChange={setOptions}
+                            sourceView={sourceView}
+                            targetCount={targetIds.size}
+                            lookupWarningViews={lookupWarningViews}
+                            primaryNameAttribute={table?.primaryNameAttribute ?? "name"}
+                            componentsAvailable={!!sourceView?.layoutjson}
+                            isCopying={isCopying}
+                            results={results}
+                            publishStatus={publishStatus}
+                            publishMessage={publishMessage}
+                            onCopy={handleCopy}
+                            onReset={handleReset}
+                        />
                     </div>
                 </div>
 
-                {/* View Selection */}
-                {selectedEntity && views.length > 0 && (
-                    <div className="main-section">
-                        <div className="section">
-                            <div className="section-title">Select Views</div>
-
-                            <div className="views-container">
-                                {/* Source View Panel */}
-                                <div className="views-panel">
-                                    <div className="panel-header">
-                                        <div className="panel-title">Source View</div>
-                                        <div className="panel-subtitle">Select the view to copy layout from</div>
-                                    </div>
-
-                                    <div className="view-list">
-                                        {views.map((view) => (
-                                            <div
-                                                key={view.savedqueryid}
-                                                className={`view-item ${sourceView === view.savedqueryid ? "source" : ""}`}
-                                                onClick={() => handleSourceViewChange(view.savedqueryid)}
-                                            >
-                                                <input
-                                                    type="radio"
-                                                    name="sourceView"
-                                                    checked={sourceView === view.savedqueryid}
-                                                    onChange={() => handleSourceViewChange(view.savedqueryid)}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                                <span>{view.name}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Target Views Panel */}
-                                {sourceView && (
-                                    <div className="views-panel">
-                                        <div className="panel-header">
-                                            <div className="panel-title">Target Views</div>
-                                            <div className="panel-subtitle">Select views to apply the layout to</div>
-                                        </div>
-
-                                        <div className="view-list">
-                                            {views
-                                                .filter((view) => view.savedqueryid !== sourceView)
-                                                .map((view) => (
-                                                    <div
-                                                        key={view.savedqueryid}
-                                                        className={`view-item ${targetViews.includes(view.savedqueryid) ? "selected" : ""}`}
-                                                        onClick={() => handleTargetViewToggle(view.savedqueryid)}
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={targetViews.includes(view.savedqueryid)}
-                                                            onChange={() => handleTargetViewToggle(view.savedqueryid)}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                        />
-                                                        <span>{view.name}</span>
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    </div>
-                                )}
+                <main className="main-area">
+                    {!selectedTable && (
+                        <div className="empty-state">
+                            <div className="empty-state-icon" aria-hidden="true">
+                                ⬱
                             </div>
+                            <h2>Select a table on the left to get started</h2>
+                            <ol className="empty-state-steps">
+                                <li>Narrow the list by solution, or search by display or schema name</li>
+                                <li>Pick the source view to copy the layout from — its columns show in a preview</li>
+                                <li>Check the target views to apply it to</li>
+                                <li>Review the copy options at the bottom left, then Copy &amp; publish</li>
+                            </ol>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* Action Bar */}
-                {sourceView && targetViews.length > 0 && (
-                    <div className="action-bar">
-                        <div className="selection-info">
-                            <strong>{targetViews.length}</strong> view(s) selected for copying
-                        </div>
-                        <div className="button-group">
-                            <button className="btn btn-success" onClick={handleCopyLayout} disabled={isCopying}>
-                                {isCopying ? "Copying..." : "✓ Copy Layout"}
-                            </button>
-                            <button className="btn btn-secondary" onClick={handleReset} disabled={isCopying}>
-                                Reset
-                            </button>
-                        </div>
-                    </div>
-                )}
+                    {selectedTable && table && (
+                        <>
+                            <div className="table-heading">
+                                <h2>{table.displayName}</h2>
+                                <span className="table-heading-logical">{table.logicalName}</span>
+                                {loadingViews && <span className="loading-inline">Loading views…</span>}
+                            </div>
 
-                {/* Progress */}
-                {updateProgress.length > 0 && (
-                    <div className="section">
-                        <div className="section-title">Progress</div>
-                        <div className="progress-list">
-                            {updateProgress.map((item) => (
-                                <div key={item.viewId} className={`progress-item ${item.status}`}>
-                                    <span className="status-icon">
-                                        {item.status === "success" && "✓"}
-                                        {item.status === "error" && "✗"}
-                                        {item.status === "pending" && "⋯"}
-                                    </span>
-                                    <div>
-                                        <strong>{item.viewName}</strong>
-                                        {item.message && <span> - {item.message}</span>}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                            {sourceView && <LayoutPreview view={sourceView} attributeNames={attributeNames} />}
+
+                            <div className="work-area">
+                                <ViewListPanel mode="source" views={views} selectedId={sourceViewId} onSelect={handleSourceSelect} />
+                                <ViewListPanel
+                                    mode="target"
+                                    views={views}
+                                    sourceId={sourceViewId}
+                                    selectedIds={targetIds}
+                                    onToggle={handleTargetToggle}
+                                    onSelectAll={() => {
+                                        clearResults();
+                                        setTargetIds(new Set(views.filter((v) => v.id !== sourceViewId).map((v) => v.id)));
+                                    }}
+                                    onClearAll={() => {
+                                        clearResults();
+                                        setTargetIds(new Set());
+                                    }}
+                                />
+                            </div>
+                        </>
+                    )}
+                </main>
             </div>
         </div>
     );
