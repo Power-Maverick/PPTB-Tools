@@ -8,6 +8,7 @@ import { CopyOptions, CopyResultItem, Solution, TableInfo, ViewInfo } from "./mo
 import { isLookupView, viewTypeRank } from "./models/viewTypes";
 import { DataverseClient, ViewUpdatePayload } from "./utils/DataverseClient";
 import { buildTargetLayoutXml, mergeFetchXml, parseLayoutColumns } from "./utils/layoutUtils";
+import { version as APP_VERSION } from "../package.json";
 
 const client = new DataverseClient();
 
@@ -306,6 +307,7 @@ function App() {
             <header className="app-header">
                 <div className="app-title">
                     <span className="app-title-text">View Layout Copier</span>
+                    <span className="app-version">v{APP_VERSION}</span>
                     {isDemoMode && <span className="tag tag-demo">Demo mode — sample data</span>}
                 </div>
                 {connectionUrl && (

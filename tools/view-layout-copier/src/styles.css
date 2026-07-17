@@ -148,6 +148,12 @@ body {
     white-space: nowrap;
 }
 
+.app-version {
+    font-size: 11px;
+    color: var(--text-faint);
+    white-space: nowrap;
+}
+
 .connection-info {
     margin-left: auto;
     font-size: 12px;
