@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CopyPanel } from "./components/CopyPanel";
+import { ConfigurationPanel } from "./components/ConfigurationPanel";
+import { CopyActionsBar } from "./components/CopyActionsBar";
 import { LayoutPreview } from "./components/LayoutPreview";
 import { SolutionPicker } from "./components/SolutionPicker";
 import { TableSidebar } from "./components/TableSidebar";
@@ -34,6 +35,7 @@ function App() {
     const [loadingViews, setLoadingViews] = useState<boolean>(false);
 
     // Copy configuration
+    const [leftTab, setLeftTab] = useState<"tables" | "configuration">("tables");
     const [sourceViewId, setSourceViewId] = useState<string>("");
     const [targetIds, setTargetIds] = useState<Set<string>>(new Set());
     const [options, setOptions] = useState<CopyOptions>({ columnLayout: true, sortOrder: true, components: true });
@@ -325,23 +327,43 @@ function App() {
 
             <div className="app-body">
                 <div className="left-col">
-                    <TableSidebar
-                        tables={tables}
-                        solutionTableIds={solutionTableIds}
-                        selectedTable={selectedTable}
-                        onSelect={setSelectedTable}
-                        loading={loadingTables}
-                        headerSlot={<SolutionPicker solutions={solutions} selectedId={selectedSolutionId} onSelect={handleSolutionSelect} disabled={loadingTables && solutions.length === 0} />}
-                    />
+                    <div className="left-tabs" role="tablist">
+                        <button type="button" role="tab" aria-selected={leftTab === "tables"} className={`left-tab ${leftTab === "tables" ? "active" : ""}`} onClick={() => setLeftTab("tables")}>
+                            Tables
+                        </button>
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={leftTab === "configuration"}
+                            className={`left-tab ${leftTab === "configuration" ? "active" : ""}`}
+                            onClick={() => setLeftTab("configuration")}
+                        >
+                            Configuration
+                        </button>
+                    </div>
+
+                    {/* Both tab panels stay mounted so search text and scroll position survive tab switches */}
+                    <div className="left-tab-content" hidden={leftTab !== "tables"}>
+                        <TableSidebar
+                            tables={tables}
+                            solutionTableIds={solutionTableIds}
+                            selectedTable={selectedTable}
+                            onSelect={setSelectedTable}
+                            loading={loadingTables}
+                            headerSlot={<SolutionPicker solutions={solutions} selectedId={selectedSolutionId} onSelect={handleSolutionSelect} disabled={loadingTables && solutions.length === 0} />}
+                        />
+                    </div>
+                    <div className="left-tab-content" hidden={leftTab !== "configuration"}>
+                        <ConfigurationPanel options={options} onOptionsChange={setOptions} componentsAvailable={!!sourceView?.layoutjson} />
+                    </div>
+
                     <div className="sidebar-copy">
-                        <CopyPanel
+                        <CopyActionsBar
                             options={options}
-                            onOptionsChange={setOptions}
                             sourceView={sourceView}
                             targetCount={targetIds.size}
                             lookupWarningViews={lookupWarningViews}
                             primaryNameAttribute={table?.primaryNameAttribute ?? "name"}
-                            componentsAvailable={!!sourceView?.layoutjson}
                             isCopying={isCopying}
                             results={results}
                             publishStatus={publishStatus}
@@ -363,7 +385,7 @@ function App() {
                                 <li>Narrow the list by solution, or search by display or schema name</li>
                                 <li>Pick the source view to copy the layout from — its columns show in a preview</li>
                                 <li>Check the target views to apply it to</li>
-                                <li>Review the copy options at the bottom left, then Copy &amp; publish</li>
+                                <li>Adjust what gets copied on the Configuration tab, then Copy &amp; publish</li>
                             </ol>
                         </div>
                     )}

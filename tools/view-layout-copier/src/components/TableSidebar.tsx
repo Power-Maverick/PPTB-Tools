@@ -30,7 +30,6 @@ export function TableSidebar({ tables, solutionTableIds, selectedTable, onSelect
     return (
         <aside className="sidebar">
             <div className="sidebar-header">
-                <div className="sidebar-title">Tables</div>
                 {headerSlot}
                 <input type="search" className="sidebar-search" placeholder="Search display or schema name…" value={search} onChange={(e) => setSearch(e.target.value)} disabled={loading} />
             </div>

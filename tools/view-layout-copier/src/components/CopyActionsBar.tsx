@@ -1,14 +1,12 @@
 import { CopyOptions, CopyResultItem, ViewInfo } from "../models/interfaces";
 
-interface CopyPanelProps {
+interface CopyActionsBarProps {
     options: CopyOptions;
-    onOptionsChange: (options: CopyOptions) => void;
     sourceView?: ViewInfo;
     targetCount: number;
     /** names of selected lookup-view targets when the source's first column is not the primary name attribute */
     lookupWarningViews: string[];
     primaryNameAttribute: string;
-    componentsAvailable: boolean;
     isCopying: boolean;
     results: CopyResultItem[];
     publishStatus: "pending" | "success" | "error" | null;
@@ -17,63 +15,24 @@ interface CopyPanelProps {
     onReset: () => void;
 }
 
-export function CopyPanel({
+export function CopyActionsBar({
     options,
-    onOptionsChange,
     sourceView,
     targetCount,
     lookupWarningViews,
     primaryNameAttribute,
-    componentsAvailable,
     isCopying,
     results,
     publishStatus,
     publishMessage,
     onCopy,
     onReset,
-}: CopyPanelProps) {
+}: CopyActionsBarProps) {
     const nothingToCopy = !options.columnLayout && !options.sortOrder && !options.components;
     const canCopy = !!sourceView && targetCount > 0 && !nothingToCopy && !isCopying;
 
-    const toggle = (key: keyof CopyOptions) => onOptionsChange({ ...options, [key]: !options[key] });
-
     return (
-        <section className="panel copy-panel">
-            <header className="panel-header">
-                <div>
-                    <div className="panel-title">Copy options</div>
-                    <div className="panel-subtitle">What to copy to the targets</div>
-                </div>
-            </header>
-
-            <div className="copy-options">
-                <label className="option-item">
-                    <input type="checkbox" checked={options.columnLayout} onChange={() => toggle("columnLayout")} />
-                    <span>
-                        <span className="option-name">Column layout</span>
-                        <span className="option-detail">Columns, order and widths</span>
-                    </span>
-                </label>
-                <label className="option-item">
-                    <input type="checkbox" checked={options.sortOrder} onChange={() => toggle("sortOrder")} />
-                    <span>
-                        <span className="option-name">Sort order</span>
-                        <span className="option-detail">Replaces the targets' sorting</span>
-                    </span>
-                </label>
-                <label className={`option-item ${!componentsAvailable ? "disabled" : ""}`}>
-                    <input type="checkbox" checked={options.components && componentsAvailable} disabled={!componentsAvailable} onChange={() => toggle("components")} />
-                    <span>
-                        <span className="option-name">Components configuration</span>
-                        <span className="option-detail">{componentsAvailable ? "Custom controls / grid components" : "Source view has no components configuration"}</span>
-                    </span>
-                </label>
-
-                <div className="filters-note">
-                    <span aria-hidden="true">ⓘ</span> View filters are never copied — each target keeps its own filter criteria. Changes are published automatically.
-                </div>
-            </div>
-
+        <section className="panel copy-actions-bar">
             {lookupWarningViews.length > 0 && (
                 <div className="warning-box" role="alert">
                     <strong>Lookup view warning</strong>
@@ -97,7 +56,7 @@ export function CopyPanel({
                     Reset
                 </button>
             </div>
-            {nothingToCopy && <div className="list-hint">Select at least one option to copy.</div>}
+            {nothingToCopy && <div className="list-hint">Enable at least one copy option on the Configuration tab.</div>}
 
             {(results.length > 0 || publishStatus) && (
                 <div className="progress-list">
