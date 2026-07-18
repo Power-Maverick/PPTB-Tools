@@ -182,12 +182,6 @@ body {
     border: 1px solid var(--warning-border);
 }
 
-.tag-managed {
-    background-color: var(--badge-other-bg);
-    color: var(--badge-other-fg);
-    margin-left: 6px;
-}
-
 /* -------------------------------------------------------- solution picker */
 .solution-picker {
     position: relative;

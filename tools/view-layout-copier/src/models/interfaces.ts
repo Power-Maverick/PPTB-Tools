@@ -3,7 +3,6 @@ export interface Solution {
     uniqueName: string;
     displayName: string;
     version: string;
-    isManaged: boolean;
 }
 
 export interface TableInfo {

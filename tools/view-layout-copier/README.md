@@ -8,7 +8,7 @@ View Layout Copier simplifies keeping view layouts consistent across a table. In
 
 ## Features
 
-- **Solution selector on launch**: Narrow the table list to a specific solution (managed or unmanaged), or work across all tables
+- **Solution selector on launch**: Narrow the table list to an unmanaged solution (managed solutions are excluded — they can't be modified), or work across all tables. Defaults to the current user's preferred solution from the maker portal when one is set, otherwise the first unmanaged solution alphabetically
 - **Persistent, searchable table list**: Search by display name *or* schema/logical name; the list is alphabetized by display name and stays available on the left for quick switching
 - **View types at a glance**: Every view is badged with its type — Default Public View, Public View, Personal View, Associated View, Advanced Find View, Quick Find View, Lookup View, and more
 - **Personal views included**: Copy to/from personal views (userquery) as well as system views (savedquery)
@@ -25,11 +25,11 @@ View Layout Copier simplifies keeping view layouts consistent across a table. In
 
 ## How to Use
 
-1. **Pick a solution** (optional) in the header to narrow the table list
+1. **Pick a solution** on the Tables tab to narrow the table list — it's pre-selected using your maker-portal preferred solution when available
 2. **Select a table** from the searchable list on the left
 3. **Choose the source view** whose layout you want to copy — its layout appears in the preview strip
 4. **Check the target views** to apply the layout to
-5. **Adjust the copy options** (pinned at the bottom of the Tables column) if needed, then click **Copy & publish** — customizations are published automatically and the publish status is shown in the progress list
+5. **Adjust the copy options** on the Configuration tab if needed, then click **Copy & publish** (pinned at the bottom of the left nav) — customizations are published automatically and the publish status is shown in the progress list
 
 ## Technical Details
 

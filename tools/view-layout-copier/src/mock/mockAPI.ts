@@ -67,6 +67,11 @@ const SOLUTIONS = [
     { solutionid: "a1000000-0000-0000-0000-000000000004", friendlyname: "Project Tracker", uniquename: "contoso_projecttracker", version: "0.9.3.0", ismanaged: false, isvisible: true },
 ];
 
+const MOCK_USER_ID = "c0000000-0000-0000-0000-000000000001";
+// Simulates a maker having picked a preferred solution in the maker portal — not the
+// alphabetically-first one, so demo mode exercises the "honor the user's choice" path.
+const MOCK_PREFERRED_SOLUTION_ID = "a1000000-0000-0000-0000-000000000002";
+
 const ENTITIES = [
     {
         MetadataId: "e0000000-0000-0000-0000-00000000000a",
@@ -615,7 +620,14 @@ export function installMockAPI(): void {
             await delay(300);
 
             if (odataQuery.startsWith("solutions?")) {
-                return { value: SOLUTIONS };
+                // Mirrors the real "isvisible eq true and ismanaged eq false" filter this tool sends.
+                return { value: SOLUTIONS.filter((s) => s.ismanaged === false) };
+            }
+
+            if (odataQuery.startsWith("usersettingscollection?")) {
+                const userId = getFilterValue(odataQuery, /systemuserid eq ([0-9a-f-]+)/i);
+                if (userId !== MOCK_USER_ID) return { value: [] };
+                return { value: [{ systemuserid: MOCK_USER_ID, preferredsolution: { solutionid: MOCK_PREFERRED_SOLUTION_ID } }] };
             }
 
             if (odataQuery.startsWith("solutioncomponents?")) {
@@ -664,6 +676,14 @@ export function installMockAPI(): void {
         async publishCustomizations(tableLogicalName?: string): Promise<void> {
             await delay(800);
             console.info(`[mock] Published customizations for ${tableLogicalName ?? "all"}`);
+        },
+
+        async execute(request: { operationName: string; operationType: string }): Promise<Record<string, unknown>> {
+            await delay(100);
+            if (request.operationName === "WhoAmI") {
+                return { UserId: MOCK_USER_ID };
+            }
+            throw new Error(`Mock does not implement operation '${request.operationName}'`);
         },
     };
 

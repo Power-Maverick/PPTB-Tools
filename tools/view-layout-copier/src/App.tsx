@@ -59,6 +59,18 @@ function App() {
         errorTimer.current = window.setTimeout(() => setError(""), 8000);
     }, []);
 
+    const fetchSolutionTableIds = useCallback(
+        async (solutionId: string): Promise<Set<string> | null> => {
+            try {
+                return await client.listSolutionTableIds(solutionId);
+            } catch (e: any) {
+                showError(`Failed to load solution tables: ${e.message}`);
+                return null;
+            }
+        },
+        [showError],
+    );
+
     // ---------------------------------------------------------------- boot
     useEffect(() => {
         const initialize = async () => {
@@ -76,9 +88,18 @@ function App() {
             }
 
             try {
-                const [solutionList, tableList] = await Promise.all([client.listSolutions(), client.listTables()]);
+                const [solutionList, tableList, preferredSolutionId] = await Promise.all([client.listSolutions(), client.listTables(), client.getPreferredSolutionId()]);
                 setSolutions(solutionList);
                 setTables(tableList);
+
+                // Default to the user's maker-portal preferred solution when it's one of the
+                // unmanaged solutions we can write to; otherwise fall back to the first
+                // alphabetically. Leaves "All tables" unselected only when no solutions exist.
+                const defaultSolutionId = solutionList.find((s) => s.id === preferredSolutionId)?.id ?? solutionList[0]?.id ?? "";
+                if (defaultSolutionId) {
+                    setSelectedSolutionId(defaultSolutionId);
+                    setSolutionTableIds(await fetchSolutionTableIds(defaultSolutionId));
+                }
             } catch (e: any) {
                 setFatalError(`Failed to load environment metadata: ${e.message}`);
             } finally {
@@ -98,20 +119,17 @@ function App() {
             setSolutionTableIds(null);
             return;
         }
-        try {
-            setLoadingTables(true);
-            const ids = await client.listSolutionTableIds(solutionId);
-            setSolutionTableIds(ids);
+        setLoadingTables(true);
+        const ids = await fetchSolutionTableIds(solutionId);
+        setSolutionTableIds(ids);
+        if (ids) {
             // Clear the selected table if it fell out of the filtered list
             const stillVisible = tables.some((t) => t.logicalName === selectedTable && ids.has(t.metadataId));
             if (selectedTable && !stillVisible) {
                 setSelectedTable("");
             }
-        } catch (e: any) {
-            showError(`Failed to load solution tables: ${e.message}`);
-        } finally {
-            setLoadingTables(false);
         }
+        setLoadingTables(false);
     };
 
     // --------------------------------------------------------- table select

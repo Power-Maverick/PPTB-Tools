@@ -68,10 +68,7 @@ export function SolutionPicker({ solutions, selectedId, onSelect, disabled }: So
                         </div>
                         {filtered.map((s) => (
                             <div key={s.id} className={`solution-picker-option ${s.id === selectedId ? "active" : ""}`} role="option" aria-selected={s.id === selectedId} onClick={() => choose(s.id)}>
-                                <span className="solution-option-name">
-                                    {s.displayName}
-                                    {s.isManaged && <span className="tag tag-managed">Managed</span>}
-                                </span>
+                                <span className="solution-option-name">{s.displayName}</span>
                                 <span className="solution-option-detail">
                                     {s.uniqueName} · v{s.version}
                                 </span>

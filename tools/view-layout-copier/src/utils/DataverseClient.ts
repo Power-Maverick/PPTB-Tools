@@ -16,18 +16,44 @@ export interface ViewUpdatePayload {
 }
 
 export class DataverseClient {
-    /** List visible solutions in the environment, alphabetized by display name */
+    /** List visible, unmanaged solutions (the only ones this tool can write to), alphabetized by display name */
     async listSolutions(): Promise<Solution[]> {
         const entitySetName = await window.dataverseAPI.getEntitySetName("solution");
-        const response = await window.dataverseAPI.queryData(`${entitySetName}?$select=solutionid,friendlyname,uniquename,version,ismanaged&$filter=isvisible eq true&$orderby=friendlyname asc`);
+        const response = await window.dataverseAPI.queryData(
+            `${entitySetName}?$select=solutionid,friendlyname,uniquename,version&$filter=isvisible eq true and ismanaged eq false&$orderby=friendlyname asc`,
+        );
 
         return response.value.map((s: any) => ({
             id: s.solutionid,
             uniqueName: s.uniquename,
             displayName: s.friendlyname,
             version: s.version,
-            isManaged: s.ismanaged === true,
         }));
+    }
+
+    /**
+     * The solution the current user has selected as their default/preferred solution in the
+     * maker portal (usersettings.preferredsolution), if any. Returns null if unset, unavailable,
+     * or the lookup fails for any reason — callers should fall back to their own default.
+     */
+    async getPreferredSolutionId(): Promise<string | null> {
+        try {
+            const who = await window.dataverseAPI.execute({ operationName: "WhoAmI", operationType: "function" });
+            const userId = who.UserId as string | undefined;
+            if (!userId) return null;
+
+            // usersettings' entity set name ("usersettingscollection") doesn't follow normal
+            // pluralization rules, so it's hardcoded here rather than derived.
+            const response = await window.dataverseAPI.queryData(
+                `usersettingscollection?$select=systemuserid&$filter=systemuserid eq ${escapeODataString(userId)}&$expand=preferredsolution($select=solutionid)`,
+            );
+
+            const solutionId = (response.value[0] as any)?.preferredsolution?.solutionid;
+            return typeof solutionId === "string" ? solutionId : null;
+        } catch (error) {
+            console.warn("Could not determine the user's preferred solution:", error);
+            return null;
+        }
     }
 
     /** Get the MetadataIds of the tables contained in a solution */
