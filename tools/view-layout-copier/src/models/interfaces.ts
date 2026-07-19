@@ -1,20 +1,41 @@
-export interface Entity {
+export interface Solution {
+    id: string;
+    uniqueName: string;
+    displayName: string;
+    version: string;
+}
+
+export interface TableInfo {
     logicalName: string;
+    schemaName: string;
     displayName: string;
     objectTypeCode: number;
+    metadataId: string;
+    primaryNameAttribute: string;
 }
 
-export interface View {
-    savedqueryid: string;
-    name: string;
-    fetchxml: string;
-    layoutxml: string;
-    returnedtypecode: string;
-    querytype: number;
-}
-
-export interface ViewListItem {
+export interface ViewInfo {
     id: string;
     name: string;
-    type: "system" | "user";
+    description?: string;
+    fetchxml: string;
+    layoutxml: string;
+    layoutjson?: string | null;
+    querytype: number;
+    isDefault: boolean;
+    /** true when the view is a personal view (userquery) instead of a system view (savedquery) */
+    isPersonal: boolean;
+}
+
+export interface CopyOptions {
+    columnLayout: boolean;
+    sortOrder: boolean;
+    components: boolean;
+}
+
+export interface CopyResultItem {
+    viewId: string;
+    viewName: string;
+    status: "pending" | "success" | "error";
+    message?: string;
 }
