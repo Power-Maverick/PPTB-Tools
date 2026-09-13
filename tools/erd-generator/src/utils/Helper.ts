@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosInstance } from "axios";
 
 export class Helper {
     private axiosInstance: AxiosInstance;
@@ -11,12 +11,18 @@ export class Helper {
         try {
             if (isPPTB) {
                 const response = await window.dataverseAPI.queryData(query);
-                return response.value as any;
+                if (Array.isArray(response)) {
+                    return response;
+                }
+                return response?.value ?? response;
             }
             const response = await this.axiosInstance.get(`/${query}`);
-            return response.data.value;
+            if (Array.isArray(response.data)) {
+                return response.data;
+            }
+            return response.data?.value ?? response.data;
         } catch (error) {
-            console.error('Error fetching OData:', error);
+            console.error("Error fetching OData:", error);
             throw error;
         }
     }
@@ -24,15 +30,15 @@ export class Helper {
     async postOData(query: string, data: Record<string, unknown>, isPPTB: boolean): Promise<any> {
         try {
             if (isPPTB) {
-                if (typeof (window.dataverseAPI as any).executeRequest === 'function') {
-                    return await (window.dataverseAPI as any).executeRequest({ method: 'POST', path: query, data });
+                if (typeof (window.dataverseAPI as any).executeRequest === "function") {
+                    return await (window.dataverseAPI as any).executeRequest({ method: "POST", path: query, data });
                 }
-                throw new Error('PPTB metadata write API is not available in this host.');
+                throw new Error("PPTB metadata write API is not available in this host.");
             }
             const response = await this.axiosInstance.post(`/${query}`, data);
             return response.data;
         } catch (error) {
-            console.error('Error posting OData:', error);
+            console.error("Error posting OData:", error);
             throw error;
         }
     }
@@ -40,15 +46,15 @@ export class Helper {
     async patchOData(query: string, data: Record<string, unknown>, isPPTB: boolean): Promise<any> {
         try {
             if (isPPTB) {
-                if (typeof (window.dataverseAPI as any).executeRequest === 'function') {
-                    return await (window.dataverseAPI as any).executeRequest({ method: 'PATCH', path: query, data });
+                if (typeof (window.dataverseAPI as any).executeRequest === "function") {
+                    return await (window.dataverseAPI as any).executeRequest({ method: "PATCH", path: query, data });
                 }
-                throw new Error('PPTB metadata write API is not available in this host.');
+                throw new Error("PPTB metadata write API is not available in this host.");
             }
             const response = await this.axiosInstance.patch(`/${query}`, data);
             return response.data;
         } catch (error) {
-            console.error('Error patching OData:', error);
+            console.error("Error patching OData:", error);
             throw error;
         }
     }

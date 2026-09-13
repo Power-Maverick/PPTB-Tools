@@ -61,7 +61,8 @@ function App() {
     const [accessToken, setAccessToken] = useState<string>("");
     const [solutions, setSolutions] = useState<Solution[]>([]);
     const [selectedSolution, setSelectedSolution] = useState<string>("");
-    const [loading, setLoading] = useState<boolean>(true);
+    const [isInitializing, setIsInitializing] = useState<boolean>(true);
+    const [loadingSolution, setLoadingSolution] = useState<boolean>(false);
     const [error, setError] = useState<string>("");
 
     const [baselineModel, setBaselineModel] = useState<ERDEditorModel | null>(null);
@@ -302,7 +303,7 @@ function App() {
         selectedSessionName,
         ensureMermaid,
         showError,
-        setLoading,
+        setLoading: setLoadingSolution,
         setBaselineModel,
         setWorkingModel,
         setPositions,
@@ -364,7 +365,7 @@ function App() {
 
     useEnvironmentInitialization({
         setIsPPTB,
-        setLoading,
+        setLoading: setIsInitializing,
         setConnectionUrl,
         setError,
     });
@@ -394,7 +395,7 @@ function App() {
     useSessionLibraryInit(setSavedSessionNames, setSelectedSessionName);
     useRelationshipNameSuggestionSync(relationshipNameSuggestion, relationshipNameTouched, relationshipName, setRelationshipName);
 
-    if (loading) {
+    if (isInitializing) {
         return (
             <div className="container">
                 <div className="loading">Loading...</div>
@@ -410,7 +411,7 @@ function App() {
                 topbarRef={topbarRef}
                 solutions={solutions}
                 selectedSolution={selectedSolution}
-                loading={loading}
+                loading={loadingSolution}
                 workingModel={!!workingModel}
                 visualMode={visualMode}
                 openTopbarFlyout={openTopbarFlyout}

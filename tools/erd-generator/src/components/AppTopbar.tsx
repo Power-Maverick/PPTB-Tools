@@ -65,7 +65,7 @@ export function AppTopbar(props: AppTopbarProps) {
                     ))}
                 </select>
                 <button className="btn btn-primary topbar-load-btn" onClick={props.onLoadSolution} disabled={!props.selectedSolution || props.loading}>
-                    Load ERD
+                    {props.loading ? "Loading..." : "Load ERD"}
                 </button>
             </div>
 
