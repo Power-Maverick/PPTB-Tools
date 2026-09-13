@@ -17,6 +17,42 @@ const toLogicalNameLiteral = (value: string): string => {
     return escapeODataString(trimmed);
 };
 
+// Limits how many tables are fetched in parallel so we don't flood the PPTB host message bridge, which can silently hang under bursty concurrent requests.
+const TABLE_FETCH_CONCURRENCY = 4;
+// Guards against a PPTB host call that never resolves (e.g. dropped message) so the UI can recover instead of spinning forever.
+const REQUEST_TIMEOUT_MS = 30000;
+
+const withTimeout = <T>(promise: Promise<T>, label: string, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`Timed out waiting for ${label} after ${timeoutMs}ms`)), timeoutMs);
+        promise.then(
+            (value) => {
+                clearTimeout(timer);
+                resolve(value);
+            },
+            (error) => {
+                clearTimeout(timer);
+                reject(error);
+            },
+        );
+    });
+
+const runWithConcurrencyLimit = async <T, R>(items: T[], limit: number, worker: (item: T) => Promise<R>): Promise<R[]> => {
+    const results: R[] = new Array(items.length);
+    let nextIndex = 0;
+
+    const runNext = async (): Promise<void> => {
+        while (nextIndex < items.length) {
+            const currentIndex = nextIndex++;
+            results[currentIndex] = await worker(items[currentIndex]);
+        }
+    };
+
+    const workers = Array.from({ length: Math.min(limit, items.length) }, () => runNext());
+    await Promise.all(workers);
+    return results;
+};
+
 export interface DataverseConfig {
     environmentUrl: string;
     accessToken?: string;
@@ -85,14 +121,12 @@ export class DataverseClient {
     private async fetchTables(tableIds: string[]): Promise<DataverseTable[]> {
         if (tableIds.length === 0) return [];
 
-        const tableFetchPromises = tableIds.map((tableId) =>
+        const results = await runWithConcurrencyLimit(tableIds, TABLE_FETCH_CONCURRENCY, (tableId) =>
             this.fetchTable(tableId).catch((error) => {
                 console.warn(`Failed to fetch table ${tableId}:`, error);
                 return null;
             }),
         );
-
-        const results = await Promise.all(tableFetchPromises);
         return results.filter((table: DataverseTable | null): table is DataverseTable => table !== null);
     }
 
@@ -102,19 +136,14 @@ export class DataverseClient {
 
             let entity: any;
             if (this.isPPTB && window.dataverseAPI?.getEntityMetadata) {
-                entity = await window.dataverseAPI.getEntityMetadata(tableId, false, [
-                    "LogicalName",
-                    "DisplayName",
-                    "SchemaName",
-                    "PrimaryIdAttribute",
-                    "PrimaryNameAttribute",
-                    "TableType",
-                    "IsIntersect",
-                ]);
+                entity = await withTimeout(
+                    window.dataverseAPI.getEntityMetadata(tableId, false, ["LogicalName", "DisplayName", "SchemaName", "PrimaryIdAttribute", "PrimaryNameAttribute", "TableType", "IsIntersect"]),
+                    `getEntityMetadata(${tableId})`,
+                );
             } else {
-                const entityDefResponse = await helper.getOData(
-                    `EntityDefinitions(${tableId})?$select=LogicalName,DisplayName,SchemaName,PrimaryIdAttribute,PrimaryNameAttribute,TableType,IsIntersect`,
-                    false,
+                const entityDefResponse = await withTimeout(
+                    helper.getOData(`EntityDefinitions(${tableId})?$select=LogicalName,DisplayName,SchemaName,PrimaryIdAttribute,PrimaryNameAttribute,TableType,IsIntersect`, false),
+                    `EntityDefinitions(${tableId})`,
                 );
                 entity = entityDefResponse;
             }
@@ -125,10 +154,22 @@ export class DataverseClient {
             }
 
             const [responseAttributes, responseOneToMany, responseManyToOne, responseManyToMany] = await Promise.all([
-                helper.getOData(`EntityDefinitions(${tableId})/Attributes?$select=LogicalName,DisplayName,AttributeType,IsPrimaryId,IsPrimaryName,RequiredLevel`, this.isPPTB),
-                helper.getOData(`EntityDefinitions(${tableId})/OneToManyRelationships?$select=SchemaName,ReferencedEntity,ReferencingEntity,ReferencingAttribute`, this.isPPTB),
-                helper.getOData(`EntityDefinitions(${tableId})/ManyToOneRelationships?$select=SchemaName,ReferencedEntity,ReferencingEntity,ReferencingAttribute`, this.isPPTB),
-                helper.getOData(`EntityDefinitions(${tableId})/ManyToManyRelationships?$select=SchemaName,Entity1LogicalName,Entity2LogicalName,IntersectEntityName`, this.isPPTB),
+                withTimeout(
+                    helper.getOData(`EntityDefinitions(${tableId})/Attributes?$select=LogicalName,DisplayName,AttributeType,IsPrimaryId,IsPrimaryName,RequiredLevel`, this.isPPTB),
+                    `Attributes(${tableId})`,
+                ),
+                withTimeout(
+                    helper.getOData(`EntityDefinitions(${tableId})/OneToManyRelationships?$select=SchemaName,ReferencedEntity,ReferencingEntity,ReferencingAttribute`, this.isPPTB),
+                    `OneToManyRelationships(${tableId})`,
+                ),
+                withTimeout(
+                    helper.getOData(`EntityDefinitions(${tableId})/ManyToOneRelationships?$select=SchemaName,ReferencedEntity,ReferencingEntity,ReferencingAttribute`, this.isPPTB),
+                    `ManyToOneRelationships(${tableId})`,
+                ),
+                withTimeout(
+                    helper.getOData(`EntityDefinitions(${tableId})/ManyToManyRelationships?$select=SchemaName,Entity1LogicalName,Entity2LogicalName,IntersectEntityName`, this.isPPTB),
+                    `ManyToManyRelationships(${tableId})`,
+                ),
             ]);
 
             const attributes: DataverseAttribute[] = (responseAttributes || []).map((attr: any) => ({

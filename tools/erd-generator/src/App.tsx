@@ -10,6 +10,7 @@ import { PublishConfirmModal } from "./components/PublishConfirmModal";
 import { PublishResultModal } from "./components/PublishResultModal";
 import { useAppActions } from "./hooks/useAppActions";
 import {
+    useAutoFitOnLoad,
     useEnvironmentInitialization,
     useGeneratedDiagrams,
     useGraphBootAnimation,
@@ -348,6 +349,7 @@ function App() {
     });
 
     useGraphBootAnimation(graphBootTick, setGraphEntryAnimating);
+    useAutoFitOnLoad(graphBootTick, reactFlowInstance);
 
     useVisualSync({
         visualMode,

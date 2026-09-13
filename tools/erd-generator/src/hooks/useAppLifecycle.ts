@@ -1,5 +1,7 @@
+import { Edge, Node as FlowNode, ReactFlowInstance } from "@xyflow/react";
 import { Dispatch, RefObject, SetStateAction, useEffect } from "react";
 import { ERDGenerator } from "../components/ERDGenerator";
+import { GraphTableNodeData } from "../components/GraphTableNode";
 import { ERDEditorModel, ERDEditorTable, changedOnlyModel, toDataverseSolution } from "../models/editor";
 import { DataverseClient } from "../utils/DataverseClient";
 import { GraphPositions } from "../utils/graphLayout";
@@ -47,6 +49,20 @@ export function useGraphBootAnimation(graphBootTick: number, setGraphEntryAnimat
         const timer = window.setTimeout(() => setGraphEntryAnimating(false), 900);
         return () => window.clearTimeout(timer);
     }, [graphBootTick, setGraphEntryAnimating]);
+}
+
+// ReactFlow's `fitView` prop only fits the viewport on the flow's initial mount, so it never
+// re-centers on later loads (the canvas stays mounted across "Load ERD" clicks) and can even miss
+// the very first fit if the container wasn't fully laid out yet when the flow mounted. Explicitly
+// re-running fitView on every load (mount or not) after a paint keeps the graph visible reliably.
+export function useAutoFitOnLoad(graphBootTick: number, reactFlowInstance: ReactFlowInstance<FlowNode<GraphTableNodeData>, Edge> | null) {
+    useEffect(() => {
+        if (graphBootTick === 0 || !reactFlowInstance) return;
+        const frame = requestAnimationFrame(() => {
+            reactFlowInstance.fitView({ padding: 0.2 });
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [graphBootTick, reactFlowInstance]);
 }
 
 interface UseVisualSyncParams {
