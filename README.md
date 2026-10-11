@@ -11,6 +11,7 @@ Tools for Power Platform ToolBox (PPTB) - a comprehensive toolkit for working wi
         - [ERD Generator](#erd-generator)
         - [PCF Builder](#pcf-builder)
         - [Plugin Registration](#plugin-registration)
+        - [Root Cause Analyzer](#root-cause-analyzer)
         - [Security Role Comparator](#security-role-comparator)
         - [Solution Dependency Analyzer](#solution-dependency-analyzer)
         - [View Layout Copier](#view-layout-copier)
@@ -191,6 +192,30 @@ Register and manage Microsoft Dataverse plugin assemblies, custom workflow activ
 - Set up pre/post images for accessing entity attribute values before and after an operation
 - Register custom workflow activities for use in Power Automate
 - Manage plugin step lifecycle across development and production environments
+
+### [Root Cause Analyzer](./tools/root-cause-analyzer)
+
+Tool README: [here](./tools/root-cause-analyzer/README.md)
+
+Trace every plugin, flow and change that touched a Dataverse record — and pinpoint why it's wrong. Exclusively for PPTB.
+
+**Key Features:**
+
+- **Strictly Read-Only**: Never writes to Dataverse or changes environment settings (enforced by tests)
+- **Preflight Check**: Reports plugin trace log level, auditing, read access and flow run history, with fix-it guidance for admins
+- **Findings**: Overwrites, expected-but-missing automation, failures, loops / depth, duplicate side effects, stuck async work, automation changes, performance limits, ownership / access changes, race conditions and computed columns — in plain language, ordered by severity
+- **Incident Summary**: Copy the findings and evidence to paste into a ticket
+- **Timeline**: One lane per actor (users, integrations, plugins, flows, workflows), effects nested under their cause, before → after values
+- **Impact Map**: Plugin steps, workflows, business rules and cloud flows in execution order, with filtering / image columns, plugin types, assemblies, relationship cascades and highlighted cycles
+- **Related Records**: Follows the chain up to 3 hops to the records where the cause usually is
+- **Honest Links**: Every link shows whether it's exact or stitched, with a confidence level; missing data is shown as "Unavailable", never hidden
+
+**Use Cases:**
+
+- Find out why a value on a record keeps reverting (e.g. a user's edit overwritten by an integration upsert)
+- Explain why a plugin or cloud flow didn't run (turned off, trigger conditions)
+- Track down failures, loops and duplicate records created by automation
+- Understand everything that fires when a table changes
 
 ### [Security Role Comparator](./tools/security-role-comparator)
 
