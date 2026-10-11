@@ -1,0 +1,15 @@
+{
+    "invocation": {
+        "version": "1.0.0",
+        "prefill": {
+            "properties": {
+                "recordUrl": { "type": "string" },
+                "table": { "type": "string" },
+                "recordId": { "type": "string" },
+                "column": { "type": "string" },
+                "from": { "type": "string" },
+                "to": { "type": "string" }
+            }
+        }
+    }
+}
