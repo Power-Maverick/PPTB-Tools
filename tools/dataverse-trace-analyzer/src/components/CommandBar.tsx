@@ -1,6 +1,6 @@
 interface CommandBarProps {
     onRetrieve: () => void;
-    onOpenFilters: () => void;
+    onToggleFilters: () => void;
     onSaveFilter: () => void;
     onLoadFilter: () => void;
     onOpenAutoRefresh: () => void;
@@ -8,6 +8,7 @@ interface CommandBarProps {
     isLoading: boolean;
     logCount: number;
     activeFilterCount: number;
+    filtersExpanded: boolean;
     hasFiltersToSave: boolean;
     autoRefreshMode: 'off' | 'auto' | 'notify';
     newLogsCount?: number;
@@ -15,7 +16,7 @@ interface CommandBarProps {
 
 export function CommandBar({ 
     onRetrieve, 
-    onOpenFilters, 
+    onToggleFilters,
     onSaveFilter, 
     onLoadFilter, 
     onOpenAutoRefresh,
@@ -23,6 +24,7 @@ export function CommandBar({
     isLoading, 
     logCount, 
     activeFilterCount,
+    filtersExpanded,
     hasFiltersToSave,
     autoRefreshMode,
     newLogsCount
@@ -38,7 +40,12 @@ export function CommandBar({
             <button className="btn btn-primary" onClick={onRetrieve} disabled={isLoading}>
                 {isLoading ? "Loading..." : "📥 Retrieve"}
             </button>
-            <button className="btn btn-secondary" onClick={onOpenFilters}>
+            <button
+                className="btn btn-secondary"
+                onClick={onToggleFilters}
+                aria-expanded={filtersExpanded}
+                aria-controls="trace-filter-panel"
+            >
                 🔍 Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
             </button>
             <button 

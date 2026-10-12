@@ -76,6 +76,7 @@ body {
     background-color: var(--surface);
     border-bottom: 1px solid var(--border-color);
     flex-shrink: 0;
+    flex-wrap: wrap;
 }
 
 .command-spacer {
@@ -86,6 +87,87 @@ body {
     font-size: 12px;
     color: var(--text-secondary);
     font-weight: 600;
+}
+
+.filter-panel {
+    flex-shrink: 0;
+    padding: 0 12px 12px;
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.filter-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0 8px;
+}
+
+.filter-panel-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.filter-panel-body {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    max-height: 32vh;
+    overflow-y: auto;
+}
+
+.filter-panel-body .filter-section {
+    min-width: 0;
+    margin-bottom: 0;
+}
+
+.filter-panel-body .checkbox-list {
+    max-height: 120px;
+}
+
+.filter-panel-footer {
+    display: flex;
+    gap: 8px;
+    padding-top: 12px;
+}
+
+.log-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.log-search input {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    font: inherit;
+    color: var(--text-color);
+    background-color: var(--background);
+}
+
+.log-search input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.log-search-clear {
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+}
+
+.log-search-count {
+    flex-shrink: 0;
+    color: var(--text-secondary);
+    font-size: 11px;
 }
 
 /* Main Content - Split View */
@@ -424,7 +506,7 @@ body {
     flex-shrink: 0;
 }
 
-/* Filter Modal */
+/* Modal */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -449,10 +531,6 @@ body {
     display: flex;
     flex-direction: column;
     position: relative;
-}
-
-.filter-modal {
-    max-width: 700px;
 }
 
 .modal-header {
@@ -511,6 +589,18 @@ body {
 /* Filter Sections */
 .filter-section {
     margin-bottom: 20px;
+}
+
+@media (max-width: 900px) {
+    .filter-panel-body {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    .filter-panel-body {
+        grid-template-columns: 1fr;
+    }
 }
 
 .filter-section > label {

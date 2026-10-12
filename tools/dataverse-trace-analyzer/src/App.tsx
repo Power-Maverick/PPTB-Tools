@@ -3,7 +3,7 @@ import { FilterOption, PluginTraceLog, SavedFilter, TraceLogFilter } from "./mod
 import { DataverseClient } from "./utils/DataverseClient";
 import { FilterStorage } from "./utils/filterStorage";
 import { CommandBar } from "./components/CommandBar";
-import { FilterModal } from "./components/FilterModal";
+import { FilterPanel } from "./components/FilterPanel";
 import { SaveFilterModal } from "./components/SaveFilterModal";
 import { LoadFilterModal } from "./components/LoadFilterModal";
 import { AutoRefreshModal } from "./components/AutoRefreshModal";
@@ -21,8 +21,9 @@ function App() {
     const [selectedLog, setSelectedLog] = useState<PluginTraceLog | null>(null);
     const [loadingLogs, setLoadingLogs] = useState<boolean>(false);
 
-    // Filter modal state
-    const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
+    // Filter panel state
+    const [showFilterPanel, setShowFilterPanel] = useState<boolean>(false);
+    const [logSearch, setLogSearch] = useState<string>("");
     const [showSaveFilterModal, setShowSaveFilterModal] = useState<boolean>(false);
     const [showLoadFilterModal, setShowLoadFilterModal] = useState<boolean>(false);
     const [showAutoRefreshModal, setShowAutoRefreshModal] = useState<boolean>(false);
@@ -80,7 +81,7 @@ function App() {
     const [correlationFilter, setCorrelationFilter] = useState<string>("");
     const [exceptionOnly, setExceptionOnly] = useState<boolean>(false);
 
-    // Temporary filter states (for modal before applying)
+    // Temporary filter states (before applying)
     const [tempDateFrom, setTempDateFrom] = useState<string>("");
     const [tempDateTo, setTempDateTo] = useState<string>("");
     const [tempSelectedPlugins, setTempSelectedPlugins] = useState<string[]>([]);
@@ -322,7 +323,12 @@ function App() {
         }
     };
 
-    const openFilterModal = () => {
+    const toggleFilterPanel = () => {
+        if (showFilterPanel) {
+            setShowFilterPanel(false);
+            return;
+        }
+
         setTempDateFrom(dateFrom);
         setTempDateTo(dateTo);
         setTempSelectedPlugins([...selectedPlugins]);
@@ -331,11 +337,7 @@ function App() {
         setTempSelectedModes([...selectedModes]);
         setTempCorrelationFilter(correlationFilter);
         setTempExceptionOnly(exceptionOnly);
-        setShowFilterModal(true);
-    };
-
-    const closeFilterModal = () => {
-        setShowFilterModal(false);
+        setShowFilterPanel(true);
     };
 
     const applyFilters = () => {
@@ -347,7 +349,7 @@ function App() {
         setSelectedModes([...tempSelectedModes]);
         setCorrelationFilter(tempCorrelationFilter);
         setExceptionOnly(tempExceptionOnly);
-        setShowFilterModal(false);
+        setShowFilterPanel(false);
     };
 
     const clearFilters = () => {
@@ -458,6 +460,21 @@ function App() {
         return getActiveFilterCount() > 0;
     };
 
+    const normalizedLogSearch = logSearch.trim().toLowerCase();
+    const visibleTraceLogs = normalizedLogSearch
+        ? traceLogs.filter(log =>
+            [
+                log.typename,
+                log.messagename,
+                log.messageblock,
+                log.exceptiondetails,
+                log.correlationid,
+                log.primaryentity,
+                log.profile,
+            ].some(value => value?.toLowerCase().includes(normalizedLogSearch))
+        )
+        : traceLogs;
+
     if (loading && !connectionUrl) {
         return (
             <div className="container">
@@ -480,7 +497,7 @@ function App() {
 
             <CommandBar
                 onRetrieve={handleRetrieve}
-                onOpenFilters={openFilterModal}
+                onToggleFilters={toggleFilterPanel}
                 onSaveFilter={() => setShowSaveFilterModal(true)}
                 onLoadFilter={() => setShowLoadFilterModal(true)}
                 onOpenAutoRefresh={() => setShowAutoRefreshModal(true)}
@@ -488,14 +505,15 @@ function App() {
                 isLoading={loadingLogs}
                 logCount={traceLogs.length}
                 activeFilterCount={getActiveFilterCount()}
+                filtersExpanded={showFilterPanel}
                 hasFiltersToSave={hasActiveFilters()}
                 autoRefreshMode={autoRefreshMode}
                 newLogsCount={newLogsCount}
             />
 
-            <FilterModal
-                isOpen={showFilterModal}
-                onClose={closeFilterModal}
+            <FilterPanel
+                isOpen={showFilterPanel}
+                onClose={() => setShowFilterPanel(false)}
                 onApply={applyFilters}
                 onClearAll={clearFilters}
                 dateFrom={tempDateFrom}
@@ -550,8 +568,30 @@ function App() {
 
             <div className="main-content">
                 <div className="logs-panel" style={{ width: `${logsPanelWidth}px` }}>
+                    <div className="log-search">
+                        <input
+                            type="text"
+                            value={logSearch}
+                            onChange={event => setLogSearch(event.target.value)}
+                            placeholder="Filter logs by text..."
+                            aria-label="Filter logs by text"
+                        />
+                        {logSearch && (
+                            <button
+                                className="log-search-clear"
+                                onClick={() => setLogSearch("")}
+                                aria-label="Clear text filter"
+                                title="Clear text filter"
+                            >
+                                ×
+                            </button>
+                        )}
+                        <span className="log-search-count">
+                            {visibleTraceLogs.length} of {traceLogs.length}
+                        </span>
+                    </div>
                     <LogList
-                        logs={traceLogs}
+                        logs={visibleTraceLogs}
                         selectedLogId={selectedLog?.plugintracelogid || null}
                         highlightedLogIds={highlightedLogIds}
                         onSelectLog={handleLogSelect}

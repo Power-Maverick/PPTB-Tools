@@ -1,7 +1,6 @@
-import { useEffect } from "react";
 import { FilterOption } from "../models/interfaces";
 
-interface FilterModalProps {
+interface FilterPanelProps {
     isOpen: boolean;
     onClose: () => void;
     onApply: () => void;
@@ -33,7 +32,7 @@ interface FilterModalProps {
     entityOptions: FilterOption[];
 }
 
-export function FilterModal({
+export function FilterPanel({
     isOpen,
     onClose,
     onApply,
@@ -57,37 +56,32 @@ export function FilterModal({
     pluginOptions,
     messageOptions,
     entityOptions,
-}: FilterModalProps) {
-    useEffect(() => {
-        if (!isOpen) return;
-
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                e.preventDefault();
-                onClose();
-            } else if (e.key === "Enter") {
-                const target = e.target as HTMLElement;
-                if (target.tagName !== "SELECT" && target.tagName !== "TEXTAREA") {
-                    e.preventDefault();
-                    onApply();
-                }
-            }
-        };
-
-        document.addEventListener("keydown", handleKeyDown);
-        return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [isOpen, onClose, onApply]);
-
+}: FilterPanelProps) {
     if (!isOpen) return null;
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content filter-modal" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
+        <section
+            className="filter-panel"
+            id="trace-filter-panel"
+            aria-label="Trace log filters"
+            onKeyDown={event => {
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                    onClose();
+                } else if (
+                    event.key === "Enter" &&
+                    !["BUTTON", "SELECT", "TEXTAREA"].includes(event.target.tagName)
+                ) {
+                    event.preventDefault();
+                    onApply();
+                }
+            }}
+        >
+                <div className="filter-panel-header">
                     <h3>Filter Trace Logs</h3>
-                    <button className="modal-close" onClick={onClose}>×</button>
+                    <button className="modal-close" onClick={onClose} aria-label="Close filters">×</button>
                 </div>
-                <div className="modal-body">
+                <div className="filter-panel-body">
                     {/* Date Filters */}
                     <div className="filter-section">
                         <label>Date Range</label>
@@ -223,13 +217,12 @@ export function FilterModal({
                         </label>
                     </div>
                 </div>
-                <div className="modal-footer">
+                <div className="filter-panel-footer">
                     <button className="btn btn-secondary" onClick={onClearAll}>Clear All</button>
                     <div className="footer-spacer"></div>
                     <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
                     <button className="btn btn-primary" onClick={onApply}>Apply Filters</button>
                 </div>
-            </div>
-        </div>
+        </section>
     );
 }

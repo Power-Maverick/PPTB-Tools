@@ -30,6 +30,7 @@ Analyze and view Plugin Trace Logs from Microsoft Dataverse with filtering, sear
 - ✅ Vite for fast development and optimized builds
 - ✅ View all plugin trace logs from Dataverse
 - ✅ Smart filtering by message name, entity, and correlation ID
+- ✅ Live text search across trace log details
 - ✅ Search and filter by exception status
 - ✅ Detailed trace log inspection
 - ✅ Delete individual or multiple trace logs
