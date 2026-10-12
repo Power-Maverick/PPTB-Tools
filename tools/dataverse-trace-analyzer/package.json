@@ -1,7 +1,7 @@
 {
   "name": "@power-maverick/tool-dataverse-trace-analyzer",
   "displayName": "Dataverse Trace Analyzer",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Analyze and view Plugin Trace Logs from Dataverse",
   "icon": "icons/traceAnalyzer.svg",
   "contributors": [
@@ -26,7 +26,7 @@
     "preview": "vite preview",
     "finalize-package": "npm shrinkwrap",
     "version-stable": "npm version patch --no-git-tag-version",
-    "publish-package": "npm run build && npm run version-stable && npm publish --access public"
+    "publish-package": "npm run build && npm publish --access public"
   },
   "files": [
     "dist",
