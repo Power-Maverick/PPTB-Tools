@@ -35,6 +35,7 @@ Compare one security role against multiple other roles in Dataverse—side by si
 - ✅ Directional difference indicators (+ for more, - for less permissions)
 - ✅ Combined Permission analysis (additive security model)
 - ✅ Advanced filtering: Row filter, Group/Operation filters
+- ✅ Export visible comparison results to CSV or Markdown
 - ✅ Search functionality (display name, schema name, operation)
 - ✅ Remembered selections per environment
 - ✅ Dark/light theme support
@@ -89,6 +90,7 @@ npm run preview
     - Click Compare to analyze privileges
     - Use filters to focus on specific areas
     - View Combined Permission for additive analysis
+    - Export the visible comparison to CSV or Markdown
 
 ## Key Concepts
 
