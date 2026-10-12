@@ -1,3 +1,5 @@
+import { Funnel } from "lucide-react";
+
 interface CommandBarProps {
     onRetrieve: () => void;
     onToggleFilters: () => void;
@@ -10,29 +12,29 @@ interface CommandBarProps {
     activeFilterCount: number;
     filtersExpanded: boolean;
     hasFiltersToSave: boolean;
-    autoRefreshMode: 'off' | 'auto' | 'notify';
+    autoRefreshMode: "off" | "auto" | "notify";
     newLogsCount?: number;
 }
 
-export function CommandBar({ 
-    onRetrieve, 
+export function CommandBar({
+    onRetrieve,
     onToggleFilters,
-    onSaveFilter, 
-    onLoadFilter, 
+    onSaveFilter,
+    onLoadFilter,
     onOpenAutoRefresh,
     onOpenTracingControl,
-    isLoading, 
-    logCount, 
+    isLoading,
+    logCount,
     activeFilterCount,
     filtersExpanded,
     hasFiltersToSave,
     autoRefreshMode,
-    newLogsCount
+    newLogsCount,
 }: CommandBarProps) {
     const getAutoRefreshButtonText = () => {
-        if (autoRefreshMode === 'off') return '🔄 Auto-Refresh: Off';
-        if (autoRefreshMode === 'auto') return '🔄 Auto: On';
-        return '🔄 Notify: On';
+        if (autoRefreshMode === "off") return "🔄 Auto-Refresh: Off";
+        if (autoRefreshMode === "auto") return "🔄 Auto: On";
+        return "🔄 Notify: On";
     };
 
     return (
@@ -41,42 +43,29 @@ export function CommandBar({
                 {isLoading ? "Loading..." : "📥 Retrieve"}
             </button>
             <button
-                className="btn btn-secondary"
+                className={`btn btn-secondary filter-trigger${activeFilterCount > 0 ? " has-active-filters" : ""}`}
                 onClick={onToggleFilters}
                 aria-expanded={filtersExpanded}
                 aria-controls="trace-filter-panel"
+                aria-haspopup="dialog"
             >
-                🔍 Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
+                <Funnel size={16} aria-hidden="true" />
+                Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
             </button>
-            <button 
-                className="btn btn-secondary" 
-                onClick={onSaveFilter}
-                disabled={!hasFiltersToSave}
-                title={hasFiltersToSave ? "Save current filters" : "Apply filters first"}
-            >
+            <button className="btn btn-secondary" onClick={onSaveFilter} disabled={!hasFiltersToSave} title={hasFiltersToSave ? "Save current filters" : "Apply filters first"}>
                 💾 Save Current
             </button>
             <button className="btn btn-secondary" onClick={onLoadFilter}>
                 📂 Load Saved
             </button>
-            <button 
-                className={`btn ${autoRefreshMode !== 'off' ? 'btn-success' : 'btn-secondary'}`}
-                onClick={onOpenAutoRefresh}
-                title="Configure auto-refresh settings"
-            >
+            <button className={`btn ${autoRefreshMode !== "off" ? "btn-success" : "btn-secondary"}`} onClick={onOpenAutoRefresh} title="Configure auto-refresh settings">
                 {getAutoRefreshButtonText()}
             </button>
-            <button 
-                className="btn btn-secondary"
-                onClick={onOpenTracingControl}
-                title="Enable/disable plugin tracing"
-            >
+            <button className="btn btn-secondary" onClick={onOpenTracingControl} title="Enable/disable plugin tracing">
                 ⚙️ Tracing
             </button>
             <div className="command-spacer"></div>
-            {newLogsCount !== undefined && newLogsCount > 0 && (
-                <span className="new-logs-badge">+{newLogsCount} new</span>
-            )}
+            {newLogsCount !== undefined && newLogsCount > 0 && <span className="new-logs-badge">+{newLogsCount} new</span>}
             <span className="log-count">{logCount} logs</span>
         </div>
     );

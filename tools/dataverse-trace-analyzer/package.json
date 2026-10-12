@@ -1,7 +1,7 @@
 {
   "name": "@power-maverick/tool-dataverse-trace-analyzer",
   "displayName": "Dataverse Trace Analyzer",
-  "version": "1.0.11",
+  "version": "1.1.0",
   "description": "Analyze and view Plugin Trace Logs from Dataverse",
   "icon": "icons/traceAnalyzer.svg",
   "contributors": [
@@ -44,6 +44,7 @@
   ],
   "author": "Power Maverick",
   "dependencies": {
+    "lucide-react": "^1.55.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

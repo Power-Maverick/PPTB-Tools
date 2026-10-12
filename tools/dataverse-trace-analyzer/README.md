@@ -108,10 +108,19 @@ A unique identifier that links related plugin executions together, helping you t
 
 ### Filtering
 
-The tool provides multiple filter options:
+Open **Filters** to edit criteria in a right-side drawer, or a full-screen drawer on narrow windows. The log workspace stays in place while the drawer is open.
 
+Use **Apply Filters** to apply changes and retrieve matching logs. **Cancel**, the close button, or Escape discards pending changes. **Reset** clears the draft; apply it to remove the active filters.
+
+Applied filters appear above the logs. Remove an individual filter with its close icon, or select **Clear all** to remove all applied criteria.
+
+Available criteria:
+
+- **Time Range**: Restrict logs by start and end date/time
+- **Plugins**: Search and select one or more plugins
 - **Message Name**: Filter by operation (e.g., "Create", "Update", "Delete")
-- **Entity Name**: Filter by table/entity (e.g., "account", "contact")
+- **Entities**: Search and select one or more tables/entities (e.g., "account", "contact")
+- **Mode**: Include synchronous and/or asynchronous executions
 - **Correlation ID**: Find all operations related to a single transaction
 - **Exceptions Only**: Show only failed executions with errors
 
@@ -143,7 +152,7 @@ The tool provides multiple filter options:
 
 - Ensure filter values match actual data (case-sensitive for some fields)
 - Clear filters and try filtering by one criterion at a time
-- Use "Refresh" after changing filters
+- Select **Apply Filters** after changing criteria in the drawer
 - Verify trace logs exist with the values you're filtering on
 
 ### Cannot Delete Logs

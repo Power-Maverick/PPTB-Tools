@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useState, useRef } from "react";
+import { X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AutoRefreshModal } from "./components/AutoRefreshModal";
+import { CommandBar } from "./components/CommandBar";
+import { FilterPanel } from "./components/FilterPanel";
+import { LoadFilterModal } from "./components/LoadFilterModal";
+import { LogDetail } from "./components/LogDetail";
+import { LogList } from "./components/LogList";
+import { SaveFilterModal } from "./components/SaveFilterModal";
+import { TracingControlModal } from "./components/TracingControlModal";
 import { FilterOption, PluginTraceLog, SavedFilter, TraceLogFilter } from "./models/interfaces";
 import { DataverseClient } from "./utils/DataverseClient";
 import { FilterStorage } from "./utils/filterStorage";
-import { CommandBar } from "./components/CommandBar";
-import { FilterPanel } from "./components/FilterPanel";
-import { SaveFilterModal } from "./components/SaveFilterModal";
-import { LoadFilterModal } from "./components/LoadFilterModal";
-import { AutoRefreshModal } from "./components/AutoRefreshModal";
-import { TracingControlModal } from "./components/TracingControlModal";
-import { LogList } from "./components/LogList";
-import { LogDetail } from "./components/LogDetail";
 
 function App() {
     const [isPPTB, setIsPPTB] = useState<boolean>(false);
@@ -28,12 +29,12 @@ function App() {
     const [showLoadFilterModal, setShowLoadFilterModal] = useState<boolean>(false);
     const [showAutoRefreshModal, setShowAutoRefreshModal] = useState<boolean>(false);
     const [showTracingControlModal, setShowTracingControlModal] = useState<boolean>(false);
-    
+
     // Saved filters
     const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
 
     // Auto-refresh state
-    const [autoRefreshMode, setAutoRefreshMode] = useState<'off' | 'auto' | 'notify'>('off');
+    const [autoRefreshMode, setAutoRefreshMode] = useState<"off" | "auto" | "notify">("off");
     const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(30);
     const [newLogsCount, setNewLogsCount] = useState<number>(0);
     const autoRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -61,13 +62,13 @@ function App() {
         };
 
         if (isResizing) {
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
+            document.addEventListener("mousemove", handleMouseMove);
+            document.addEventListener("mouseup", handleMouseUp);
         }
 
         return () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener("mousemove", handleMouseMove);
+            document.removeEventListener("mouseup", handleMouseUp);
         };
     }, [isResizing]);
 
@@ -126,7 +127,7 @@ function App() {
             const messages = new Map<string, number>();
             const entities = new Map<string, number>();
 
-            traceLogs.forEach(log => {
+            traceLogs.forEach((log) => {
                 if (log.typename) {
                     plugins.set(log.typename, (plugins.get(log.typename) || 0) + 1);
                 }
@@ -138,9 +139,21 @@ function App() {
                 }
             });
 
-            setPluginOptions(Array.from(plugins.entries()).map(([value, count]) => ({ value, label: value, count })).sort((a, b) => a.label.localeCompare(b.label)));
-            setMessageOptions(Array.from(messages.entries()).map(([value, count]) => ({ value, label: value, count })).sort((a, b) => a.label.localeCompare(b.label)));
-            setEntityOptions(Array.from(entities.entries()).map(([value, count]) => ({ value, label: value, count })).sort((a, b) => a.label.localeCompare(b.label)));
+            setPluginOptions(
+                Array.from(plugins.entries())
+                    .map(([value, count]) => ({ value, label: value, count }))
+                    .sort((a, b) => a.label.localeCompare(b.label)),
+            );
+            setMessageOptions(
+                Array.from(messages.entries())
+                    .map(([value, count]) => ({ value, label: value, count }))
+                    .sort((a, b) => a.label.localeCompare(b.label)),
+            );
+            setEntityOptions(
+                Array.from(entities.entries())
+                    .map(([value, count]) => ({ value, label: value, count }))
+                    .sort((a, b) => a.label.localeCompare(b.label)),
+            );
         }
     }, [traceLogs]);
 
@@ -210,7 +223,7 @@ function App() {
         // Highlight similar records (same correlation ID) immediately as well.
         const similarLogIds = new Set<string>();
         if (log.correlationid) {
-            traceLogs.forEach(tl => {
+            traceLogs.forEach((tl) => {
                 if (tl.correlationid === log.correlationid && tl.plugintracelogid !== log.plugintracelogid) {
                     similarLogIds.add(tl.plugintracelogid);
                 }
@@ -223,9 +236,7 @@ function App() {
             const detailedLog = await client.getTraceLogDetails(log.plugintracelogid);
             // Only apply the detailed data if the user hasn't clicked a different
             // item while the request was in flight.
-            setSelectedLog(prev =>
-                prev?.plugintracelogid === log.plugintracelogid ? detailedLog : prev
-            );
+            setSelectedLog((prev) => (prev?.plugintracelogid === log.plugintracelogid ? detailedLog : prev));
         } catch (error: any) {
             showError(`Failed to load trace log details: ${error.message}`);
         }
@@ -248,28 +259,24 @@ function App() {
             };
 
             const logs = await client.fetchPluginTraceLogs(filter);
-            
+
             // Compare with existing logs to find new ones
-            const existingIds = new Set(traceLogs.map(log => log.plugintracelogid));
-            const newLogs = logs.filter(log => !existingIds.has(log.plugintracelogid));
-            
+            const existingIds = new Set(traceLogs.map((log) => log.plugintracelogid));
+            const newLogs = logs.filter((log) => !existingIds.has(log.plugintracelogid));
+
             if (newLogs.length > 0) {
                 setTraceLogs(logs);
                 setNewLogsCount(newLogs.length);
-                
-                if (autoRefreshMode === 'notify') {
-                    await showNotification(
-                        "New Trace Logs",
-                        `${newLogs.length} new trace log(s) found`,
-                        "info"
-                    );
+
+                if (autoRefreshMode === "notify") {
+                    await showNotification("New Trace Logs", `${newLogs.length} new trace log(s) found`, "info");
                 }
-                
+
                 // Clear new logs count after 5 seconds
                 setTimeout(() => setNewLogsCount(0), 5000);
             }
         } catch (error: any) {
-            console.error('Auto-refresh failed:', error);
+            console.error("Auto-refresh failed:", error);
         }
     }, [dateFrom, dateTo, selectedPlugins, selectedMessage, selectedEntities, selectedModes, correlationFilter, exceptionOnly, traceLogs, autoRefreshMode]);
 
@@ -280,7 +287,7 @@ function App() {
             autoRefreshTimerRef.current = null;
         }
 
-        if (autoRefreshMode !== 'off' && connectionUrl) {
+        if (autoRefreshMode !== "off" && connectionUrl) {
             autoRefreshTimerRef.current = setInterval(() => {
                 loadTraceLogsForAutoRefresh();
             }, autoRefreshInterval * 1000);
@@ -293,16 +300,16 @@ function App() {
         };
     }, [autoRefreshMode, autoRefreshInterval, connectionUrl, loadTraceLogsForAutoRefresh]);
 
-    const handleAutoRefreshSave = (mode: 'off' | 'auto' | 'notify', intervalSeconds: number) => {
+    const handleAutoRefreshSave = (mode: "off" | "auto" | "notify", intervalSeconds: number) => {
         setAutoRefreshMode(mode);
         setAutoRefreshInterval(intervalSeconds);
         setNewLogsCount(0);
     };
 
-    const handleTracingSave = (enabled: boolean, mode: 'Exception' | 'All') => {
+    const handleTracingSave = (enabled: boolean, mode: "Exception" | "All") => {
         // The TracingControlModal handles the actual API calls
         // This callback is just for confirmation
-        console.log(`Tracing ${enabled ? 'enabled' : 'disabled'} with mode: ${mode}`);
+        console.log(`Tracing ${enabled ? "enabled" : "disabled"} with mode: ${mode}`);
     };
 
     const handleDeleteLog = async (logId: string) => {
@@ -377,21 +384,15 @@ function App() {
     };
 
     const toggleTempPlugin = (plugin: string) => {
-        setTempSelectedPlugins(prev =>
-            prev.includes(plugin) ? prev.filter(p => p !== plugin) : [...prev, plugin]
-        );
+        setTempSelectedPlugins((prev) => (prev.includes(plugin) ? prev.filter((p) => p !== plugin) : [...prev, plugin]));
     };
 
     const toggleTempEntity = (entity: string) => {
-        setTempSelectedEntities(prev =>
-            prev.includes(entity) ? prev.filter(e => e !== entity) : [...prev, entity]
-        );
+        setTempSelectedEntities((prev) => (prev.includes(entity) ? prev.filter((e) => e !== entity) : [...prev, entity]));
     };
 
     const toggleTempMode = (mode: number) => {
-        setTempSelectedModes(prev =>
-            prev.includes(mode) ? prev.filter(m => m !== mode) : [...prev, mode]
-        );
+        setTempSelectedModes((prev) => (prev.includes(mode) ? prev.filter((m) => m !== mode) : [...prev, mode]));
     };
 
     // Load saved filters on initialization
@@ -420,7 +421,7 @@ function App() {
 
             await FilterStorage.saveFilter(name, currentFilter);
             await showNotification("Success", `Filter "${name}" saved successfully`, "success");
-            
+
             // Reload saved filters
             const filters = await FilterStorage.loadFilters();
             setSavedFilters(filters);
@@ -439,7 +440,7 @@ function App() {
         setSelectedModes(filter.filter.modes || []);
         setCorrelationFilter(filter.filter.correlationId || "");
         setExceptionOnly(filter.filter.hasException || false);
-        
+
         showNotification("Success", `Filter "${filter.name}" loaded successfully`, "info");
     };
 
@@ -447,7 +448,7 @@ function App() {
         try {
             await FilterStorage.deleteFilter(name);
             await showNotification("Success", `Filter "${name}" deleted successfully`, "success");
-            
+
             // Reload saved filters
             const filters = await FilterStorage.loadFilters();
             setSavedFilters(filters);
@@ -460,19 +461,28 @@ function App() {
         return getActiveFilterCount() > 0;
     };
 
+    const appliedFilters = [
+        { key: "from", active: !!dateFrom, label: `From: ${dateFrom ? new Date(dateFrom).toLocaleString() : ""}`, remove: () => setDateFrom("") },
+        { key: "to", active: !!dateTo, label: `To: ${dateTo ? new Date(dateTo).toLocaleString() : ""}`, remove: () => setDateTo("") },
+        { key: "plugins", active: selectedPlugins.length > 0, label: `Plugins: ${selectedPlugins.length}`, detail: selectedPlugins.join(", "), remove: () => setSelectedPlugins([]) },
+        { key: "message", active: !!selectedMessage, label: `Message: ${selectedMessage}`, remove: () => setSelectedMessage("") },
+        { key: "entities", active: selectedEntities.length > 0, label: `Entities: ${selectedEntities.length}`, detail: selectedEntities.join(", "), remove: () => setSelectedEntities([]) },
+        { key: "mode", active: selectedModes.length > 0, label: `Mode: ${selectedModes.map((mode) => (mode === 0 ? "Sync" : "Async")).join(", ")}`, remove: () => setSelectedModes([]) },
+        { key: "correlation", active: !!correlationFilter, label: `Correlation: ${correlationFilter}`, remove: () => setCorrelationFilter("") },
+        { key: "exceptions", active: exceptionOnly, label: "Exceptions only", remove: () => setExceptionOnly(false) },
+    ].filter((filter) => filter.active);
+
+    const clearAppliedFilters = () => {
+        appliedFilters.forEach((filter) => filter.remove());
+    };
+
     const normalizedLogSearch = logSearch.trim().toLowerCase();
     const visibleTraceLogs = normalizedLogSearch
-        ? traceLogs.filter(log =>
-            [
-                log.typename,
-                log.messagename,
-                log.messageblock,
-                log.exceptiondetails,
-                log.correlationid,
-                log.primaryentity,
-                log.profile,
-            ].some(value => value?.toLowerCase().includes(normalizedLogSearch))
-        )
+        ? traceLogs.filter((log) =>
+              [log.typename, log.messagename, log.messageblock, log.exceptiondetails, log.correlationid, log.primaryentity, log.profile].some((value) =>
+                  value?.toLowerCase().includes(normalizedLogSearch),
+              ),
+          )
         : traceLogs;
 
     if (loading && !connectionUrl) {
@@ -511,6 +521,24 @@ function App() {
                 newLogsCount={newLogsCount}
             />
 
+            {appliedFilters.length > 0 && (
+                <div className="applied-filters" role="group" aria-label="Applied filters">
+                    {appliedFilters.map((filter) => (
+                        <span className="filter-chip" key={filter.key}>
+                            <span className="filter-chip-label" title={filter.detail || filter.label}>
+                                {filter.label}
+                            </span>
+                            <button onClick={filter.remove} aria-label={`Remove ${filter.label} filter`} title={`Remove ${filter.label} filter`}>
+                                <X size={14} aria-hidden="true" />
+                            </button>
+                        </span>
+                    ))}
+                    <button className="filter-clear-all" onClick={clearAppliedFilters}>
+                        Clear all
+                    </button>
+                </div>
+            )}
+
             <FilterPanel
                 isOpen={showFilterPanel}
                 onClose={() => setShowFilterPanel(false)}
@@ -537,20 +565,9 @@ function App() {
                 entityOptions={entityOptions}
             />
 
-            <SaveFilterModal
-                isOpen={showSaveFilterModal}
-                onClose={() => setShowSaveFilterModal(false)}
-                onSave={handleSaveFilter}
-                existingNames={savedFilters.map(f => f.name)}
-            />
+            <SaveFilterModal isOpen={showSaveFilterModal} onClose={() => setShowSaveFilterModal(false)} onSave={handleSaveFilter} existingNames={savedFilters.map((f) => f.name)} />
 
-            <LoadFilterModal
-                isOpen={showLoadFilterModal}
-                onClose={() => setShowLoadFilterModal(false)}
-                onLoad={handleLoadFilter}
-                onDelete={handleDeleteFilter}
-                savedFilters={savedFilters}
-            />
+            <LoadFilterModal isOpen={showLoadFilterModal} onClose={() => setShowLoadFilterModal(false)} onLoad={handleLoadFilter} onDelete={handleDeleteFilter} savedFilters={savedFilters} />
 
             <AutoRefreshModal
                 isOpen={showAutoRefreshModal}
@@ -560,29 +577,14 @@ function App() {
                 onSave={handleAutoRefreshSave}
             />
 
-            <TracingControlModal
-                isOpen={showTracingControlModal}
-                onClose={() => setShowTracingControlModal(false)}
-                onSave={handleTracingSave}
-            />
+            <TracingControlModal isOpen={showTracingControlModal} onClose={() => setShowTracingControlModal(false)} onSave={handleTracingSave} />
 
             <div className="main-content">
                 <div className="logs-panel" style={{ width: `${logsPanelWidth}px` }}>
                     <div className="log-search">
-                        <input
-                            type="text"
-                            value={logSearch}
-                            onChange={event => setLogSearch(event.target.value)}
-                            placeholder="Filter logs by text..."
-                            aria-label="Filter logs by text"
-                        />
+                        <input type="text" value={logSearch} onChange={(event) => setLogSearch(event.target.value)} placeholder="Filter logs by text..." aria-label="Filter logs by text" />
                         {logSearch && (
-                            <button
-                                className="log-search-clear"
-                                onClick={() => setLogSearch("")}
-                                aria-label="Clear text filter"
-                                title="Clear text filter"
-                            >
+                            <button className="log-search-clear" onClick={() => setLogSearch("")} aria-label="Clear text filter" title="Clear text filter">
                                 ×
                             </button>
                         )}
@@ -598,18 +600,12 @@ function App() {
                         isLoading={loadingLogs}
                     />
                 </div>
-                
-                <div 
-                    className="resize-handle"
-                    onMouseDown={() => setIsResizing(true)}
-                />
+
+                <div className="resize-handle" onMouseDown={() => setIsResizing(true)} />
 
                 {selectedLog && (
                     <div className="detail-panel">
-                        <LogDetail
-                            log={selectedLog}
-                            onDelete={handleDeleteLog}
-                        />
+                        <LogDetail log={selectedLog} onDelete={handleDeleteLog} />
                     </div>
                 )}
             </div>
