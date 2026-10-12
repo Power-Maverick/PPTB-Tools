@@ -70,7 +70,7 @@ export function FilterPanel({
                     onClose();
                 } else if (
                     event.key === "Enter" &&
-                    !["BUTTON", "SELECT", "TEXTAREA"].includes(event.target.tagName)
+                    !["BUTTON", "SELECT", "TEXTAREA"].includes((event.target as HTMLElement).tagName)
                 ) {
                     event.preventDefault();
                     onApply();
