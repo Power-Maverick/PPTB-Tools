@@ -47,6 +47,7 @@ Migrate data from one Dataverse environment to another with intelligent auto-map
 - ✅ Modern Fluent UI with responsive design
 - ✅ Step-based workflow with collapsible sections
 - ✅ Confidence-level indicators for auto-mapping results
+- ✅ Ordered migration playlists with per-entity settings and import/export
 
 ## Installation
 
@@ -96,7 +97,11 @@ npm run preview
     - Secondary connection: Target Dataverse environment
 
 5. Open Data Migrator and follow the step-by-step workflow:
-    - Select entity to migrate
+    - Select an entity and configure its migration
+    - Choose **Create Playlist**, then configure each entity and choose **Add Entity to Playlist**
+    - Repeat for each entity and use the arrows to set processing order
+    - Choose **Save Playlist** to reuse the ordered configuration
+    - Start the playlist; preview and confirm each entity to continue in order
     - Choose fields to include
     - Apply filters (OData or FetchXML)
     - Select migration operation (Create/Update/Upsert/Delete)
@@ -142,6 +147,10 @@ Configure how lookup fields are processed during migration:
 - **@pptb/types** - PPTB type definitions
 
 ## Configuration
+
+### Migration Playlists
+
+Choose **Create Playlist** before adding entities. Then configure an entity and select **Add Entity to Playlist**; repeat for additional entities and use the up/down buttons to set processing order. The playlist keeps each entity's field mappings, filter, operations, and batch size. **Save Playlist** exports the ordered entries; without a playlist, **Save Configuration** continues to save the current entity configuration. **Start Playlist** asks for confirmation, loads the first entity, and advances to the next one only after you preview and confirm the current migration. The sequence stops if any record fails. Existing single-entity configuration files can still be loaded.
 
 ### Filter Options
 

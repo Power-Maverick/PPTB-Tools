@@ -181,12 +181,122 @@ body {
 /* Configuration toolbar */
 .config-toolbar {
     display: flex;
+    flex-wrap: wrap;
     gap: 12px;
     margin-bottom: 20px;
     padding: 12px;
     background: var(--card-bg);
     border-radius: 8px;
     box-shadow: var(--shadow-sm);
+}
+
+.playlist-card {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: var(--shadow-sm);
+}
+
+.playlist-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.playlist-header h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.playlist-header span,
+.playlist-items small {
+    color: var(--text-secondary);
+}
+
+.playlist-items {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.playlist-items li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.playlist-items li.active {
+    border-color: var(--primary-color);
+}
+
+.playlist-entity,
+.playlist-item-actions button {
+    border: 0;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.playlist-entity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+}
+
+.playlist-position {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--primary-light);
+    color: var(--primary-color);
+}
+
+.playlist-items small {
+    margin-left: 4px;
+}
+
+.playlist-item-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.playlist-item-actions button {
+    min-width: 30px;
+    min-height: 30px;
+    border-radius: 4px;
+    font-size: 18px;
+}
+
+.playlist-item-actions button:hover:not(:disabled) {
+    background: var(--hover-bg);
+}
+
+.playlist-item-actions button:disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+
+.playlist-progress {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 4px;
+    background: var(--primary-light);
+    color: var(--primary-color);
+    font-weight: 600;
 }
 
 .content-fluid {
@@ -686,6 +796,15 @@ select.modern-input:focus {
 .btn-primary:disabled {
     background-color: #ccc;
     cursor: not-allowed;
+}
+
+.btn-start-playlist {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 20px;
+    border: 2px solid transparent;
 }
 
 .btn-secondary {
