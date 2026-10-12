@@ -1,3 +1,4 @@
+import { Play16Filled } from "@fluentui/react-icons";
 import { useEffect, useState } from "react";
 import { AutoMappingPanel } from "./components/AutoMappingPanel";
 import { EntitySelector } from "./components/EntitySelector";
@@ -70,16 +71,19 @@ function App() {
 
     const [migrationEngine] = useState<MigrationEngine>(() => new MigrationEngine());
 
-    const getCurrentConfiguration = (): MigrationConfig | null => selectedEntity ? ({
-        entityLogicalName: selectedEntity.logicalName,
-        entityDisplayName: selectedEntity.displayName,
-        operations,
-        fieldMappings,
-        lookupMappings,
-        filterQuery: filterQuery || undefined,
-        filterType,
-        batchSize,
-    }) : null;
+    const getCurrentConfiguration = (): MigrationConfig | null =>
+        selectedEntity
+            ? {
+                  entityLogicalName: selectedEntity.logicalName,
+                  entityDisplayName: selectedEntity.displayName,
+                  operations,
+                  fieldMappings,
+                  lookupMappings,
+                  filterQuery: filterQuery || undefined,
+                  filterType,
+                  batchSize,
+              }
+            : null;
 
     // Detect environment and initialize
     useEffect(() => {
@@ -380,7 +384,7 @@ function App() {
         setPlaylist((current) => {
             const existingIndex = current.findIndex((item) => item.entityLogicalName === config.entityLogicalName);
             if (existingIndex < 0) return [...current, config];
-            return current.map((item, index) => index === existingIndex ? config : item);
+            return current.map((item, index) => (index === existingIndex ? config : item));
         });
         setError("");
     };
@@ -412,14 +416,12 @@ function App() {
         await handleEntitySelect(entity);
         setOperations(config.operations || ["create"]);
         setFieldMappings(config.fieldMappings || []);
-        setLookupMappings((config.lookupMappings || []).map((mapping) => ({
-            ...mapping,
-            manualMappings: mapping.manualMappings instanceof Map
-                ? mapping.manualMappings
-                : mapping.manualMappings
-                  ? new Map(mapping.manualMappings as unknown as [string, string][])
-                  : undefined,
-        })));
+        setLookupMappings(
+            (config.lookupMappings || []).map((mapping) => ({
+                ...mapping,
+                manualMappings: mapping.manualMappings instanceof Map ? mapping.manualMappings : mapping.manualMappings ? new Map(mapping.manualMappings as unknown as [string, string][]) : undefined,
+            })),
+        );
         setFilterType(config.filterType || "odata");
         setFilterQuery(config.filterQuery || "");
         setBatchSize(config.batchSize || 50);
@@ -430,11 +432,14 @@ function App() {
             setError("Add at least one entity to the playlist");
             return;
         }
-        if (!window.confirm(`Start this ${playlist.length}-entity playlist in order?\n\n${playlist.map((item, index) => `${index + 1}. ${item.entityDisplayName}`).join("\n")}\n\nEach entity will still require preview and confirmation before migration.`)) return;
+        if (
+            !window.confirm(
+                `Start this ${playlist.length}-entity playlist in order?\n\n${playlist.map((item, index) => `${index + 1}. ${item.entityDisplayName}`).join("\n")}\n\nEach entity will still require preview and confirmation before migration.`,
+            )
+        )
+            return;
         const activeConfig = getCurrentConfiguration();
-        const configurations = playlist.map((item) => (
-            item.entityLogicalName === selectedEntity?.logicalName ? activeConfig! : item
-        ));
+        const configurations = playlist.map((item) => (item.entityLogicalName === selectedEntity?.logicalName ? activeConfig! : item));
         setPlaylist(configurations);
         setPlaylistRunIndex(0);
         setError("");
@@ -490,16 +495,18 @@ function App() {
         });
         const config = isPlaylistCreated
             ? {
-                entities: playlist.map(serializeLookupMappings),
-                version: "1.0",
-            }
+                  entities: playlist.map(serializeLookupMappings),
+                  version: "1.0",
+              }
             : (() => {
-                const currentConfig = getCurrentConfiguration();
-                return currentConfig ? {
-                    ...serializeLookupMappings(currentConfig),
-                    version: "1.0",
-                } : null;
-            })();
+                  const currentConfig = getCurrentConfiguration();
+                  return currentConfig
+                      ? {
+                            ...serializeLookupMappings(currentConfig),
+                            version: "1.0",
+                        }
+                      : null;
+              })();
         if (!config) return;
 
         const json = JSON.stringify(config, null, 2);
@@ -526,11 +533,8 @@ function App() {
                     ...item,
                     lookupMappings: (item.lookupMappings || []).map((mapping) => ({
                         ...mapping,
-                        manualMappings: mapping.manualMappings instanceof Map
-                            ? mapping.manualMappings
-                            : mapping.manualMappings
-                              ? new Map(mapping.manualMappings as unknown as [string, string][])
-                              : undefined,
+                        manualMappings:
+                            mapping.manualMappings instanceof Map ? mapping.manualMappings : mapping.manualMappings ? new Map(mapping.manualMappings as unknown as [string, string][]) : undefined,
                     })),
                 }));
             const missingEntities = savedConfigurations
@@ -612,14 +616,30 @@ function App() {
                             ➕ Create Playlist
                         </button>
                     )}
-                    <button className="btn-secondary" onClick={handleSaveConfiguration} disabled={isMigrating || (!selectedEntity && (!isPlaylistCreated || playlist.length === 0))} title={isPlaylistCreated ? "Save playlist configuration" : "Save current entity configuration"}>
+                    <button
+                        className="btn-secondary"
+                        onClick={handleSaveConfiguration}
+                        disabled={isMigrating || (!selectedEntity && (!isPlaylistCreated || playlist.length === 0))}
+                        title={isPlaylistCreated ? "Save playlist configuration" : "Save current entity configuration"}
+                    >
                         💾 {isPlaylistCreated ? "Save Playlist" : "Save Configuration"}
                     </button>
-                    <button className="btn-secondary" onClick={handleAddToPlaylist} disabled={!isPlaylistCreated || !selectedEntity || isMigrating || loadingFields || playlistRunIndex !== null} title="Add or update this entity in the playlist">
+                    <button
+                        className="btn-secondary"
+                        onClick={handleAddToPlaylist}
+                        disabled={!isPlaylistCreated || !selectedEntity || isMigrating || loadingFields || playlistRunIndex !== null}
+                        title="Add or update this entity in the playlist"
+                    >
                         ➕ Add Entity to Playlist
                     </button>
-                    <button className="btn-preview" onClick={handleRunPlaylist} disabled={playlist.length === 0 || isMigrating || loadingFields || playlistRunIndex !== null} title="Start the playlist in order">
-                        {isMigrating ? "Migrating..." : `▶ Start Playlist (${playlist.length})`}
+                    <button
+                        className="btn-primary btn-start-playlist"
+                        onClick={handleRunPlaylist}
+                        disabled={playlist.length === 0 || isMigrating || loadingFields || playlistRunIndex !== null}
+                        title="Start the playlist in order"
+                    >
+                        <Play16Filled aria-hidden="true" />
+                        {isMigrating ? "Migrating..." : `Start Playlist (${playlist.length})`}
                     </button>
                     <label className="btn-secondary" style={{ cursor: "pointer" }}>
                         📂 Load Configuration
@@ -634,10 +654,14 @@ function App() {
                     <section className="playlist-card" aria-label="Migration playlist">
                         <div className="playlist-header">
                             <h2>Migration Playlist</h2>
-                            <span>{playlist.length} {playlist.length === 1 ? "entity" : "entities"} · processed top to bottom</span>
+                            <span>
+                                {playlist.length} {playlist.length === 1 ? "entity" : "entities"} · processed top to bottom
+                            </span>
                         </div>
                         {playlist.length === 0 ? (
-                            <p className="playlist-empty">Playlist created. Select and configure an entity below, then choose <strong>Add Entity to Playlist</strong>.</p>
+                            <p className="playlist-empty">
+                                Playlist created. Select and configure an entity below, then choose <strong>Add Entity to Playlist</strong>.
+                            </p>
                         ) : (
                             <ol className="playlist-items">
                                 {playlist.map((item, index) => (
@@ -656,9 +680,27 @@ function App() {
                                             <small>{item.entityLogicalName}</small>
                                         </button>
                                         <div className="playlist-item-actions">
-                                            <button onClick={() => handleReorderPlaylist(index, -1)} disabled={index === 0 || isMigrating || playlistRunIndex !== null} aria-label={`Move ${item.entityDisplayName} up`}>↑</button>
-                                            <button onClick={() => handleReorderPlaylist(index, 1)} disabled={index === playlist.length - 1 || isMigrating || playlistRunIndex !== null} aria-label={`Move ${item.entityDisplayName} down`}>↓</button>
-                                            <button onClick={() => setPlaylist((current) => current.filter((entry) => entry.entityLogicalName !== item.entityLogicalName))} disabled={isMigrating || playlistRunIndex !== null} aria-label={`Remove ${item.entityDisplayName}`}>×</button>
+                                            <button
+                                                onClick={() => handleReorderPlaylist(index, -1)}
+                                                disabled={index === 0 || isMigrating || playlistRunIndex !== null}
+                                                aria-label={`Move ${item.entityDisplayName} up`}
+                                            >
+                                                ↑
+                                            </button>
+                                            <button
+                                                onClick={() => handleReorderPlaylist(index, 1)}
+                                                disabled={index === playlist.length - 1 || isMigrating || playlistRunIndex !== null}
+                                                aria-label={`Move ${item.entityDisplayName} down`}
+                                            >
+                                                ↓
+                                            </button>
+                                            <button
+                                                onClick={() => setPlaylist((current) => current.filter((entry) => entry.entityLogicalName !== item.entityLogicalName))}
+                                                disabled={isMigrating || playlistRunIndex !== null}
+                                                aria-label={`Remove ${item.entityDisplayName}`}
+                                            >
+                                                ×
+                                            </button>
                                         </div>
                                     </li>
                                 ))}
@@ -856,7 +898,11 @@ function App() {
                 {/* Migration Progress - Always show section when entity is selected */}
                 {selectedEntity && (
                     <div className="progress-card">
-                        {playlistRunIndex !== null && <div className="playlist-progress">Playlist entity {playlistRunIndex + 1} of {playlist.length}: preview and confirm the migration to continue.</div>}
+                        {playlistRunIndex !== null && (
+                            <div className="playlist-progress">
+                                Playlist entity {playlistRunIndex + 1} of {playlist.length}: preview and confirm the migration to continue.
+                            </div>
+                        )}
                         {error && (isMigrating || migrationProgress) && (
                             <div className="error-message-progress">
                                 <span>⚠️ {error}</span>

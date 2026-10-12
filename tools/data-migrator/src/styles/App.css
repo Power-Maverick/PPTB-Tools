@@ -798,6 +798,15 @@ select.modern-input:focus {
     cursor: not-allowed;
 }
 
+.btn-start-playlist {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 20px;
+    border: 2px solid transparent;
+}
+
 .btn-secondary {
     background-color: var(--card-bg);
     color: var(--text-primary);
