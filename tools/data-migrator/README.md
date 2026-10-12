@@ -98,8 +98,9 @@ npm run preview
 
 5. Open Data Migrator and follow the step-by-step workflow:
     - Select an entity and configure its migration
-    - Add it to the playlist; repeat for each entity and use the arrows to set processing order
-    - Save the playlist configuration if you want to reuse it
+    - Choose **Create Playlist**, then configure each entity and choose **Add Entity to Playlist**
+    - Repeat for each entity and use the arrows to set processing order
+    - Choose **Save Playlist** to reuse the ordered configuration
     - Start the playlist; preview and confirm each entity to continue in order
     - Choose fields to include
     - Apply filters (OData or FetchXML)
@@ -149,7 +150,7 @@ Configure how lookup fields are processed during migration:
 
 ### Migration Playlists
 
-Add each configured entity to the playlist with **Add / Update Entity**. The playlist keeps each entity's field mappings, filter, operations, and batch size; use the up/down buttons to set its processing order. **Start Playlist** asks for confirmation, loads the first entity, and advances to the next one only after you preview and confirm the current migration. The sequence stops if any record fails. Save and load configuration files to reuse the complete playlist. Existing single-entity configuration files can still be loaded.
+Choose **Create Playlist** before adding entities. Then configure an entity and select **Add Entity to Playlist**; repeat for additional entities and use the up/down buttons to set processing order. The playlist keeps each entity's field mappings, filter, operations, and batch size. **Save Playlist** exports the ordered entries; without a playlist, **Save Configuration** continues to save the current entity configuration. **Start Playlist** asks for confirmation, loads the first entity, and advances to the next one only after you preview and confirm the current migration. The sequence stops if any record fails. Existing single-entity configuration files can still be loaded.
 
 ### Filter Options
 
