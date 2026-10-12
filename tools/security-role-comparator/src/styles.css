@@ -318,6 +318,12 @@ body.dark-theme .set-base-link {
     margin-left: auto;
 }
 
+.export-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
 /* ───────────── Comparison table ───────────── */
 .table-container {
     flex: 1;

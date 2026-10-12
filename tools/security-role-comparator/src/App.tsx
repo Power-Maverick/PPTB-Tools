@@ -166,6 +166,26 @@ function DepthIcon({ depth, muted }: { depth: PrivilegeDepth; muted?: boolean })
     );
 }
 
+function downloadComparison(content: string, fileName: string, contentType: string): void {
+    const url = URL.createObjectURL(new Blob([content], { type: contentType }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function csvCell(value: string): string {
+    const safeValue = /^[\s\uFEFF]*[=+\-@]/.test(value) ? `'${value}` : value;
+    return `"${safeValue.replace(/"/g, '""')}"`;
+}
+
+function markdownCell(value: string): string {
+    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
+}
+
 export default function App() {
     const [roles, setRoles] = useState<SecurityRole[]>([]);
     const [loadingEnvironment, setLoadingEnvironment] = useState(false);
@@ -359,6 +379,28 @@ export default function App() {
             }
         }
         return best;
+    };
+
+    const exportComparison = (format: "csv" | "markdown") => {
+        const headers = ["Group", "Entity", "Schema Name", "Operation", ...comparedRoleIds.map(getRoleName), ...(showCombined ? ["Combined Permission"] : [])];
+        const rows = filteredData.map((priv) => [
+            priv.categoryLabel,
+            priv.entityDisplayName,
+            priv.entitySchemaName,
+            operationLabel(priv.operation),
+            ...comparedRoleIds.map((roleId) => DEPTH_LABELS[priv.depthByRole[roleId] ?? PrivilegeDepth.None]),
+            ...(showCombined ? [DEPTH_LABELS[getCombinedDepth(priv)]] : []),
+        ]);
+
+        if (format === "csv") {
+            const content = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
+            downloadComparison(`\uFEFF${content}`, "security-role-comparison.csv", "text/csv;charset=utf-8");
+            return;
+        }
+
+        const markdownRows = [headers, ...rows].map((row) => `| ${row.map(markdownCell).join(" | ")} |`);
+        markdownRows.splice(1, 0, `| ${headers.map(() => "---").join(" | ")} |`);
+        downloadComparison(markdownRows.join("\n"), "security-role-comparison.md", "text/markdown;charset=utf-8");
     };
 
     const showCombined = diffFilter === "combined";
@@ -620,6 +662,14 @@ export default function App() {
                     <span className="result-count">
                         {filteredData.length} / {comparisonData.length} privileges
                     </span>
+                    <div className="export-actions">
+                        <Button appearance="secondary" size="small" onClick={() => exportComparison("csv")} disabled={filteredData.length === 0}>
+                            Export CSV
+                        </Button>
+                        <Button appearance="secondary" size="small" onClick={() => exportComparison("markdown")} disabled={filteredData.length === 0}>
+                            Export Markdown
+                        </Button>
+                    </div>
                 </div>
             )}
 
