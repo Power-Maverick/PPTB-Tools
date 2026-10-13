@@ -2,8 +2,8 @@ import { Badge, Button, Text, ToggleButton } from "@fluentui/react-components";
 import { Dismiss16Regular } from "@fluentui/react-icons";
 import { Background, Controls, Handle, MarkerType, Position, ReactFlow, ReactFlowProvider, useReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import { memo, useEffect, useMemo, useState } from "react";
-import { matchHandler } from "../engine/correlate";
 import { STAGE_LABELS } from "../data/wiring";
+import { matchHandler } from "../engine/correlate";
 import type { AnalysisInput, Timeline, WiringGraph, WiringHandler } from "../model/types";
 import { tableNode } from "../model/types";
 import { KIND_LABEL } from "../rules/context";
@@ -60,7 +60,10 @@ const HandlerNode = memo(({ data }: NodeProps<Node<HandlerData>>) => {
     const h = data.handler;
     const writesColumn = data.column && h.writes.some((w) => w.columns?.includes(data.column!));
     return (
-        <div className={`map-node map-handler kind-${h.kind} ${h.enabled ? "" : "off"} ${data.dimmed ? "dimmed" : ""} ${data.inCycle ? "in-cycle" : ""} ${data.focused ? "focused" : ""}`} title={data.dimmed}>
+        <div
+            className={`map-node map-handler kind-${h.kind} ${h.enabled ? "" : "off"} ${data.dimmed ? "dimmed" : ""} ${data.inCycle ? "in-cycle" : ""} ${data.focused ? "focused" : ""}`}
+            title={data.dimmed}
+        >
             <Handle type="target" position={Position.Left} />
             <div className="map-kind">
                 {KIND_LABEL[h.kind]}
@@ -70,7 +73,11 @@ const HandlerNode = memo(({ data }: NodeProps<Node<HandlerData>>) => {
             <div className="map-name" title={h.name}>
                 {h.kind === "plugin" && h.typeName ? h.typeName.split(".").pop() : h.name}
             </div>
-            {h.kind === "plugin" && <div className="map-sub" title={h.name}>{h.messages.join(" / ")} of {h.table}</div>}
+            {h.kind === "plugin" && (
+                <div className="map-sub" title={h.name}>
+                    {h.messages.join(" / ")} of {h.table}
+                </div>
+            )}
             <div className="map-row">
                 <span className="map-label">{h.kind === "flow" || h.kind === "workflow" ? "When" : "Filter"}</span>
                 {h.filteringColumns ? <Chips columns={h.filteringColumns} highlight={data.column} /> : <span className="muted">any column</span>}
@@ -82,7 +89,11 @@ const HandlerNode = memo(({ data }: NodeProps<Node<HandlerData>>) => {
                 </div>
             ))}
             <div className="map-meta">
-                {!h.enabled && <Badge size="small" color="danger">Off</Badge>}
+                {!h.enabled && (
+                    <Badge size="small" color="danger">
+                        Off
+                    </Badge>
+                )}
                 {data.runs > 0 && (
                     <Badge size="small" appearance="tint" color="success">
                         {`ran ${data.runs}×`}
@@ -143,6 +154,7 @@ export function ImpactMap(props: Props) {
 function ImpactMapInner({ graph, timeline, input, focusId, onFocusHandled }: Props) {
     const [selected, setSelected] = useState<string>();
     const [showImpl, setShowImpl] = useState(true);
+    const [nodePositions, setNodePositions] = useState<Record<string, { x: number; y: number }>>({});
     const flow = useReactFlow();
 
     const runs = useMemo(() => {
@@ -175,7 +187,12 @@ function ImpactMapInner({ graph, timeline, input, focusId, onFocusHandled }: Pro
             const columns = PHASES.map((p) => ({ phase: p, list: mine.filter((h) => p.match(h)).sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0) || a.name.localeCompare(b.name)) }));
             const height = Math.max(1, ...columns.map((c) => c.list.length)) * ROW_H;
             const computed = graph.computed?.find((c) => c.table === table && c.column === input.column)?.kind;
-            nodes.push({ id: tableNode(table), type: "table", position: { x: 0, y: y + height / 2 - 30 }, data: { table, isTarget: table === input.table, focused: focusId === tableNode(table), column: input.column, computed } satisfies TableData });
+            nodes.push({
+                id: tableNode(table),
+                type: "table",
+                position: { x: 0, y: y + height / 2 - 30 },
+                data: { table, isTarget: table === input.table, focused: focusId === tableNode(table), column: input.column, computed } satisfies TableData,
+            });
             let col = 0;
             for (const { phase, list } of columns) {
                 if (!list.length) continue;
@@ -191,7 +208,15 @@ function ImpactMapInner({ graph, timeline, input, focusId, onFocusHandled }: Pro
                         id: h.id,
                         type: "handler",
                         position: pos,
-                        data: { handler: h, runs: runs.get(h.id) ?? 0, column: table === input.table ? input.column : undefined, dimmed, inCycle: cycleNodes.has(h.id), focused: focusId === h.id || selected === h.id, phase: h.kind === "plugin" ? phase.label : undefined } satisfies HandlerData,
+                        data: {
+                            handler: h,
+                            runs: runs.get(h.id) ?? 0,
+                            column: table === input.table ? input.column : undefined,
+                            dimmed,
+                            inCycle: cycleNodes.has(h.id),
+                            focused: focusId === h.id || selected === h.id,
+                            phase: h.kind === "plugin" ? phase.label : undefined,
+                        } satisfies HandlerData,
                     });
                 });
                 col++;
@@ -206,7 +231,12 @@ function ImpactMapInner({ graph, timeline, input, focusId, onFocusHandled }: Pro
                 const pos = { x: TABLE_W + 60 + (i % 4) * COL_W, y: y + Math.floor(i / 4) * ROW_H };
                 handlerY.set(h.id, pos.y);
                 maxCols = Math.max(maxCols, Math.min(4, i + 1));
-                nodes.push({ id: h.id, type: "handler", position: pos, data: { handler: h, runs: runs.get(h.id) ?? 0, inCycle: cycleNodes.has(h.id), focused: focusId === h.id } satisfies HandlerData });
+                nodes.push({
+                    id: h.id,
+                    type: "handler",
+                    position: pos,
+                    data: { handler: h, runs: runs.get(h.id) ?? 0, inCycle: cycleNodes.has(h.id), focused: focusId === h.id } satisfies HandlerData,
+                });
             });
 
         const edges: Edge[] = graph.edges.map((e) => {
@@ -268,7 +298,15 @@ function ImpactMapInner({ graph, timeline, input, focusId, onFocusHandled }: Pro
                 for (const s of t.steps) edges.push({ id: `impl-${s.id}`, source: s.id, sourceHandle: "impl", target: t.id, className: "edge-impl", style: { strokeDasharray: "2 4" } });
                 if (t.assembly) {
                     const key = `asm:${t.assembly.id ?? t.assembly.name}`;
-                    const a = assemblies.get(key) ?? { id: key, name: t.assembly.name, version: t.assembly.version, isolation: t.assembly.isolation, modifiedOn: t.assembly.modifiedOn, types: [], steps: 0 };
+                    const a = assemblies.get(key) ?? {
+                        id: key,
+                        name: t.assembly.name,
+                        version: t.assembly.version,
+                        isolation: t.assembly.isolation,
+                        modifiedOn: t.assembly.modifiedOn,
+                        types: [],
+                        steps: 0,
+                    };
                     a.types.push(t.id);
                     a.steps += t.steps.length;
                     assemblies.set(key, a);
@@ -280,13 +318,20 @@ function ImpactMapInner({ graph, timeline, input, focusId, onFocusHandled }: Pro
                     id: a.id,
                     type: "impl",
                     position: { x: typeX + COL_W, y: asmYs.get(a.id)! },
-                    data: { kind: "assembly", title: a.name, subtitle: [a.version && `v${a.version}`, a.isolation && `${a.isolation} isolation`, a.modifiedOn && `updated ${fmtDateTime(a.modifiedOn)}`].filter(Boolean).join(" · ") || undefined, steps: a.steps, focused: focusId === a.id } satisfies ImplData,
+                    data: {
+                        kind: "assembly",
+                        title: a.name,
+                        subtitle:
+                            [a.version && `v${a.version}`, a.isolation && `${a.isolation} isolation`, a.modifiedOn && `updated ${fmtDateTime(a.modifiedOn)}`].filter(Boolean).join(" · ") || undefined,
+                        steps: a.steps,
+                        focused: focusId === a.id,
+                    } satisfies ImplData,
                 });
                 for (const t of a.types) edges.push({ id: `asm-${t}-${a.id}`, source: t, target: a.id, className: "edge-impl", style: { strokeDasharray: "2 4" } });
             }
         }
-        return { nodes, edges };
-    }, [graph, input, runs, cycleNodes, cycleEdges, focusId, selected, showImpl]);
+        return { nodes: nodes.map((node) => ({ ...node, position: nodePositions[node.id] ?? node.position })), edges };
+    }, [graph, input, runs, cycleNodes, cycleEdges, focusId, selected, showImpl, nodePositions]);
 
     useEffect(() => {
         if (!focusId) return;
@@ -339,6 +384,7 @@ function ImpactMapInner({ graph, timeline, input, focusId, onFocusHandled }: Pro
                 <ToggleButton size="small" checked={showImpl} onClick={() => setShowImpl(!showImpl)}>
                     Plugin types &amp; assemblies
                 </ToggleButton>
+                <span className="muted">Drag blocks to rearrange</span>
                 <span className="muted">{graph.cycles.length ? `${graph.cycles.length} cycle${graph.cycles.length === 1 ? "" : "s"}` : "No cycles"} · runs left → right</span>
             </div>
             <div className="map-body">
@@ -349,8 +395,19 @@ function ImpactMapInner({ graph, timeline, input, focusId, onFocusHandled }: Pro
                         nodeTypes={nodeTypes}
                         fitView
                         minZoom={0.15}
-                        nodesDraggable={false}
+                        nodesDraggable
                         nodesConnectable={false}
+                        onNodesChange={(changes) => {
+                            setNodePositions((current) => {
+                                let next = current;
+                                for (const change of changes) {
+                                    if (change.type !== "position" || !change.position) continue;
+                                    if (next === current) next = { ...current };
+                                    next[change.id] = change.position;
+                                }
+                                return next;
+                            });
+                        }}
                         onNodeClick={(_, n) => setSelected(n.type === "handler" ? n.id : undefined)}
                         proOptions={{ hideAttribution: true }}
                     >
@@ -377,7 +434,8 @@ function HandlerPanel({ handler: h, runs, column, onClose }: { handler: WiringHa
     if (h.kind === "plugin") {
         rows.push(["Stage", h.stage !== undefined ? (STAGE_LABELS[h.stage] ?? String(h.stage)) : "?"], ["Mode", h.mode === "sync" ? "Synchronous" : "Asynchronous"], ["Rank", String(h.rank ?? "")]);
         if (h.typeName) rows.push(["Plugin type (class)", h.typeName]);
-        if (h.assembly) rows.push(["Assembly", [h.assembly.name, h.assembly.version && `v${h.assembly.version}`, h.assembly.isolation && `${h.assembly.isolation} isolation`].filter(Boolean).join(" · ")]);
+        if (h.assembly)
+            rows.push(["Assembly", [h.assembly.name, h.assembly.version && `v${h.assembly.version}`, h.assembly.isolation && `${h.assembly.isolation} isolation`].filter(Boolean).join(" · ")]);
         if (h.assembly?.modifiedOn) rows.push(["Assembly updated", `${fmtDateTime(h.assembly.modifiedOn)}${h.assembly.modifiedByName ? ` by ${h.assembly.modifiedByName}` : ""}`]);
         if (h.asyncAutoDelete) rows.push(["Async jobs", "deleted when they succeed"]);
     }
@@ -421,7 +479,10 @@ function HandlerPanel({ handler: h, runs, column, onClose }: { handler: WiringHa
                         {h.writes.map((w, i) => (
                             <li key={i}>
                                 {w.operation} <strong>{w.table}</strong>
-                                {w.columns?.length ? ` (${w.columns.join(", ")})` : ""} <Badge size="small" appearance="outline">{w.kind}</Badge>
+                                {w.columns?.length ? ` (${w.columns.join(", ")})` : ""}{" "}
+                                <Badge size="small" appearance="outline">
+                                    {w.kind}
+                                </Badge>
                             </li>
                         ))}
                     </ul>

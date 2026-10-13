@@ -8,6 +8,7 @@ Root Cause Analyzer combines what _could_ run when a table (or column) changes (
 
 - [Root Cause Analyzer](#root-cause-analyzer)
     - [Table of Contents](#table-of-contents)
+    - [UI Preview](#ui-preview)
     - [Features](#features)
     - [Development](#development)
     - [Usage in ToolBox](#usage-in-toolbox)
@@ -29,6 +30,10 @@ Root Cause Analyzer combines what _could_ run when a table (or column) changes (
     - [Contributing](#contributing)
     - [License](#license)
     - [Support](#support)
+
+## UI Preview
+
+![Root Cause Analyzer demo](/assets/rootCauseAnalyzer.png)
 
 ## Features
 
@@ -254,4 +259,3 @@ This project is licensed under the GPL-2.0 License - see the [LICENSE](../../LIC
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/Power-Maverick/PPTB-Tools/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Power-Maverick/PPTB-Tools/discussions)
