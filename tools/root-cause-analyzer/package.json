@@ -1,7 +1,7 @@
 {
     "name": "@power-maverick/tool-root-cause-analyzer",
     "displayName": "Root Cause Analyzer",
-    "version": "2.0.0",
+    "version": "2.0.2",
     "description": "Trace every plugin, flow and change that touched a record — and pinpoint why it's wrong.",
     "icon": "icons/rootCauseAnalyzer.svg",
     "contributors": [
@@ -36,7 +36,8 @@
     },
     "files": [
         "dist",
-        "npm-shrinkwrap.json"
+        "npm-shrinkwrap.json",
+        "pptb.config.json"
     ],
     "keywords": [
         "dataverse",
