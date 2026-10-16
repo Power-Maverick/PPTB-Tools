@@ -50,6 +50,7 @@ Root Cause Analyzer combines what _could_ run when a table (or column) changes (
 - ✅ Progressive results with cancel; paged reads that never block on a full scan
 - ✅ Copy an incident summary (findings, evidence, what couldn't be checked) to paste into a ticket
 - ✅ Optional Power Automate API integration for more complete flow run history
+- ✅ MCP agent integration with automated headless analysis input normalization and evidence-collection planning
 - ✅ Dark/light theme support
 
 ## Development
@@ -93,6 +94,35 @@ npm run validate
 5. Optionally pick a column of interest.
 6. Click **Analyze**.
 7. Start with **Findings**; click any evidence to jump to it on the **Timeline** or **Impact Map**.
+
+## Agent Integration (Headless)
+
+Root Cause Analyzer is invokable by AI assistants through PPTB MCP with both `windowed` and `headless` execution modes.
+
+- `windowed`: opens the normal interactive UI.
+- `headless`: accepts UI-parity analysis inputs and runs the same evidence collection pipeline used by the UI when Dataverse APIs are available.
+
+The tool manifest declares:
+
+- `agents.invokable: true`
+- `agents.executionModes: ["windowed", "headless"]`
+- `agents.headlessEntry: "dist/headless/headless.cjs"`
+
+For headless runs, provide UI-parity investigation input:
+
+- `recordUrl` (preferred) plus optional `column`
+- Optional `from` / `to` window
+
+Table and record ID are inferred from `recordUrl` when possible (same as the UI model).
+
+Headless output includes:
+
+- Operation mode (`analysis-complete`, `analysis-error`, or `analysis-request` when APIs are unavailable)
+- Normalized analysis input (`analysisInput`) and evidence collection plan (`dataCollection`)
+- Structured analysis payload (`analysis`)
+- Findings array (`findings`)
+- Timeline highlights array (`timelineHighlights`)
+- Evidence summary (`evidenceSummary`)
 
 ## Key Concepts
 
@@ -177,7 +207,8 @@ On connect, the tool checks and explains:
 
 **v3**
 
-- **MCP / agent exposure** — let AI agents run an analysis and read the findings
+- **Delivered:** MCP / agent exposure with headless live Dataverse evidence collection (record URL + optional column)
+- **Next:** richer headless output shaping and export formats
 
 **Later**
 

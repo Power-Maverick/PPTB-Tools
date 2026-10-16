@@ -1,6 +1,7 @@
 {
     "invocation": {
         "version": "1.0.0",
+        "capabilities": ["root-cause-analyzer"],
         "prefill": {
             "properties": {
                 "recordUrl": { "type": "string" },
@@ -10,6 +11,29 @@
                 "from": { "type": "string" },
                 "to": { "type": "string" }
             }
+        },
+        "returnTopic": {
+            "properties": {
+                "operation": { "type": "string" },
+                "analysisInput": { "type": "object" },
+                "dataCollection": { "type": "object" },
+                "analysis": { "type": "object" },
+                "findings": { "type": "array" },
+                "timelineHighlights": { "type": "array" },
+                "evidenceSummary": { "type": "object" },
+                "generatedAt": { "type": "string" }
+            }
         }
+    },
+    "agents": {
+        "version": "1.0.0",
+        "invokable": true,
+        "modes": ["one-way", "two-way"],
+        "defaultMode": "two-way",
+        "timeoutMS": 120000,
+        "headless": true,
+        "executionModes": ["windowed", "headless"],
+        "defaultExecutionMode": "headless",
+        "headlessEntry": "dist/headless/headless.cjs"
     }
 }

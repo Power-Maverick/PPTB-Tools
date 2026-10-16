@@ -7,7 +7,7 @@ import { runAnalysis, type AnalysisResult } from "../../src/engine/analyze";
 import type { ReadOnlyDataverse } from "../../src/host/readOnlyDataverse";
 import { DEFAULT_SETTINGS } from "../../src/model/types";
 import { healthyFacts } from "./preflight";
-import { ACCOUNT, ADDR_BILLING, ADDR_PRIMARY, at, auditRow, flowClientData, flowRunRow, FLOW, FLOW_OWNER, INTEGRATION, STEP_SYNC, traceRow, USER } from "./scenario";
+import { ACCOUNT, ADDR_BILLING, ADDR_PRIMARY, at, auditRow, FLOW, FLOW_OWNER, flowClientData, flowRunRow, INTEGRATION, STEP_SYNC, traceRow, USER } from "./scenario";
 
 type Row = Record<string, unknown>;
 const SEC = 1000;
@@ -31,7 +31,13 @@ function scenarioStore() {
         audit: [a1, a2, a3, a5, a6],
         plugintracelog: [
             traceRow("dddddddd-0000-4000-8000-000000000001", { time: at(35 * SEC - 300), table: "account", correlation: "eeeeeeee-0000-4000-8000-000000000001", block: `Syncing ${ACCOUNT}` }),
-            traceRow("dddddddd-0000-4000-8000-000000000002", { time: at(2 * HOUR - 100), table: "account", correlation: "eeeeeeee-0000-4000-8000-000000000002", duration: 600, block: `Syncing ${ACCOUNT}` }),
+            traceRow("dddddddd-0000-4000-8000-000000000002", {
+                time: at(2 * HOUR - 100),
+                table: "account",
+                correlation: "eeeeeeee-0000-4000-8000-000000000002",
+                duration: 600,
+                block: `Syncing ${ACCOUNT}`,
+            }),
         ],
         asyncoperation: [],
         flowrun: [flowRunRow("ffffffff-0000-4000-8000-000000000001", at(20 * SEC), at(40 * SEC))],
@@ -54,20 +60,63 @@ function scenarioStore() {
         ],
         plugintype: [{ plugintypeid: "66666666-0000-4000-8000-000000000006", typename: "Contoso.Plugins.AccountAddressSync" }],
         sdkmessageprocessingstepimage: [],
-        workflow: [{ workflowid: FLOW, name: "Address – validate & sync", category: 5, type: 1, statecode: 1, clientdata: flowClientData({ filtering: "cr_line1,cr_city" }), _ownerid_value: FLOW_OWNER }],
+        workflow: [
+            { workflowid: FLOW, name: "Address – validate & sync", category: 5, type: 1, statecode: 1, clientdata: flowClientData({ filtering: "cr_line1,cr_city" }), _ownerid_value: FLOW_OWNER },
+        ],
         systemuser: [
             { systemuserid: USER, fullname: "Dana Field", accessmode: 0 },
             { systemuserid: INTEGRATION, fullname: "ERP Integration", applicationid: "9", accessmode: 4 },
             { systemuserid: FLOW_OWNER, fullname: "Flow Service Account", accessmode: 0 },
         ],
         cr_address: [
-            { cr_addressid: ADDR_PRIMARY, cr_name: "Primary", _cr_accountid_value: ACCOUNT, cr_addresstype: 1, [`cr_addresstype${F}`]: "Primary", statecode: 0, createdon: at(-48 * HOUR), modifiedon: at(2 * HOUR) },
-            { cr_addressid: ADDR_BILLING, cr_name: "Billing", _cr_accountid_value: ACCOUNT, cr_addresstype: 2, [`cr_addresstype${F}`]: "Billing", statecode: 0, createdon: at(-48 * HOUR), modifiedon: at(-48 * HOUR) },
-            { cr_addressid: "bbbbbbbb-0000-4000-8000-000000000003", cr_name: "Primary (dup)", _cr_accountid_value: ACCOUNT, cr_addresstype: 1, [`cr_addresstype${F}`]: "Primary", statecode: 0, createdon: at(2 * HOUR + 400), modifiedon: at(2 * HOUR + 400) },
+            {
+                cr_addressid: ADDR_PRIMARY,
+                cr_name: "Primary",
+                _cr_accountid_value: ACCOUNT,
+                cr_addresstype: 1,
+                [`cr_addresstype${F}`]: "Primary",
+                statecode: 0,
+                createdon: at(-48 * HOUR),
+                modifiedon: at(2 * HOUR),
+            },
+            {
+                cr_addressid: ADDR_BILLING,
+                cr_name: "Billing",
+                _cr_accountid_value: ACCOUNT,
+                cr_addresstype: 2,
+                [`cr_addresstype${F}`]: "Billing",
+                statecode: 0,
+                createdon: at(-48 * HOUR),
+                modifiedon: at(-48 * HOUR),
+            },
+            {
+                cr_addressid: "bbbbbbbb-0000-4000-8000-000000000003",
+                cr_name: "Primary (dup)",
+                _cr_accountid_value: ACCOUNT,
+                cr_addresstype: 1,
+                [`cr_addresstype${F}`]: "Primary",
+                statecode: 0,
+                createdon: at(2 * HOUR + 400),
+                modifiedon: at(2 * HOUR + 400),
+            },
         ],
         account: [{ accountid: ACCOUNT, name: "Contoso Ltd", address1_line1: "1 Old St", statecode: 0 }],
     };
     return { tables, changes };
+}
+
+export function createEndToEndHeadlessContext() {
+    const store = scenarioStore();
+    const calls: string[] = [];
+    return {
+        dataverse: fakeDataverse(store, calls),
+        calls,
+        tables: [
+            { logicalName: "account", displayName: "Account", entitySetName: "accounts" },
+            { logicalName: "cr_address", displayName: "Address", entitySetName: "cr_addresses" },
+        ],
+        connection: { name: "Test", url: "https://contoso.crm.dynamics.com", enabledForPowerPlatformAPI: false },
+    };
 }
 
 /** Minimal FetchXML evaluator: entity, eq / in / ne conditions (dates accepted), top. */
@@ -93,8 +142,23 @@ function fakeDataverse(store: ReturnType<typeof scenarioStore>, calls: string[])
         return top ? rows.slice(0, Number(top[1])) : rows;
     };
     const attrs: Record<string, Array<[string, number, string]>> = {
-        account: [["accountid", 1, "Uniqueidentifier"], ["name", 2, "String"], ["address1_line1", 3, "String"], ["statecode", 4, "State"]],
-        cr_address: [["cr_addressid", 1, "Uniqueidentifier"], ["cr_name", 2, "String"], ["cr_line1", 3, "String"], ["cr_accountid", 4, "Lookup"], ["cr_addresstype", 5, "Picklist"], ["statecode", 6, "State"], ["createdon", 7, "DateTime"], ["modifiedon", 8, "DateTime"], ["cr_latitude", 9, "Decimal"]],
+        account: [
+            ["accountid", 1, "Uniqueidentifier"],
+            ["name", 2, "String"],
+            ["address1_line1", 3, "String"],
+            ["statecode", 4, "State"],
+        ],
+        cr_address: [
+            ["cr_addressid", 1, "Uniqueidentifier"],
+            ["cr_name", 2, "String"],
+            ["cr_line1", 3, "String"],
+            ["cr_accountid", 4, "Lookup"],
+            ["cr_addresstype", 5, "Picklist"],
+            ["statecode", 6, "State"],
+            ["createdon", 7, "DateTime"],
+            ["modifiedon", 8, "DateTime"],
+            ["cr_latitude", 9, "Decimal"],
+        ],
     };
     return {
         fetchXml: async (xml) => ({ value: evalFetch(xml), "@Microsoft.Dynamics.CRM.morerecords": false }) as never,
@@ -112,7 +176,11 @@ function fakeDataverse(store: ReturnType<typeof scenarioStore>, calls: string[])
                 .filter((a) => norm(a._objectid_value) === norm(target))
                 .map((a) => {
                     const ch = store.changes[String(a.auditid)] ?? [];
-                    return { AuditRecord: { auditid: a.auditid, createdon: a.createdon }, OldValue: Object.fromEntries(ch.map(([c, o]) => [c, o])), NewValue: Object.fromEntries(ch.map(([c, , n]) => [c, n])) };
+                    return {
+                        AuditRecord: { auditid: a.auditid, createdon: a.createdon },
+                        OldValue: Object.fromEntries(ch.map(([c, o]) => [c, o])),
+                        NewValue: Object.fromEntries(ch.map(([c, , n]) => [c, n])),
+                    };
                 });
             return { AuditDetailCollection: { AuditDetails: details, MoreRecords: false } };
         },
@@ -149,4 +217,3 @@ export async function run() {
     );
     return { result, updates, calls };
 }
-
