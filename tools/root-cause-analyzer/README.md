@@ -117,12 +117,22 @@ Table and record ID are inferred from `recordUrl` when possible (same as the UI 
 
 Headless output includes:
 
-- Operation mode (`analysis-complete`, `analysis-error`, or `analysis-request` when APIs are unavailable)
+- Operation mode (`analysis-complete`, `analysis-error`, `analysis-request` when APIs are unavailable, or `validation-error` when the prefill is wrong)
+- Prefill validation result (`validation`)
 - Normalized analysis input (`analysisInput`) and evidence collection plan (`dataCollection`)
 - Structured analysis payload (`analysis`)
 - Findings array (`findings`)
 - Timeline highlights array (`timelineHighlights`)
 - Evidence summary (`evidenceSummary`)
+
+### Prefill validation
+
+The prefill is validated before any analysis runs. Invalid values do not throw. Instead, the tool returns `operation: "validation-error"` with `validation.valid: false`, so the calling agent can correct the values and invoke the tool again.
+
+- Structural checks: values are strings, `recordUrl` parses and contains a record ID, `recordId` is a GUID, `table`/`column` are logical names (not display names), `from`/`to` are ISO 8601 and `from` < `to`, and `table`/`recordId` agree with `recordUrl`.
+- Metadata checks (when Dataverse is available): the table exists (entity set / type code URLs are resolved via metadata) and the column exists on that table.
+
+Each entry in `validation.errors` has `field`, `code` (`invalid_input`, `invalid_type`, `invalid_format`, `required`, `conflict`, `invalid_range`, `not_found`), `message`, `received`, `expected`, and `suggestions` (closest matching logical names) for `not_found`. `validation.message` summarizes all errors, and `validation.acceptedFields` describes every accepted field. Unknown properties are ignored and listed in `validation.warnings`.
 
 ## Key Concepts
 

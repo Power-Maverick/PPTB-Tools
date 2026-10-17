@@ -1,6 +1,6 @@
 {
     "invocation": {
-        "version": "1.0.0",
+        "version": "1.0.1",
         "capabilities": ["root-cause-analyzer"],
         "prefill": {
             "properties": {
@@ -16,6 +16,7 @@
             "properties": {
                 "operation": { "type": "string" },
                 "analysisInput": { "type": "object" },
+                "validation": { "type": "object" },
                 "dataCollection": { "type": "object" },
                 "analysis": { "type": "object" },
                 "findings": { "type": "array" },
@@ -26,13 +27,13 @@
         }
     },
     "agents": {
-        "version": "1.0.0",
+        "version": "1.0.1",
         "invokable": true,
         "modes": ["one-way", "two-way"],
         "defaultMode": "two-way",
         "timeoutMS": 120000,
         "headless": true,
-        "executionModes": ["windowed", "headless"],
+        "executionModes": ["headless"],
         "defaultExecutionMode": "headless",
         "headlessEntry": "dist/headless/headless.cjs"
     }
