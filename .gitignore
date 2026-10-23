@@ -142,3 +142,6 @@ vite.config.ts.timestamp-*
 # Example output
 tools/*/output/
 .DS_Store
+
+# Playwright files
+.playwright-mcp/

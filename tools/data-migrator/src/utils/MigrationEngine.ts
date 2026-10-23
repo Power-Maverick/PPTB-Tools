@@ -18,9 +18,9 @@ export class MigrationEngine {
     private teamMappings: Map<string, string> = new Map();
     private businessUnitMappings: Map<string, string> = new Map();
 
-    constructor() {
-        this.sourceClient = new DataverseClient("primary");
-        this.targetClient = new DataverseClient("secondary");
+    constructor(private sourceTarget: ToolBoxAPI.ConnectionTarget = "primary", private destinationTarget: ToolBoxAPI.ConnectionTarget = "secondary") {
+        this.sourceClient = new DataverseClient(sourceTarget);
+        this.targetClient = new DataverseClient(destinationTarget);
     }
 
     /**
@@ -141,8 +141,10 @@ export class MigrationEngine {
     /**
      * Migrate records based on configuration
      */
-    async migrateRecords(config: MigrationConfig, selectedRecords: PreviewRecord[], onProgress: (progress: MigrationProgress) => void): Promise<void> {
+    async migrateRecords(config: MigrationConfig, selectedRecords: PreviewRecord[], onProgress: (progress: MigrationProgress) => void, signal?: AbortSignal): Promise<void> {
+        let progress: MigrationProgress | undefined;
         try {
+            signal?.throwIfAborted();
             // Use the selected records directly from preview
             // Note: The preview records must contain all field data that is required for the configured field mappings
             // This is ensured by the preview query which fetches all enabled fields from the source
@@ -178,7 +180,7 @@ export class MigrationEngine {
                 config.entityLogicalName,
                 true, // searchByLogicalName should be true
                 ["PrimaryIdAttribute"],
-                "primary", // Use primary connection for source
+                this.sourceTarget,
             )) as EntityMetadataResponse | null;
 
             if (!entityMetadata || typeof entityMetadata.PrimaryIdAttribute !== "string" || entityMetadata.PrimaryIdAttribute.trim() === "") {
@@ -187,7 +189,7 @@ export class MigrationEngine {
 
             const primaryIdField = entityMetadata.PrimaryIdAttribute;
 
-            const entityMetadataForName = (await window.dataverseAPI.getEntityMetadata(config.entityLogicalName, true, ["PrimaryNameAttribute"], "primary")) as EntityMetadataResponse | null;
+            const entityMetadataForName = (await window.dataverseAPI.getEntityMetadata(config.entityLogicalName, true, ["PrimaryNameAttribute"], this.sourceTarget)) as EntityMetadataResponse | null;
 
             const primaryNameField =
                 typeof entityMetadataForName?.PrimaryNameAttribute === "string" && entityMetadataForName.PrimaryNameAttribute.trim() !== "" ? entityMetadataForName.PrimaryNameAttribute : undefined;
@@ -195,7 +197,7 @@ export class MigrationEngine {
             const totalRecords = sourceRecords.length;
             const totalBatches = Math.ceil(totalRecords / config.batchSize);
 
-            const progress: MigrationProgress = {
+            progress = {
                 total: totalRecords,
                 processed: 0,
                 successful: 0,
@@ -213,6 +215,7 @@ export class MigrationEngine {
                 progress.currentBatch = Math.floor(i / config.batchSize) + 1;
 
                 for (const sourceRecord of batch) {
+                    signal?.throwIfAborted();
                     const recordId = sourceRecord[primaryIdField] as string;
                     const primaryName = primaryNameField && sourceRecord[primaryNameField] ? (sourceRecord[primaryNameField] as string) : "";
 
@@ -245,6 +248,7 @@ export class MigrationEngine {
                         }
 
                         for (const operation of config.operations) {
+                            signal?.throwIfAborted();
                             // Skip create if record already exists and both create and update are selected
                             if (operation === "create" && recordExistsInTarget && config.operations.includes("update")) {
                                 continue; // Skip create, will be handled by update
@@ -289,6 +293,10 @@ export class MigrationEngine {
             progress.isInProgress = false;
             onProgress({ ...progress });
         } catch (error: any) {
+            if (progress) {
+                progress.isInProgress = false;
+                onProgress({ ...progress });
+            }
             console.error("Failed to migrate records:", error);
             throw new Error(`Failed to migrate records: ${error.message}`);
         }
@@ -365,7 +373,7 @@ export class MigrationEngine {
                 let entitySetName: string | undefined;
                 try {
                     // Get entity metadata to extract the LogicalCollectionName (entity set name)
-                    const entityMetadata = (await window.dataverseAPI.getEntityMetadata(lookupMapping.targetEntity, true, ["LogicalCollectionName"], "primary")) as EntityMetadataResponse | null;
+                    const entityMetadata = (await window.dataverseAPI.getEntityMetadata(lookupMapping.targetEntity, true, ["LogicalCollectionName"], this.destinationTarget)) as EntityMetadataResponse | null;
 
                     const metadataCollectionName = typeof entityMetadata?.LogicalCollectionName === "string" ? entityMetadata.LogicalCollectionName.trim() : "";
 

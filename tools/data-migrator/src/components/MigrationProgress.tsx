@@ -11,7 +11,7 @@ export function MigrationProgress({ progress }: MigrationProgressProps) {
   return (
     <div className="progress-panel">
       <div className="progress-header">
-        <h3>Migration Progress</h3>
+        <h3>{!progress.isInProgress && progress.processed < progress.total ? "Migration stopped" : "Migration Progress"}</h3>
         <span>
           {progress.processed} / {progress.total}
         </span>
@@ -51,7 +51,7 @@ export function MigrationProgress({ progress }: MigrationProgressProps) {
 
       {progress.currentBatch && progress.totalBatches && (
         <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "12px" }}>
-          Processing batch {progress.currentBatch} of {progress.totalBatches}
+          {progress.isInProgress ? "Processing batch" : "Last batch"} {progress.currentBatch} of {progress.totalBatches}
         </p>
       )}
 

@@ -19,9 +19,9 @@ function extractLabel(value: any): string | undefined {
  * Client for interacting with Dataverse using PPTB API
  */
 export class DataverseClient {
-    private connectionTarget: "primary" | "secondary";
+    private connectionTarget: ToolBoxAPI.ConnectionTarget;
 
-    constructor(connectionTarget: "primary" | "secondary" = "primary") {
+    constructor(connectionTarget: ToolBoxAPI.ConnectionTarget = "primary") {
         this.connectionTarget = connectionTarget;
     }
 
@@ -130,7 +130,11 @@ export class DataverseClient {
      */
     async queryRecords(entityLogicalName: string, selectFields: string[], filterQuery?: string, orderBy?: string, top?: number, entitySetName?: string): Promise<any[]> {
         try {
-            const resolvedEntitySetName = entitySetName || await window.dataverseAPI.getEntitySetName(entityLogicalName);
+            const metadata = entitySetName ? null : await window.dataverseAPI.getEntityMetadata(entityLogicalName, true, ["EntitySetName"], this.connectionTarget);
+            const resolvedEntitySetName = entitySetName || metadata?.EntitySetName;
+            if (typeof resolvedEntitySetName !== "string" || !resolvedEntitySetName) {
+                throw new Error(`Entity set name not found for ${entityLogicalName}`);
+            }
 
             let query = `${resolvedEntitySetName}?$select=${selectFields.join(",")}`;
 

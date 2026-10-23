@@ -126,6 +126,10 @@ export interface AutoMappingResult {
  * Migration configuration
  */
 export interface MigrationConfig {
+  /** Saved connection identities, resolved to current slots before execution. */
+  sourceConnectionId?: string;
+  targetConnectionIds?: string[];
+  autoMapSystemRecords?: boolean;
   /** Source entity logical name */
   entityLogicalName: string;
   /** Entity display name */

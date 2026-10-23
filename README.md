@@ -33,8 +33,10 @@ Migrate data from one Dataverse environment to another with intelligent auto-map
 **Key Features:**
 
 - **React + TypeScript**: Modern component-based architecture with Vite build system
-- **PPTB-Only Integration**: Designed exclusively for Power Platform ToolBox (uses @pptb/types v1.0.16)
-- **Modern Minimalist UI**: Clean design with no header and optimized to avoid excessive scrolling and whitespace
+- **PPTB-Only Integration**: Requires Power Platform ToolBox API 1.2.7 or newer, with `@pptb/types` 1.2.7
+- **Guided UI**: Separate configuration, playlist, and migration actions with a final confirmation before writing
+- **Selectable Environments**: Choose any assigned connection as the source and up to five destinations
+- **Migration Playlists**: Repeat entities with independent source/destination combinations, ordered execution, and import/export
 - **Auto-Mapping**: Automatically map users, teams, and business units between environments
 - **Smart Migration Operations**: Choose between create, update, or upsert operations
 - **Field Selection**: Select which fields to include in the migration

@@ -1,5 +1,5 @@
 import { Play16Filled } from "@fluentui/react-icons";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AutoMappingPanel } from "./components/AutoMappingPanel";
 import { EntitySelector } from "./components/EntitySelector";
 import { FieldSelector } from "./components/FieldSelector";
@@ -12,26 +12,26 @@ import "./styles/App.css";
 import { DataverseClient } from "./utils/DataverseClient";
 import { isReferenceFieldType } from "./utils/fieldUtils";
 import { MigrationEngine } from "./utils/MigrationEngine";
-
-// Extends the published DataverseConnection type to include the environmentColor
-// property that PPTB returns at runtime (user-configurable per connection).
-type DataverseConnectionWithColor = ToolBoxAPI.DataverseConnection & {
-    environmentColor?: string;
-};
+import { assertConnectionsUnchanged, getUnavailablePlaylistConnections, resolveMigrationConnections } from "./utils/connections";
 
 function App() {
     const [isPPTB, setIsPPTB] = useState<boolean>(false);
-    const [connectionUrl, setConnectionUrl] = useState<string>("");
-    const [connectionName, setConnectionName] = useState<string>("");
-    const [connectionEnvironment, setConnectionEnvironment] = useState<string>("");
-    const [connectionEnvironmentColor, setConnectionEnvironmentColor] = useState<string>("");
-    const [secondaryConnectionUrl, setSecondaryConnectionUrl] = useState<string>("");
-    const [secondaryConnectionName, setSecondaryConnectionName] = useState<string>("");
-    const [secondaryConnectionEnvironment, setSecondaryConnectionEnvironment] = useState<string>("");
-    const [secondaryConnectionEnvironmentColor, setSecondaryConnectionEnvironmentColor] = useState<string>("");
+    const [connections, setConnections] = useState<Array<ToolBoxAPI.Connection | null>>([]);
+    const [sourceConnectionId, setSourceConnectionId] = useState("");
+    const [targetConnectionIds, setTargetConnectionIds] = useState<string[]>([]);
+    const [autoMapSystemRecords, setAutoMapSystemRecords] = useState(false);
+    const [activePlaylistIndex, setActivePlaylistIndex] = useState<number | null>(null);
+    const [activeDestination, setActiveDestination] = useState("");
+    const [pendingMigration, setPendingMigration] = useState<PreviewRecord[] | null>(null);
+    const [destinationResults, setDestinationResults] = useState<Array<{ id: string; progress: MigrationProgress }>>([]);
     const [loading, setLoading] = useState<boolean>(true);
+    const [refreshingConnections, setRefreshingConnections] = useState(false);
     const [error, setError] = useState<string>("");
     const [launchContext, setLaunchContext] = useState<Record<string, unknown> | null>(null);
+    const launchContextApplied = useRef(false);
+    const connectionRevision = useRef(0);
+    const refreshQueued = useRef(false);
+    const migrationAbort = useRef<AbortController | null>(null);
 
     // Entities
     const [entities, setEntities] = useState<DataverseEntity[]>([]);
@@ -66,10 +66,75 @@ function App() {
     const [businessUnitMappings, setBusinessUnitMappings] = useState<AutoMappingResult[]>([]);
 
     // Step management for better UX - track which steps are expanded
-    const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set([1]));
+    const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set([0, 1]));
     const [isLaunchingFxs, setIsLaunchingFxs] = useState<boolean>(false);
 
-    const [migrationEngine] = useState<MigrationEngine>(() => new MigrationEngine());
+    const sourceSlot = connections.findIndex((connection) => connection?.id === sourceConnectionId);
+    const connectionLabel = (id: string) => {
+        const connection = connections.find((item) => item?.id === id);
+        return connection ? `${connection.name} (${connection.url})` : `Unavailable connection: ${id}`;
+    };
+    const validateConnections = (config: MigrationConfig, slots = connections) => resolveMigrationConnections(config, slots);
+    const linkedConnectionCount = connections.filter((connection) => connection !== null).length;
+    const unavailablePlaylistConnections = getUnavailablePlaylistConnections(playlist, connections);
+
+    const refreshConnections = useCallback(async () => {
+        const revision = ++connectionRevision.current;
+        setRefreshingConnections(true);
+        setPendingMigration(null);
+        setShowPreview(false);
+        setShowAutoMapping(false);
+        setPreviewRecords([]);
+        setSelectedEntity(null);
+        setEntities([]);
+        setLoadingFields(false);
+        setLoadingPreview(false);
+        setLoadingEntities(false);
+        setPlaylistRunIndex(null);
+        setActivePlaylistIndex(null);
+        setUserMappings([]);
+        setTeamMappings([]);
+        setBusinessUnitMappings([]);
+        setExpandedSteps(new Set([0, 1]));
+        try {
+            const slots = await window.toolboxAPI.connections.getConnections();
+            if (revision !== connectionRevision.current) return;
+            setConnections(slots);
+            setSourceConnectionId((id) => slots.some((connection) => connection?.id === id) ? id : "");
+            setTargetConnectionIds((ids) => ids.filter((id) => slots.some((connection) => connection?.id === id)));
+            if (slots.filter(Boolean).length < 2) setError("Assign at least two connections in PPTB.");
+        } catch (error) {
+            if (revision !== connectionRevision.current) return;
+            setConnections([]);
+            setError(`Failed to refresh connections: ${error instanceof Error ? error.message : String(error)}`);
+        } finally {
+            if (revision === connectionRevision.current) {
+                setRefreshingConnections(false);
+                setLoading(false);
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!window.toolboxAPI) return;
+        const onConnectionEvent = (_event: unknown, payload: ToolBoxAPI.ToolBoxEventPayload) => {
+            if (!["connection:updated", "connection:created", "connection:deleted"].includes(payload.event)) return;
+            if (isMigrating) {
+                ++connectionRevision.current;
+                migrationAbort.current?.abort(new Error("Connections changed during migration. Remaining records, destinations, and playlist entries were stopped."));
+                refreshQueued.current = true;
+                setError("Connections changed during migration. Remaining destinations and playlist entries will be stopped; completed changes are not rolled back.");
+                return;
+            }
+            void refreshConnections();
+        };
+        window.toolboxAPI.events.on(onConnectionEvent);
+        if (!isMigrating && refreshQueued.current) {
+            refreshQueued.current = false;
+            void refreshConnections();
+        }
+        return () => window.toolboxAPI.events.off(onConnectionEvent);
+    }, [isMigrating, refreshConnections]);
 
     const getCurrentConfiguration = (): MigrationConfig | null =>
         selectedEntity
@@ -82,38 +147,37 @@ function App() {
                   filterQuery: filterQuery || undefined,
                   filterType,
                   batchSize,
+                  sourceConnectionId,
+                  targetConnectionIds: [...targetConnectionIds],
+                  autoMapSystemRecords,
               }
             : null;
 
     // Detect environment and initialize
     useEffect(() => {
+        let cancelled = false;
+        const revision = connectionRevision.current;
         const initializeEnvironment = async () => {
             if (window.toolboxAPI) {
                 setIsPPTB(true);
 
                 try {
-                    // Get active (source) connection
-                    const activeConnection = (await window.toolboxAPI.connections.getActiveConnection()) as DataverseConnectionWithColor | null;
-                    setConnectionUrl(activeConnection?.url || "");
-                    setConnectionName(activeConnection?.name || "");
-                    setConnectionEnvironment(activeConnection?.environment || "");
-                    setConnectionEnvironmentColor(activeConnection?.environmentColor || "");
-
-                    // Get secondary (target) connection
-                    const secondaryConnection = (await window.toolboxAPI.connections.getSecondaryConnection()) as DataverseConnectionWithColor | null;
-                    setSecondaryConnectionUrl(secondaryConnection?.url || "");
-                    setSecondaryConnectionName(secondaryConnection?.name || "");
-                    setSecondaryConnectionEnvironment(secondaryConnection?.environment || "");
-                    setSecondaryConnectionEnvironmentColor(secondaryConnection?.environmentColor || "");
+                    const slots = await window.toolboxAPI.connections.getConnections();
+                    if (cancelled || revision !== connectionRevision.current) return;
+                    setConnections(slots);
+                    setSourceConnectionId(slots[0]?.id || "");
+                    setTargetConnectionIds(slots[1] ? [slots[1].id] : []);
 
                     // Identify if launch context exists
                     const launchContext = await window.toolboxAPI.invocation.getLaunchContext();
+                    if (cancelled) return;
                     setLaunchContext(launchContext);
 
-                    if (!secondaryConnection) {
-                        setError("Please select a secondary connection as the target environment");
+                    if (slots.filter(Boolean).length < 2) {
+                        setError("Assign at least two connections in PPTB, then refresh connections below.");
                     }
                 } catch (error) {
+                    if (cancelled) return;
                     console.error("Failed to get connections:", error);
                     setError("Failed to get connections from PPTB");
                 }
@@ -127,26 +191,31 @@ function App() {
         };
 
         initializeEnvironment();
+        return () => { cancelled = true; };
     }, []);
 
     // Load entities when connections are available
     useEffect(() => {
-        if (connectionUrl && secondaryConnectionUrl) {
-            loadEntities();
+        if (sourceSlot >= 0) {
+            let cancelled = false;
+            loadEntities(() => cancelled);
+            return () => { cancelled = true; };
         }
-    }, [connectionUrl, secondaryConnectionUrl]);
+    }, [sourceConnectionId, connections]);
 
-    const loadEntities = async () => {
+    const loadEntities = async (cancelled: () => boolean) => {
+        const revision = connectionRevision.current;
         setLoadingEntities(true);
-        setError("");
 
         try {
-            const client = new DataverseClient("primary");
+            const client = new DataverseClient(sourceSlot);
             const entityList = await client.fetchAllEntities();
+            if (cancelled() || revision !== connectionRevision.current) return;
             setEntities(entityList.sort((a, b) => a.displayName.localeCompare(b.displayName)));
 
             // Pre-select entity if launch context is available
-            if (launchContext) {
+            if (launchContext && !launchContextApplied.current) {
+                launchContextApplied.current = true;
                 const preselectedEntityName = launchContext?.entityLogicalName;
                 const preselectedFetchXML = launchContext?.fetchXml;
                 if (preselectedEntityName) {
@@ -161,9 +230,9 @@ function App() {
                 }
             }
         } catch (error: any) {
-            setError(`Failed to load entities: ${error.message}`);
+            if (!cancelled() && revision === connectionRevision.current) setError(`Failed to load entities: ${error.message}`);
         } finally {
-            setLoadingEntities(false);
+            if (!cancelled() && revision === connectionRevision.current) setLoadingEntities(false);
         }
     };
 
@@ -185,8 +254,9 @@ function App() {
         setExpandedSteps(newExpanded);
     };
 
-    const handleEntitySelect = async (entity: DataverseEntity) => {
-        setSelectedEntity(entity);
+    const handleEntitySelect = async (entity: DataverseEntity, slot = sourceSlot) => {
+        const revision = connectionRevision.current;
+        setSelectedEntity(null);
         setLoadingFields(true);
         setError("");
 
@@ -195,8 +265,9 @@ function App() {
 
         try {
             // Load fields for the selected entity
-            const client = new DataverseClient("primary");
+            const client = new DataverseClient(slot);
             const fields = await client.fetchEntityFields(entity.logicalName);
+            if (revision !== connectionRevision.current) return false;
 
             // Sort fields by display name
             const sortedFields = [...fields].sort((a, b) => a.displayName.localeCompare(b.displayName));
@@ -227,32 +298,42 @@ function App() {
             // Reset preview and migration progress
             setPreviewRecords([]);
             setMigrationProgress(null);
+            return true;
         } catch (error: any) {
-            setError(`Failed to load fields: ${error.message}`);
+            if (revision === connectionRevision.current) setError(`Failed to load fields: ${error.message}`);
+            return false;
         } finally {
-            setLoadingFields(false);
+            if (revision === connectionRevision.current) setLoadingFields(false);
         }
     };
 
     const handleAutoMapping = async () => {
+        const revision = connectionRevision.current;
         setShowAutoMapping(true);
         setError("");
 
         try {
+            const config = getCurrentConfiguration();
+            if (!config) throw new Error("Select an entity first.");
+            const slots = validateConnections(config);
+            const migrationEngine = new MigrationEngine(slots.source, slots.targets[0]);
             // Auto-map users, teams, and business units
             const users = await migrationEngine.autoMapUsers();
             const teams = await migrationEngine.autoMapTeams();
             const businessUnits = await migrationEngine.autoMapBusinessUnits();
+            if (revision !== connectionRevision.current) return;
 
             setUserMappings(users);
             setTeamMappings(teams);
             setBusinessUnitMappings(businessUnits);
+            setAutoMapSystemRecords(true);
         } catch (error: any) {
-            setError(`Failed to auto-map: ${error.message}`);
+            if (revision === connectionRevision.current) setError(`Failed to auto-map: ${error.message}`);
         }
     };
 
     const handlePreview = async () => {
+        const revision = connectionRevision.current;
         if (!selectedEntity) {
             setError("Please select an entity first");
             return;
@@ -262,7 +343,10 @@ function App() {
         setError("");
 
         try {
-            const client = new DataverseClient("primary");
+            const config = getCurrentConfiguration()!;
+            validateConnections(config);
+            assertConnectionsUnchanged(config, connections, await window.toolboxAPI.connections.getConnections());
+            const client = new DataverseClient(sourceSlot);
             const selectFields = fieldMappings
                 .filter((m) => m.isEnabled)
                 .map((m) => {
@@ -320,12 +404,13 @@ function App() {
                 };
             });
 
+            if (revision !== connectionRevision.current) return;
             setPreviewRecords(preview);
             setShowPreview(true);
         } catch (error: any) {
-            setError(`Failed to load preview: ${error.message}`);
+            if (revision === connectionRevision.current) setError(`Failed to load preview: ${error.message}`);
         } finally {
-            setLoadingPreview(false);
+            if (revision === connectionRevision.current) setLoadingPreview(false);
         }
     };
 
@@ -340,27 +425,76 @@ function App() {
             return;
         }
 
+        const config = getCurrentConfiguration()!;
+        try {
+            validateConnections(config);
+        } catch (error) {
+            setError(error instanceof Error ? error.message : String(error));
+            return;
+        }
         setShowPreview(false);
+        setDestinationResults([]);
+        setPendingMigration(selectedRecords);
+    };
+
+    const executeMigration = async () => {
+        if (!pendingMigration || isMigrating) return;
+        const selectedRecords = pendingMigration;
+        setPendingMigration(null);
         setIsMigrating(true);
         setError("");
 
         const config = getCurrentConfiguration()!;
+        const revision = connectionRevision.current;
+        const controller = new AbortController();
+        migrationAbort.current = controller;
 
         let migrationSucceeded = false;
+        let closeProtected = false;
         try {
-            let failed = 0;
-            await migrationEngine.migrateRecords(config, selectedRecords, (progress) => {
-                failed = progress.failed;
-                setMigrationProgress(progress);
-            });
-            if (failed > 0) throw new Error(`${failed} record(s) failed; the remaining playlist was stopped.`);
+            closeProtected = await window.toolboxAPI.preventClose();
+            const liveConnections = await window.toolboxAPI.connections.getConnections();
+            assertConnectionsUnchanged(config, connections, liveConnections);
+            const slots = validateConnections(config, liveConnections);
+            for (const targetSlot of slots.targets) {
+                if (revision !== connectionRevision.current) throw new Error("Connections changed during migration. Remaining destinations were stopped.");
+                assertConnectionsUnchanged(config, connections, await window.toolboxAPI.connections.getConnections());
+                setActiveDestination(connectionLabel(liveConnections[targetSlot]!.id));
+                const migrationEngine = new MigrationEngine(slots.source, targetSlot);
+                if (config.autoMapSystemRecords) {
+                    await migrationEngine.autoMapUsers();
+                    await migrationEngine.autoMapTeams();
+                    await migrationEngine.autoMapBusinessUnits();
+                }
+                if (revision !== connectionRevision.current) throw new Error("Connections changed during migration setup. Remaining destinations were stopped.");
+                let failed = 0;
+                await migrationEngine.migrateRecords(config, selectedRecords, (progress) => {
+                    failed = progress.failed;
+                    setMigrationProgress(progress);
+                    setDestinationResults((current) => {
+                        const result = { id: liveConnections[targetSlot]!.id, progress };
+                        return [...current.filter((item) => item.id !== result.id), result];
+                    });
+                }, controller.signal);
+                if (failed > 0) throw new Error(`${failed} record(s) failed in ${connectionLabel(liveConnections[targetSlot]!.id)}; remaining destinations and playlist entries were stopped.`);
+            }
+            if (revision !== connectionRevision.current) throw new Error("Connections changed during migration. Remaining playlist entries were stopped.");
             migrationSucceeded = true;
         } catch (error: any) {
             setError(`Migration failed: ${error.message}`);
         } finally {
+            migrationAbort.current = null;
             setIsMigrating(false);
+            if (closeProtected) {
+                try {
+                    await window.toolboxAPI.releasePreventClose();
+                } catch (error) {
+                    console.error("Failed to release close protection:", error);
+                    setError("Migration finished, but close protection could not be released.");
+                }
+            }
         }
-        if (!migrationSucceeded && playlistRunIndex !== null) {
+        if ((!migrationSucceeded || revision !== connectionRevision.current) && playlistRunIndex !== null) {
             setPlaylistRunIndex(null);
             return;
         }
@@ -368,11 +502,10 @@ function App() {
             const nextIndex = playlistRunIndex + 1;
             if (nextIndex < playlist.length) {
                 setPlaylistRunIndex(nextIndex);
-                await activateConfiguration(playlist[nextIndex]);
-                setError(`Next playlist entity loaded (${nextIndex + 1} of ${playlist.length}). Preview it to continue.`);
+                await activateConfiguration(playlist[nextIndex], nextIndex);
             } else {
                 setPlaylistRunIndex(null);
-                setError("Playlist completed.");
+                setActiveDestination("Playlist completed.");
             }
         }
     };
@@ -380,12 +513,14 @@ function App() {
     const handleAddToPlaylist = () => {
         const config = getCurrentConfiguration();
         if (!config || !isPlaylistCreated) return;
-
-        setPlaylist((current) => {
-            const existingIndex = current.findIndex((item) => item.entityLogicalName === config.entityLogicalName);
-            if (existingIndex < 0) return [...current, config];
-            return current.map((item, index) => (index === existingIndex ? config : item));
-        });
+        try {
+            validateConnections(config);
+        } catch (error) {
+            setError(error instanceof Error ? error.message : String(error));
+            return;
+        }
+        setPlaylist((current) => [...current, config]);
+        setActivePlaylistIndex(null);
         setError("");
     };
 
@@ -393,6 +528,7 @@ function App() {
         setPlaylist([]);
         setIsPlaylistCreated(true);
         setPlaylistRunIndex(null);
+        setActivePlaylistIndex(null);
         setError("");
     };
 
@@ -406,25 +542,41 @@ function App() {
         });
     };
 
-    const activateConfiguration = async (config: MigrationConfig) => {
-        const entity = entities.find((item) => item.logicalName === config.entityLogicalName);
-        if (!entity) {
-            setError(`Entity "${config.entityLogicalName}" not found in this environment`);
-            return;
+    const activateConfiguration = async (config: MigrationConfig, index: number | null = null) => {
+        const revision = connectionRevision.current;
+        setLoadingFields(true);
+        setSelectedEntity(null);
+        try {
+            const slots = validateConnections(config);
+            const entityList = await new DataverseClient(slots.source).fetchAllEntities();
+            if (revision !== connectionRevision.current) return;
+            const entity = entityList.find((item) => item.logicalName === config.entityLogicalName);
+            if (!entity) throw new Error(`Entity "${config.entityLogicalName}" not found in the saved source environment.`);
+            setSourceConnectionId(config.sourceConnectionId!);
+            setTargetConnectionIds(config.targetConnectionIds!);
+            setAutoMapSystemRecords(config.autoMapSystemRecords || false);
+            setActivePlaylistIndex(index);
+            setUserMappings([]);
+            setTeamMappings([]);
+            setBusinessUnitMappings([]);
+            if (!await handleEntitySelect(entity, slots.source)) {
+                setPlaylistRunIndex(null);
+                return;
+            }
+            setOperations(config.operations || ["create"]);
+            setFieldMappings(config.fieldMappings || []);
+            setLookupMappings(config.lookupMappings || []);
+            setFilterType(config.filterType || "odata");
+            setFilterQuery(config.filterQuery || "");
+            setBatchSize(config.batchSize || 50);
+        } catch (error) {
+            if (revision === connectionRevision.current) {
+                setPlaylistRunIndex(null);
+                setError(error instanceof Error ? error.message : String(error));
+            }
+        } finally {
+            if (revision === connectionRevision.current) setLoadingFields(false);
         }
-
-        await handleEntitySelect(entity);
-        setOperations(config.operations || ["create"]);
-        setFieldMappings(config.fieldMappings || []);
-        setLookupMappings(
-            (config.lookupMappings || []).map((mapping) => ({
-                ...mapping,
-                manualMappings: mapping.manualMappings instanceof Map ? mapping.manualMappings : mapping.manualMappings ? new Map(mapping.manualMappings as unknown as [string, string][]) : undefined,
-            })),
-        );
-        setFilterType(config.filterType || "odata");
-        setFilterQuery(config.filterQuery || "");
-        setBatchSize(config.batchSize || 50);
     };
 
     const handleRunPlaylist = async () => {
@@ -434,17 +586,20 @@ function App() {
         }
         if (
             !window.confirm(
-                `Start this ${playlist.length}-entity playlist in order?\n\n${playlist.map((item, index) => `${index + 1}. ${item.entityDisplayName}`).join("\n")}\n\nEach entity will still require preview and confirmation before migration.`,
+                `Prepare this ${playlist.length}-entry playlist in order?\n\n${playlist.map((item, index) => `${index + 1}. ${item.entityDisplayName}: ${connectionLabel(item.sourceConnectionId || "")} → ${(item.targetConnectionIds || []).map(connectionLabel).join(", ")}`).join("\n")}\n\nNo records are changed until you preview and confirm each entry.`,
             )
         )
             return;
-        const activeConfig = getCurrentConfiguration();
-        const configurations = playlist.map((item) => (item.entityLogicalName === selectedEntity?.logicalName ? activeConfig! : item));
-        setPlaylist(configurations);
+        try {
+            playlist.forEach((config) => validateConnections(config));
+        } catch (error) {
+            setError(error instanceof Error ? error.message : String(error));
+            return;
+        }
         setPlaylistRunIndex(0);
         setError("");
         setMigrationProgress(null);
-        await activateConfiguration(configurations[0]);
+        await activateConfiguration(playlist[0], 0);
     };
 
     if (loading) {
@@ -472,7 +627,9 @@ function App() {
         setError("");
 
         try {
-            const result = await window.toolboxAPI.invocation.launchTool("@mohsinonxrm/pptb-fetchxml-studio", filterQuery ? { fetchXml: filterQuery } : undefined);
+            const result = await window.toolboxAPI.invocation.launchTool("@mohsinonxrm/pptb-fetchxml-studio", filterQuery ? { fetchXml: filterQuery } : undefined, {
+                connectionIds: [sourceConnectionId],
+            });
 
             const fetchxml = result !== null ? (result as { fetchXml?: string }).fetchXml : undefined;
             if (fetchxml) {
@@ -496,14 +653,14 @@ function App() {
         const config = isPlaylistCreated
             ? {
                   entities: playlist.map(serializeLookupMappings),
-                  version: "1.0",
+                  version: "2.0",
               }
             : (() => {
                   const currentConfig = getCurrentConfiguration();
                   return currentConfig
                       ? {
                             ...serializeLookupMappings(currentConfig),
-                            version: "1.0",
+                            version: "2.0",
                         }
                       : null;
               })();
@@ -528,26 +685,34 @@ function App() {
             const config = JSON.parse(text);
             const savedConfigurations = Array.isArray(config.entities) ? config.entities : [config];
             const validConfigurations = savedConfigurations
-                .filter((item: MigrationConfig) => entities.some((entity) => entity.logicalName === item.entityLogicalName))
-                .map((item: MigrationConfig) => ({
-                    ...item,
-                    lookupMappings: (item.lookupMappings || []).map((mapping) => ({
-                        ...mapping,
-                        manualMappings:
-                            mapping.manualMappings instanceof Map ? mapping.manualMappings : mapping.manualMappings ? new Map(mapping.manualMappings as unknown as [string, string][]) : undefined,
-                    })),
-                }));
-            const missingEntities = savedConfigurations
-                .filter((item: MigrationConfig) => !entities.some((entity) => entity.logicalName === item.entityLogicalName))
-                .map((item: MigrationConfig) => item.entityLogicalName);
+                .map((item: MigrationConfig) => {
+                    if (config.version === "2.0" && (typeof item.sourceConnectionId !== "string" || !Array.isArray(item.targetConnectionIds))) {
+                        throw new Error("Version 2.0 configurations must specify their source and destination connection IDs.");
+                    }
+                    if (!Number.isInteger(item.batchSize) || item.batchSize < 1 || item.batchSize > 100) {
+                        throw new Error("Each entry must specify a batch size between 1 and 100.");
+                    }
+                    if (!Array.isArray(item.operations) || !item.operations.length || item.operations.some((operation) => !["create", "update", "delete"].includes(operation))) {
+                        throw new Error("Each entry must specify valid migration operations.");
+                    }
+                    return {
+                        ...item,
+                        sourceConnectionId: item.sourceConnectionId === undefined ? sourceConnectionId : item.sourceConnectionId,
+                        targetConnectionIds: item.targetConnectionIds === undefined ? [...targetConnectionIds] : item.targetConnectionIds,
+                        lookupMappings: (item.lookupMappings || []).map((mapping) => ({
+                            ...mapping,
+                            manualMappings:
+                                mapping.manualMappings instanceof Map ? mapping.manualMappings : mapping.manualMappings ? new Map(mapping.manualMappings as unknown as [string, string][]) : undefined,
+                        })),
+                    };
+                });
             if (validConfigurations.length === 0) {
-                throw new Error(`No saved entities were found in this environment${missingEntities.length ? `: ${missingEntities.join(", ")}` : ""}`);
+                throw new Error("The playlist contains no entries.");
             }
             const isPlaylistConfiguration = Array.isArray(config.entities);
             setIsPlaylistCreated(isPlaylistConfiguration);
             setPlaylist(isPlaylistConfiguration ? validConfigurations : []);
-            await activateConfiguration(validConfigurations[0]);
-            if (missingEntities.length) setError(`Skipped entities not found in this environment: ${missingEntities.join(", ")}`);
+            await activateConfiguration(validConfigurations[0], isPlaylistConfiguration ? 0 : null);
         } catch (error: any) {
             setError(`Failed to load configuration: ${error.message}`);
         }
@@ -561,6 +726,10 @@ function App() {
         setPlaylist([]);
         setIsPlaylistCreated(false);
         setPlaylistRunIndex(null);
+        setActivePlaylistIndex(null);
+        setAutoMapSystemRecords(false);
+        setActiveDestination("");
+        setDestinationResults([]);
         setSelectedEntity(null);
         setFieldMappings([]);
         setLookupMappings([]);
@@ -572,7 +741,7 @@ function App() {
         setMigrationProgress(null);
         setShowPreview(false);
         setError("");
-        setExpandedSteps(new Set([1]));
+        setExpandedSteps(new Set([0, 1]));
         setUserMappings([]);
         setTeamMappings([]);
         setBusinessUnitMappings([]);
@@ -581,140 +750,92 @@ function App() {
     return (
         <div className="app-container">
             <div className="content-fluid">
-                {/* Header with connections */}
-                <div className="header-card">
-                    <div className="header-content">
-                        <h1 className="app-title">Data Migrator</h1>
-                        {connectionUrl && secondaryConnectionUrl && (
-                            <div className="connection-flow">
-                                <div
-                                    className={`connection-badge env-${connectionEnvironment ? connectionEnvironment.toLowerCase() : "default"}`}
-                                    style={connectionEnvironmentColor ? { borderLeftColor: connectionEnvironmentColor } : undefined}
-                                >
-                                    <span className="connection-label">Source</span>
-                                    {connectionName && <span className="connection-name">{connectionName}</span>}
-                                    <span className="connection-url">{new URL(connectionUrl).hostname}</span>
-                                </div>
-                                <div className="flow-arrow">→</div>
-                                <div
-                                    className={`connection-badge env-${secondaryConnectionEnvironment ? secondaryConnectionEnvironment.toLowerCase() : "default"}`}
-                                    style={secondaryConnectionEnvironmentColor ? { borderLeftColor: secondaryConnectionEnvironmentColor } : undefined}
-                                >
-                                    <span className="connection-label">Target</span>
-                                    {secondaryConnectionName && <span className="connection-name">{secondaryConnectionName}</span>}
-                                    <span className="connection-url">{new URL(secondaryConnectionUrl).hostname}</span>
-                                </div>
-                            </div>
-                        )}
+                {error && <div className="error-banner" role="alert"><span>{error}</span><button aria-label="Dismiss message" onClick={() => setError("")}>×</button></div>}
+                <fieldset className={`step-card connection-picker configuration-fields ${expandedSteps.has(0) ? "active" : "collapsed"}`} aria-label="Select environments" disabled={refreshingConnections || isMigrating || loadingFields || loadingPreview || pendingMigration !== null || playlistRunIndex !== null}>
+                    <h2 className="environment-heading">
+                        <button className="step-header environment-step-header" onClick={() => toggleStep(0)} aria-expanded={expandedSteps.has(0)} aria-controls="environment-settings">
+                            <span className="step-number">1</span>
+                            <span className="step-title">Select environments</span>
+                            <span className="step-count" role="status">{linkedConnectionCount} active {linkedConnectionCount === 1 ? "connection" : "connections"} linked</span>
+                            <span className="step-toggle" aria-hidden="true">{expandedSteps.has(0) ? "−" : "+"}</span>
+                        </button>
+                    </h2>
+                    {expandedSteps.has(0) ? <div id="environment-settings" className="step-content environment-settings">
+                    <label htmlFor="source-connection">Source environment</label>
+                    <select id="source-connection" className="modern-input" value={sourceConnectionId} onChange={(event) => {
+                        const id = event.target.value;
+                        setSourceConnectionId(id);
+                        const source = connections.find((connection) => connection?.id === id);
+                        setTargetConnectionIds((current) => current.filter((targetId) => {
+                            const target = connections.find((connection) => connection?.id === targetId);
+                            return target && target.id !== id && target.url.replace(/\/$/, "").toLowerCase() !== source?.url.replace(/\/$/, "").toLowerCase();
+                        }));
+                        setSelectedEntity(null);
+                        setExpandedSteps(new Set([0, 1]));
+                        setEntities([]);
+                        setPreviewRecords([]);
+                        setShowPreview(false);
+                        setMigrationProgress(null);
+                        setAutoMapSystemRecords(false);
+                        setActivePlaylistIndex(null);
+                        setUserMappings([]);
+                        setTeamMappings([]);
+                        setBusinessUnitMappings([]);
+                        setError("");
+                    }}>
+                        <option value="">Select a source</option>
+                        {connections.map((connection, slot) => connection && <option key={slot} value={connection.id}>Connection {slot + 1}: {connectionLabel(connection.id)}</option>)}
+                    </select>
+                    <div className="destination-heading">Destinations <strong>{targetConnectionIds.length} selected</strong></div>
+                    <p className="field-hint">Any connection can be the source. Each destination is processed separately, in selection order.</p>
+                    <div className="destination-grid">
+                        {connections.map((connection, slot) => connection && connection.id !== sourceConnectionId && (
+                            <label key={slot} className={`destination-option ${targetConnectionIds.includes(connection.id) ? "selected" : ""}`}>
+                                <input type="checkbox" checked={targetConnectionIds.includes(connection.id)} disabled={!targetConnectionIds.includes(connection.id) && targetConnectionIds.length >= 5}
+                                    onChange={(event) => {
+                                        setTargetConnectionIds((current) => event.target.checked ? [...current, connection.id] : current.filter((id) => id !== connection.id));
+                                        setPreviewRecords([]);
+                                        setMigrationProgress(null);
+                                        setUserMappings([]);
+                                        setTeamMappings([]);
+                                        setBusinessUnitMappings([]);
+                                    }} />
+                                <span><strong>Connection {slot + 1}: {connection.name}</strong><small>{connection.url}</small></span>
+                            </label>
+                        ))}
                     </div>
-                </div>
+                    <button className="btn-secondary" onClick={refreshConnections}>{refreshingConnections ? "Refreshing connections..." : "Refresh connections"}</button>
+                    </div> : <p className="environment-route">{sourceConnectionId ? connectionLabel(sourceConnectionId) : "No source selected"} → {targetConnectionIds.length} {targetConnectionIds.length === 1 ? "destination" : "destinations"} selected</p>}
+                </fieldset>
 
                 {/* Configuration Save/Load */}
-                <div className="config-toolbar">
-                    {!isPlaylistCreated && (
-                        <button className="btn-secondary" onClick={handleCreatePlaylist} disabled={isMigrating || playlistRunIndex !== null} title="Create an ordered playlist">
-                            ➕ Create Playlist
-                        </button>
-                    )}
+                <fieldset className="config-toolbar configuration-fields" disabled={refreshingConnections || pendingMigration !== null || loadingFields || loadingPreview || isMigrating}>
+                    <span className="toolbar-label">Configuration</span>
+                    <label className="btn-secondary file-action">
+                        Load configuration
+                        <input type="file" accept=".json" onChange={handleLoadConfiguration} disabled={isMigrating || playlistRunIndex !== null} />
+                    </label>
                     <button
                         className="btn-secondary"
                         onClick={handleSaveConfiguration}
                         disabled={isMigrating || (!selectedEntity && (!isPlaylistCreated || playlist.length === 0))}
                         title={isPlaylistCreated ? "Save playlist configuration" : "Save current entity configuration"}
                     >
-                        💾 {isPlaylistCreated ? "Save Playlist" : "Save Configuration"}
+                        {isPlaylistCreated ? "Save playlist" : "Save configuration"}
                     </button>
-                    <button
-                        className="btn-secondary"
-                        onClick={handleAddToPlaylist}
-                        disabled={!isPlaylistCreated || !selectedEntity || isMigrating || loadingFields || playlistRunIndex !== null}
-                        title="Add or update this entity in the playlist"
-                    >
-                        ➕ Add Entity to Playlist
+                    <button className="btn-secondary toolbar-reset" onClick={() => {
+                        if (window.confirm("Reset the current configuration and playlist? Unsaved changes will be lost.")) handleResetConfiguration();
+                    }} disabled={isMigrating || playlistRunIndex !== null} title="Reset all configuration">
+                        Reset
                     </button>
-                    <button
-                        className="btn-primary btn-start-playlist"
-                        onClick={handleRunPlaylist}
-                        disabled={playlist.length === 0 || isMigrating || loadingFields || playlistRunIndex !== null}
-                        title="Start the playlist in order"
-                    >
-                        <Play16Filled aria-hidden="true" />
-                        {isMigrating ? "Migrating..." : `Start Playlist (${playlist.length})`}
-                    </button>
-                    <label className="btn-secondary" style={{ cursor: "pointer" }}>
-                        📂 Load Configuration
-                        <input type="file" accept=".json" onChange={handleLoadConfiguration} disabled={isMigrating || playlistRunIndex !== null} style={{ display: "none" }} />
-                    </label>
-                    <button className="btn-secondary btn-reset" onClick={handleResetConfiguration} disabled={isMigrating} title="Reset all configuration">
-                        🔄 Reset
-                    </button>
-                </div>
-
-                {isPlaylistCreated && (
-                    <section className="playlist-card" aria-label="Migration playlist">
-                        <div className="playlist-header">
-                            <h2>Migration Playlist</h2>
-                            <span>
-                                {playlist.length} {playlist.length === 1 ? "entity" : "entities"} · processed top to bottom
-                            </span>
-                        </div>
-                        {playlist.length === 0 ? (
-                            <p className="playlist-empty">
-                                Playlist created. Select and configure an entity below, then choose <strong>Add Entity to Playlist</strong>.
-                            </p>
-                        ) : (
-                            <ol className="playlist-items">
-                                {playlist.map((item, index) => (
-                                    <li key={item.entityLogicalName} className={item.entityLogicalName === selectedEntity?.logicalName ? "active" : ""}>
-                                        <button
-                                            className="playlist-entity"
-                                            onClick={() => {
-                                                setPlaylistRunIndex(null);
-                                                activateConfiguration(item);
-                                            }}
-                                            disabled={isMigrating || loadingFields}
-                                            title={`Configure ${item.entityDisplayName}`}
-                                        >
-                                            <span className="playlist-position">{index + 1}</span>
-                                            <span>{item.entityDisplayName}</span>
-                                            <small>{item.entityLogicalName}</small>
-                                        </button>
-                                        <div className="playlist-item-actions">
-                                            <button
-                                                onClick={() => handleReorderPlaylist(index, -1)}
-                                                disabled={index === 0 || isMigrating || playlistRunIndex !== null}
-                                                aria-label={`Move ${item.entityDisplayName} up`}
-                                            >
-                                                ↑
-                                            </button>
-                                            <button
-                                                onClick={() => handleReorderPlaylist(index, 1)}
-                                                disabled={index === playlist.length - 1 || isMigrating || playlistRunIndex !== null}
-                                                aria-label={`Move ${item.entityDisplayName} down`}
-                                            >
-                                                ↓
-                                            </button>
-                                            <button
-                                                onClick={() => setPlaylist((current) => current.filter((entry) => entry.entityLogicalName !== item.entityLogicalName))}
-                                                disabled={isMigrating || playlistRunIndex !== null}
-                                                aria-label={`Remove ${item.entityDisplayName}`}
-                                            >
-                                                ×
-                                            </button>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ol>
-                        )}
-                    </section>
-                )}
+                </fieldset>
 
                 {/* Main content with steps */}
-                <div className="steps-container">
-                    {/* Step 1: Entity Selection */}
+                <fieldset className="steps-container configuration-fields" disabled={refreshingConnections || isMigrating || pendingMigration !== null}>
+                    {/* Entity Selection */}
                     <div className={`step-card ${expandedSteps.has(1) ? "active" : "collapsed"}`}>
                         <div className="step-header" onClick={() => toggleStep(1)}>
-                            <div className="step-number">1</div>
+                            <div className="step-number">2</div>
                             <h2 className="step-title">Select Entity</h2>
                             {selectedEntity && <span className="step-count">{selectedEntity.displayName}</span>}
                             <span className="step-toggle">{expandedSteps.has(1) ? "−" : "+"}</span>
@@ -725,7 +846,9 @@ function App() {
                                     entities={entities}
                                     selectedEntity={selectedEntity}
                                     onEntitySelect={(entity) => {
+                                        if (refreshingConnections || isMigrating || loadingFields || pendingMigration) return;
                                         setPlaylistRunIndex(null);
+                                        setActivePlaylistIndex(null);
                                         handleEntitySelect(entity);
                                     }}
                                     loading={loadingEntities}
@@ -748,7 +871,7 @@ function App() {
                             {/* Step 2: Field Selection */}
                             <div className={`step-card ${expandedSteps.has(2) ? "active" : "collapsed"}`}>
                                 <div className="step-header" onClick={() => toggleStep(2)}>
-                                    <div className="step-number">2</div>
+                                    <div className="step-number">3</div>
                                     <h2 className="step-title">Select Fields</h2>
                                     <span className="step-count">{fieldMappings.filter((m) => m.isEnabled).length} selected</span>
                                     <span className="step-toggle">{expandedSteps.has(2) ? "−" : "+"}</span>
@@ -763,7 +886,7 @@ function App() {
                             {/* Step 3: Filter Configuration */}
                             <div className={`step-card ${expandedSteps.has(3) ? "active" : "collapsed"}`}>
                                 <div className="step-header" onClick={() => toggleStep(3)}>
-                                    <div className="step-number">3</div>
+                                    <div className="step-number">4</div>
                                     <h2 className="step-title">Filter Data</h2>
                                     <span className="step-badge">Optional</span>
                                     <span className="step-toggle">{expandedSteps.has(3) ? "−" : "+"}</span>
@@ -829,7 +952,7 @@ function App() {
                             {/* Step 4: Settings */}
                             <div className={`step-card ${expandedSteps.has(4) ? "active" : "collapsed"}`}>
                                 <div className="step-header" onClick={() => toggleStep(4)}>
-                                    <div className="step-number">4</div>
+                                    <div className="step-number">5</div>
                                     <h2 className="step-title">Settings</h2>
                                     <span className="step-toggle">{expandedSteps.has(4) ? "−" : "+"}</span>
                                 </div>
@@ -860,7 +983,7 @@ function App() {
                             {lookupMappings.length > 0 && (
                                 <div className={`step-card ${expandedSteps.has(5) ? "active" : "collapsed"}`}>
                                     <div className="step-header" onClick={() => toggleStep(5)}>
-                                        <div className="step-number">5</div>
+                                        <div className="step-number">6</div>
                                         <h2 className="step-title">Lookup Mappings</h2>
                                         <span className="step-badge">Optional</span>
                                         <span className="step-toggle">{expandedSteps.has(5) ? "−" : "+"}</span>
@@ -872,41 +995,88 @@ function App() {
                                                 onLookupMappingsChange={setLookupMappings}
                                                 onAutoMapping={handleAutoMapping}
                                             />
+                                            <label className="auto-map-option"><input type="checkbox" checked={autoMapSystemRecords} onChange={(event) => setAutoMapSystemRecords(event.target.checked)} />Auto-map users, teams, and business units separately for every destination</label>
+                                            <p className="field-hint">Mapping preview shows the first selected destination. Manual lookup IDs apply to every selected destination; use separate playlist entries for destination-specific IDs.</p>
                                         </div>
                                     )}
                                 </div>
                             )}
 
-                            {/* Action Button */}
-                            <div className="action-bar">
-                                <button className="btn-preview" onClick={handlePreview} disabled={loadingPreview || isMigrating}>
-                                    {loadingPreview ? "Loading..." : "Preview Data"}
-                                </button>
-                            </div>
-
-                            {/* Error Message - appears below preview button */}
-                            {error && !isMigrating && !migrationProgress && (
-                                <div className="error-message-inline">
-                                    <span>⚠️ {error}</span>
-                                    <button onClick={() => setError("")}>×</button>
-                                </div>
-                            )}
                         </>
                     )}
-                </div>
+                </fieldset>
 
-                {/* Migration Progress - Always show section when entity is selected */}
-                {selectedEntity && (
+                <fieldset className="playlist-card configuration-fields" aria-label="Review and run" disabled={refreshingConnections || pendingMigration !== null || loadingFields || loadingPreview || isMigrating}>
+                    <div className="playlist-header">
+                        <div>
+                            <h2>Review and run</h2>
+                            <p className="field-hint">Preview this combination now, or queue combinations in a reusable playlist.</p>
+                        </div>
+                    </div>
+                    <div className="action-bar">
+                        <button className="btn-primary" onClick={handlePreview} disabled={!selectedEntity || loadingEntities || loadingFields || loadingPreview}>
+                            {loadingPreview ? "Loading..." : "Preview and review migration"}
+                        </button>
+                        {!isPlaylistCreated ? <button className="btn-secondary" onClick={handleCreatePlaylist}>Create playlist</button> :
+                            <div className="entry-actions">
+                                <button className="btn-secondary" onClick={handleAddToPlaylist} disabled={!selectedEntity || playlistRunIndex !== null}>Add combination to playlist</button>
+                                {activePlaylistIndex !== null && <button className="btn-secondary" disabled={!selectedEntity || playlistRunIndex !== null} onClick={() => {
+                                    const config = getCurrentConfiguration();
+                                    if (!config) return;
+                                    try {
+                                        validateConnections(config);
+                                        setPlaylist((current) => current.map((item, index) => index === activePlaylistIndex ? config : item));
+                                        setError("");
+                                    } catch (error) {
+                                        setError(error instanceof Error ? error.message : String(error));
+                                    }
+                                }}>Update entry {activePlaylistIndex + 1}</button>}
+                            </div>}
+                    </div>
+                    {isPlaylistCreated && <section aria-label="Migration playlist">
+                        <div className="playlist-header">
+                            <h3>Migration playlist</h3>
+                            <span role="status">{playlist.length} {playlist.length === 1 ? "combination" : "combinations"} · processed top to bottom</span>
+                        </div>
+                        {playlist.length === 0 ? <p className="playlist-empty">Use <strong>Add combination to playlist</strong> above to queue the current settings. Each entry can use different environments, including repeated entities.</p> :
+                            <ol className="playlist-items">
+                                {playlist.map((item, index) => <li key={index} className={`${index === activePlaylistIndex ? "active" : ""} ${unavailablePlaylistConnections.some((issue) => issue.index === index) ? "playlist-item-warning" : ""}`}>
+                                    <button className="playlist-entity" onClick={() => activateConfiguration(item, index)} disabled={playlistRunIndex !== null} title={`Configure ${item.entityDisplayName}`}>
+                                        <span className="playlist-position">{index + 1}</span>
+                                        <span>{item.entityDisplayName}</span>
+                                        <small>{connectionLabel(item.sourceConnectionId || "")} → {(item.targetConnectionIds || []).map(connectionLabel).join(", ")} · {item.operations.join(" + ")}</small>
+                                    </button>
+                                    <div className="playlist-item-actions">
+                                        <button onClick={() => { handleReorderPlaylist(index, -1); setActivePlaylistIndex(null); }} disabled={index === 0 || playlistRunIndex !== null} aria-label={`Move ${item.entityDisplayName} up`}>↑</button>
+                                        <button onClick={() => { handleReorderPlaylist(index, 1); setActivePlaylistIndex(null); }} disabled={index === playlist.length - 1 || playlistRunIndex !== null} aria-label={`Move ${item.entityDisplayName} down`}>↓</button>
+                                        <button onClick={() => { setPlaylist((current) => current.filter((_, entryIndex) => entryIndex !== index)); setActivePlaylistIndex(null); }} disabled={playlistRunIndex !== null} aria-label={`Remove ${item.entityDisplayName}`}>×</button>
+                                    </div>
+                                </li>)}
+                            </ol>}
+                        <div className="playlist-footer">
+                            <p className="field-hint">Entries run in order. Preview and confirmation are required for each entry.</p>
+                            {unavailablePlaylistConnections.length > 0 && <div id="playlist-connection-warning" className="playlist-warning" role="alert">
+                                <strong>Playlist cannot start: saved connections are no longer linked.</strong>
+                                <ul>{unavailablePlaylistConnections.map((issue) => <li key={issue.index}>Entry {issue.index + 1} ({issue.entityDisplayName}): {issue.missingIds.length} unavailable {issue.missingIds.length === 1 ? "connection" : "connections"}.</li>)}</ul>
+                                <span>Relink the connections in PPTB, or remove and recreate the affected entries with available connections.</span>
+                            </div>}
+                            {playlistRunIndex !== null ? <button className="btn-secondary" onClick={() => setPlaylistRunIndex(null)}>Stop playlist</button> :
+                                <button className="btn-primary btn-start-playlist" onClick={handleRunPlaylist} disabled={playlist.length === 0 || unavailablePlaylistConnections.length > 0} aria-describedby={unavailablePlaylistConnections.length > 0 ? "playlist-connection-warning" : undefined}>
+                                    <Play16Filled aria-hidden="true" />Start playlist ({playlist.length})
+                                </button>}
+                        </div>
+                    </section>}
+                </fieldset>
+
+                {(selectedEntity || migrationProgress || destinationResults.length > 0) && (
                     <div className="progress-card">
+                        {activeDestination && <p role="status"><strong>{isMigrating ? "Migrating to: " : "Last run: "}</strong>{activeDestination}</p>}
+                        {destinationResults.length > 0 && <ul className="destination-results" aria-label="Destination results">{destinationResults.map(({ id, progress }) => (
+                            <li key={id}><strong>{connectionLabel(id)}</strong><span>{progress.isInProgress ? "In progress" : progress.processed < progress.total ? "Stopped" : progress.failed ? "Finished with errors" : "Completed"}: {progress.successful} successful, {progress.failed} failed, {progress.skipped} skipped</span></li>
+                        ))}</ul>}
                         {playlistRunIndex !== null && (
                             <div className="playlist-progress">
                                 Playlist entity {playlistRunIndex + 1} of {playlist.length}: preview and confirm the migration to continue.
-                            </div>
-                        )}
-                        {error && (isMigrating || migrationProgress) && (
-                            <div className="error-message-progress">
-                                <span>⚠️ {error}</span>
-                                <button onClick={() => setError("")}>×</button>
                             </div>
                         )}
                         {migrationProgress ? (
@@ -921,6 +1091,26 @@ function App() {
                 )}
 
                 {/* Preview Modal */}
+                {pendingMigration && selectedEntity && (
+                        <dialog className="modal confirmation-modal" aria-labelledby="migration-confirmation-title" ref={(dialog) => {
+                            if (dialog && !dialog.open) dialog.showModal();
+                        }} onCancel={(event) => { event.preventDefault(); setPendingMigration(null); setShowPreview(true); }}>
+                            <div className="modal-header"><h3 id="migration-confirmation-title">Confirm migration</h3></div>
+                            <div className="confirmation-content">
+                                <p><strong>{pendingMigration.length} selected records</strong> from <strong>{selectedEntity.displayName}</strong> will be processed in each destination.</p>
+                                <p><strong>Source:</strong> {connectionLabel(sourceConnectionId)}</p>
+                                <p><strong>Operations:</strong> {operations.join(" + ").toUpperCase()}</p>
+                                <h4>Destinations ({targetConnectionIds.length})</h4>
+                                <ol>{targetConnectionIds.map((id) => <li key={id}>{connectionLabel(id)}</li>)}</ol>
+                                <p>{autoMapSystemRecords ? "System mappings will be rebuilt separately for each destination." : "System auto-mapping is disabled."}</p>
+                                <p className="preview-warning-text">{operations.includes("delete") ? "WARNING: Selected records will be deleted from every destination. " : ""}Changes cannot be automatically undone. A failure stops remaining destinations and playlist entries; completed changes are not rolled back.</p>
+                            </div>
+                            <div className="modal-footer">
+                                <button className="btn-secondary" autoFocus onClick={() => { setPendingMigration(null); setShowPreview(true); }}>Back to preview</button>
+                                <button className="btn-primary" onClick={executeMigration}>Confirm and start migration</button>
+                            </div>
+                        </dialog>
+                )}
                 {showPreview && selectedEntity && (
                     <PreviewData
                         previewRecords={previewRecords}
