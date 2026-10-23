@@ -88,6 +88,12 @@ Preview production build:
 npm run preview
 ```
 
+### Publishing
+
+The [Publish Data Migrator workflow](../../.github/workflows/publish-data-migrator.yml) installs dependencies, builds, tests, and publishes `@power-maverick/tool-data-migrator` publicly to npm when a pull request is merged into `main`. Update the package version before merging a release; npm does not allow publishing the same version twice.
+
+Configure an npm trusted publisher for this package using the `Power-Maverick/PPTB-Tools` repository and the `publish-data-migrator.yml` workflow filename. The workflow uses OIDC rather than a stored npm token.
+
 ## Usage in ToolBox
 
 1. Build the tool:
