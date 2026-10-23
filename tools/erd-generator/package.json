@@ -1,70 +1,73 @@
 {
-  "name": "@power-maverick/tool-erd-generator",
-  "displayName": "ERD Generator",
-  "version": "2.0.5",
-  "description": "Graph-first Dataverse ERD editor with in-memory schema diffs, session sharing, and multi-format export",
-  "icon": "icons/erdGenerator.svg",
-  "contributors": [
-    {
-      "name": "Power Maverick",
-      "url": "https://github.com/Power-Maverick"
-    }
-  ],
-  "license": "GPL-2.0",
-  "configurations": {
-    "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/erd-generator",
-    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/erd-generator/README.md"
-  },
-  "cspExceptions": {
-    "connect-src": [
-      "https://www.plantuml.com"
+    "name": "@power-maverick/tool-erd-generator",
+    "displayName": "ERD Generator",
+    "version": "2.0.6",
+    "description": "Graph-first Dataverse ERD editor with in-memory schema diffs, session sharing, and multi-format export",
+    "icon": "icons/erdGenerator.svg",
+    "contributors": [
+        {
+            "name": "Power Maverick",
+            "url": "https://github.com/Power-Maverick"
+        }
     ],
-    "frame-src": [
-      "https://viewer.diagrams.net/"
-    ]
-  },
-  "type": "module",
-  "scripts": {
-    "build": "npm run typecheck && vite build",
-    "dev": "vite",
-    "preview": "vite preview",
-    "typecheck": "tsc -b",
-    "finalize-package": "npm shrinkwrap",
-    "version-stable": "npm version patch --no-git-tag-version",
-    "publish-package": "npm run build && npm publish --access public"
-  },
-  "files": [
-    "dist",
-    "npm-shrinkwrap.json"
-  ],
-  "keywords": [
-    "dataverse",
-    "erd",
-    "entity-relationship-diagram",
-    "power-platform",
-    "pptb",
-    "toolbox"
-  ],
-  "author": "Power Maverick",
-  "dependencies": {
-    "@types/plantuml-encoder": "^1.4.2",
-    "@xyflow/react": "^12.11.2",
-    "axios": "^1.7.9",
-    "html-to-image": "^1.11.13",
-    "mermaid": "^11.4.1",
-    "plantuml-encoder": "^1.4.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
-    "@pptb/types": "^1.0.8",
-    "@types/react": "^18.3.1",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.9.3",
-    "vite": "^6.0.7"
-  },
-  "overrides": {
-    "katex": "^0.18.2"
-  }
+    "license": "GPL-2.0",
+    "configurations": {
+        "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/erd-generator",
+        "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/erd-generator/README.md"
+    },
+    "cspExceptions": {
+        "connect-src": [
+            "https://www.plantuml.com"
+        ],
+        "frame-src": [
+            "https://viewer.diagrams.net/"
+        ]
+    },
+    "type": "module",
+    "scripts": {
+        "security-check": "npm audit",
+        "build": "npm run typecheck && vite build",
+        "dev": "vite",
+        "preview": "vite preview",
+        "typecheck": "tsc -b",
+        "finalize-package": "npm shrinkwrap",
+        "version-stable": "npm version patch --no-git-tag-version",
+        "publish-package": "npm run build && npm publish --access public"
+    },
+    "files": [
+        "dist",
+        "npm-shrinkwrap.json"
+    ],
+    "keywords": [
+        "dataverse",
+        "erd",
+        "entity-relationship-diagram",
+        "power-platform",
+        "pptb",
+        "toolbox"
+    ],
+    "author": "Power Maverick",
+    "dependencies": {
+        "@types/plantuml-encoder": "^1.4.2",
+        "@xyflow/react": "^12.11.2",
+        "axios": "^1.7.9",
+        "html-to-image": "^1.11.13",
+        "mermaid": "^11.4.1",
+        "plantuml-encoder": "^1.4.0",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1"
+    },
+    "devDependencies": {
+        "@pptb/types": "^1.0.8",
+        "@types/react": "^18.3.1",
+        "@types/react-dom": "^18.3.0",
+        "@vitejs/plugin-react": "^4.3.4",
+        "typescript": "^5.9.3",
+        "vite": "^6.4.5"
+    },
+    "overrides": {
+        "dompurify": "^3.4.17",
+        "follow-redirects": "^1.16.1",
+        "katex": "^0.18.2"
+    }
 }

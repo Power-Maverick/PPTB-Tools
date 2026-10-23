@@ -1,58 +1,59 @@
 {
-  "name": "@power-maverick/tool-view-layout-copier",
-  "displayName": "View Layout Copier",
-  "version": "2.0.10",
-  "description": "Copy column layout, sort order and components configuration from one view to multiple views of the same table in a single operation",
-  "icon": "icons/layoutReplicator.svg",
-  "contributors": [
-    {
-      "name": "Power Maverick",
-      "url": "https://github.com/Power-Maverick"
+    "name": "@power-maverick/tool-view-layout-copier",
+    "displayName": "View Layout Copier",
+    "version": "2.0.12",
+    "description": "Copy column layout, sort order and components configuration from one view to multiple views of the same table in a single operation",
+    "icon": "icons/layoutReplicator.svg",
+    "contributors": [
+        {
+            "name": "Power Maverick",
+            "url": "https://github.com/Power-Maverick"
+        },
+        {
+            "name": "Scott Sewell",
+            "url": "https://github.com/mscottsewell"
+        }
+    ],
+    "license": "GPL-2.0",
+    "configurations": {
+        "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/view-layout-copier",
+        "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/view-layout-copier/README.md"
     },
-    {
-      "name": "Scott Sewell",
-      "url": "https://github.com/mscottsewell"
+    "type": "module",
+    "scripts": {
+        "security-check": "npm audit",
+        "prebuild": "npm run version-stable",
+        "build": "vite build",
+        "dev": "vite",
+        "preview": "vite preview",
+        "finalize-package": "npm shrinkwrap",
+        "version-stable": "npm version patch --no-git-tag-version",
+        "publish-package": "npm run build && npm publish --access public"
+    },
+    "files": [
+        "dist",
+        "npm-shrinkwrap.json"
+    ],
+    "keywords": [
+        "dataverse",
+        "view",
+        "layout",
+        "copier",
+        "power-platform",
+        "pptb",
+        "toolbox"
+    ],
+    "author": "Power Maverick",
+    "dependencies": {
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1"
+    },
+    "devDependencies": {
+        "@pptb/types": "^1.0.13",
+        "@types/react": "^18.3.1",
+        "@types/react-dom": "^18.3.0",
+        "@vitejs/plugin-react": "^4.3.4",
+        "typescript": "^5.9.3",
+        "vite": "^6.4.5"
     }
-  ],
-  "license": "GPL-2.0",
-  "configurations": {
-    "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/view-layout-copier",
-    "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/view-layout-copier/README.md"
-  },
-  "type": "module",
-  "scripts": {
-    "prebuild": "npm run version-stable",
-    "build": "vite build",
-    "dev": "vite",
-    "preview": "vite preview",
-    "finalize-package": "npm shrinkwrap",
-    "version-stable": "npm version patch --no-git-tag-version",
-    "publish-package": "npm run build && npm publish --access public"
-  },
-  "files": [
-    "dist",
-    "npm-shrinkwrap.json"
-  ],
-  "keywords": [
-    "dataverse",
-    "view",
-    "layout",
-    "copier",
-    "power-platform",
-    "pptb",
-    "toolbox"
-  ],
-  "author": "Power Maverick",
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
-    "@pptb/types": "^1.0.13",
-    "@types/react": "^18.3.1",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.9.3",
-    "vite": "^6.0.7"
-  }
 }

@@ -1,12 +1,12 @@
 {
   "name": "@power-maverick/tool-erd-generator",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "@power-maverick/tool-erd-generator",
-      "version": "2.0.5",
+      "version": "2.0.6",
       "license": "GPL-2.0",
       "dependencies": {
         "@types/plantuml-encoder": "^1.4.2",
@@ -24,7 +24,7 @@
         "@types/react-dom": "^18.3.0",
         "@vitejs/plugin-react": "^4.3.4",
         "typescript": "^5.9.3",
-        "vite": "^6.0.7"
+        "vite": "^6.4.5"
       }
     },
     "node_modules/@antfu/install-pkg": {
@@ -2446,9 +2446,9 @@
       }
     },
     "node_modules/dompurify": {
-      "version": "3.4.16",
-      "resolved": "https://registry.npmjs.org/dompurify/-/dompurify-3.4.16.tgz",
-      "integrity": "sha512-sqo+pNp3qRhCIpbgRi1y8Tgk27Bo2Ry7w0dC1NBeNTdZChWjz9Xb/KOoZbRP/R6pQZ80Qw8YhXw13hWWBbMRnQ==",
+      "version": "3.4.17",
+      "resolved": "https://registry.npmjs.org/dompurify/-/dompurify-3.4.17.tgz",
+      "integrity": "sha512-B/pSlYVHQ58kqISD/yDjuJ1yfzI34m1gF4lAod2bwSRhiN4K5Cl3H8Af7hqB2PmTL911tdEudnnXn5FnhRoz0w==",
       "license": "(MPL-2.0 OR Apache-2.0)",
       "optionalDependencies": {
         "@types/trusted-types": "^2.0.7"
@@ -2618,9 +2618,9 @@
       }
     },
     "node_modules/follow-redirects": {
-      "version": "1.16.0",
-      "resolved": "https://registry.npmjs.org/follow-redirects/-/follow-redirects-1.16.0.tgz",
-      "integrity": "sha512-y5rN/uOsadFT/JfYwhxRS5R7Qce+g3zG97+JrtFZlC9klX/W5hD7iiLzScI4nZqUS7DNUdhPgw4xI8W2LuXlUw==",
+      "version": "1.16.1",
+      "resolved": "https://registry.npmjs.org/follow-redirects/-/follow-redirects-1.16.1.tgz",
+      "integrity": "sha512-FNvFGzoMLWmE6Yj9spb/zjd7yiNCHiAW9/Tg9CXrQ8wuu32HtlJOwWO11OJafl5FfY3DxTdQ0vj42zU1kvv5jg==",
       "funding": [
         {
           "type": "individual",
@@ -3477,9 +3477,9 @@
       }
     },
     "node_modules/vite": {
-      "version": "6.4.3",
-      "resolved": "https://registry.npmjs.org/vite/-/vite-6.4.3.tgz",
-      "integrity": "sha512-NTKlcQjlAK7MlQoyb6LgaqHc8sso/pVyUJYWMws3jg21uTJw/LddqIFPcPqP6PzpgbIcZyKI85sFE4HBrQDA8A==",
+      "version": "6.4.5",
+      "resolved": "https://registry.npmjs.org/vite/-/vite-6.4.5.tgz",
+      "integrity": "sha512-4enwjFfi4IwtEh0w+jPzpLVOFQiPHmmzPxcHXQOyEur47o6u0jE573DmGpjA+7irXoMLYRZD5ZaFUEneS3abPg==",
       "dev": true,
       "license": "MIT",
       "dependencies": {
