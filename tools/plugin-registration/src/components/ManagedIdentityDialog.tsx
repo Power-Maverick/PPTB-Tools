@@ -8,6 +8,22 @@ const client = new DataverseClient();
 
 const DOCS_URL = "https://learn.microsoft.com/power-platform/admin/set-up-managed-identity";
 
+/**
+ * Tools run in a sandboxed iframe, so a plain link doesn't open the browser. Newer ToolBox versions
+ * have utils.openInConnectionBrowser; on older ones, copy the link to the clipboard instead.
+ */
+async function openExternal(url: string): Promise<void> {
+    const utils = window.toolboxAPI?.utils as (typeof window.toolboxAPI.utils & { openInConnectionBrowser?: (url: string) => Promise<void> }) | undefined;
+    if (utils?.openInConnectionBrowser) {
+        await utils.openInConnectionBrowser(url);
+        return;
+    }
+    if (utils) {
+        await utils.copyToClipboard(url);
+        await utils.showNotification({ title: "Link copied", body: "Paste it into your browser to open it.", type: "info" });
+    }
+}
+
 interface ManagedIdentityDialogProps {
     isOpen: boolean;
     /** Shown at the top, e.g. "Assembly: Contoso.Plugins". */
@@ -180,7 +196,13 @@ export function ManagedIdentityDialog({
                         <div className="form-hint">
                             The assembly or package must be signed with a certificate, and the app registration or managed identity in
                             Entra ID needs a matching federated credential.{" "}
-                            <a href={DOCS_URL} target="_blank" rel="noreferrer">
+                            <a
+                                href={DOCS_URL}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    openExternal(DOCS_URL).catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+                                }}
+                            >
                                 How to set up managed identity (Microsoft Learn)
                             </a>
                         </div>
