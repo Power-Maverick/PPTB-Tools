@@ -27,12 +27,18 @@ interface PackageDetailsProps {
         ismanaged?: boolean;
         createdon?: string;
         modifiedon?: string;
+        _managedidentityid_value?: string;
     };
+    /** Show the managed identity section and button (the environment has the managedidentity table). */
+    managedIdentitySupported?: boolean;
+    /** Display name of the linked identity, or its id when the name isn't known. */
+    managedIdentityName?: string;
+    onManageIdentity?: () => void;
     onUpdate?: () => void;
     onDelete?: () => void;
 }
 
-export function PackageDetails({ pkg, onUpdate, onDelete }: PackageDetailsProps) {
+export function PackageDetails({ pkg, managedIdentitySupported, managedIdentityName, onManageIdentity, onUpdate, onDelete }: PackageDetailsProps) {
     const isManaged = !!pkg.ismanaged;
 
     return (
@@ -76,6 +82,20 @@ export function PackageDetails({ pkg, onUpdate, onDelete }: PackageDetailsProps)
                     </div >
                 )}
             </PropertySection>
+            {managedIdentitySupported && (
+                <PropertySection title="Managed Identity" defaultExpanded={true}>
+                    <div className="prop-row">
+                        <span className="prop-label">Managed Identity</span>
+                        <span className="prop-value">{managedIdentityName ?? "(none)"}</span>
+                    </div>
+                    {pkg._managedidentityid_value && (
+                        <div className="prop-row">
+                            <span className="prop-label">ManagedIdentityId</span>
+                            <span className="prop-value">{pkg._managedidentityid_value}</span>
+                        </div>
+                    )}
+                </PropertySection>
+            )}
             {/* Removed the assembly section to only show package-specific details when in "Packages View". */}
             {/* If you need assemblies to be viewable optionally, restore the following block: */}
             {/*
@@ -97,6 +117,11 @@ export function PackageDetails({ pkg, onUpdate, onDelete }: PackageDetailsProps)
                     <div className="field-hint-desc">{FIELD_HINTS["Name"]}</div>
                 </div>
                 <div className="details-footer-actions">
+                    {managedIdentitySupported && onManageIdentity && (
+                        <button className="btn-secondary" onClick={onManageIdentity}>
+                            Managed Identity…
+                        </button>
+                    )}
                     <button
                         className="btn-secondary"
                         onClick={onUpdate}
