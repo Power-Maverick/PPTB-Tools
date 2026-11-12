@@ -14,7 +14,6 @@ Register and manage Microsoft Dataverse plugin assemblies, custom workflow activ
         - [Plugin Assemblies](#plugin-assemblies)
         - [SDK Message Processing Steps](#sdk-message-processing-steps)
         - [Service Endpoints](#service-endpoints)
-        - [Managed Identities](#managed-identities)
     - [Technical Stack](#technical-stack)
     - [Troubleshooting](#troubleshooting)
     - [Contributing](#contributing)
@@ -40,7 +39,6 @@ Register and manage Microsoft Dataverse plugin assemblies, custom workflow activ
 - ✅ Plugins/Endpoints filtering and toggling
 - ✅ Dark/light theme support
 - ✅ Unsecure and Secure Config management
-- ✅ Managed identities for plug-in assemblies and packages: link, create, edit and delete identities
 
 ## Installation
 
@@ -123,18 +121,6 @@ Service Endpoints allow Dataverse to call external systems when events occur. Su
 - **Service Bus**: Azure Service Bus (One Way, Queue, Topic)
 - **Event Hub**: Azure Event Hub
 - **Event Grid**: Azure Event Grid
-
-### Managed Identities
-
-A managed identity lets a plug-in get tokens for Azure resources (Key Vault, Storage, your own APIs) through `IManagedIdentityService`, with no secrets to store. Select an assembly or package and choose **Managed Identity** to link an identity, or to create, edit or delete one.
-
-- The option only appears when the environment has the `managedidentity` table.
-- An assembly that is part of a plug-in package uses the package's identity, so the identity is set on the package.
-- The assembly or package must be **signed with a certificate**; a strong name alone isn't enough. Dataverse refuses the link otherwise.
-- The app registration or user-assigned managed identity in Entra ID needs a **federated credential** for each environment, because the credential subject contains the environment ID. Use a separate app registration per environment.
-- New identities use **version 2**, which Microsoft recommends. Editing an identity can upgrade its version but not downgrade it.
-
-See [Set up managed identity for Dataverse plug-ins](https://learn.microsoft.com/power-platform/admin/set-up-managed-identity).
 
 ## Technical Stack
 
@@ -230,7 +216,6 @@ This project is licensed under the GPL-2.0 License - see the [LICENSE](../../LIC
 | `sdkmessage`                           | SDK messages (Create, Update, Delete, etc.)              |
 | `sdkmessagefilter`                     | Entity-specific filters for messages                     |
 | `serviceendpoint`                      | Stores webhook and Service Bus endpoint configuration    |
-| `managedidentity`                      | Identity that plug-in assemblies and packages use for Azure tokens |
 | `sdkmessageprocessingstepsecureconfig` | Stores secure configuration strings for steps            |
 
 ## Reference

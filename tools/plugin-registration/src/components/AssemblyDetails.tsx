@@ -4,13 +4,6 @@ import { PropertySection } from "./PropertySection";
 
 interface AssemblyDetailsProps {
     assembly: PluginAssembly;
-    /** Show the managed identity section and button (the environment has the managedidentity table). */
-    managedIdentitySupported?: boolean;
-    /** Display name of the identity in effect, or its id when the name isn't known. */
-    managedIdentityName?: string;
-    /** Set when the assembly is part of a plug-in package: the package's name, whose identity it uses. */
-    identityFromPackage?: string;
-    onManageIdentity?: () => void;
     onSave: (description: string) => Promise<void>;
     onUpdate: () => void;
     onUnregister: () => void;
@@ -28,19 +21,9 @@ const FIELD_HINTS: Record<string, string> = {
     PublicKeyToken: "Public key token of the assembly",
     SourceType: "Location and method to load the assembly",
     Version: "Version number of the assembly",
-    ManagedIdentity: "Managed identity the plug-ins use to get tokens for Azure resources (IManagedIdentityService)",
 };
 
-export function AssemblyDetails({
-    assembly,
-    managedIdentitySupported,
-    managedIdentityName,
-    identityFromPackage,
-    onManageIdentity,
-    onSave,
-    onUpdate,
-    onUnregister,
-}: AssemblyDetailsProps) {
+export function AssemblyDetails({ assembly, onSave, onUpdate, onUnregister }: AssemblyDetailsProps) {
     const [description, setDescription] = useState(assembly.description);
     const [saving, setSaving] = useState(false);
     const [focusedField, setFocusedField] = useState<string>("Name");
@@ -114,26 +97,12 @@ export function AssemblyDetails({
                     <span className="prop-value" onClick={() => setFocusedField("Version")}>{assembly.version}</span>
                 </div>
             </PropertySection>
-            {managedIdentitySupported && (
-                <PropertySection title="Managed Identity" defaultExpanded={true}>
-                    <div className="prop-row">
-                        <span className="prop-label" onClick={() => setFocusedField("ManagedIdentity")}>Managed Identity</span>
-                        <span className="prop-value" onClick={() => setFocusedField("ManagedIdentity")}>
-                            {managedIdentityName ?? "(none)"}
-                            {identityFromPackage && ` (from package ${identityFromPackage})`}
-                        </span>
-                    </div>
-                </PropertySection>
-            )}
             <div className="details-footer">
                 <div className="field-hint">
                     <div className="field-hint-label">{focusedField}</div>
                     <div className="field-hint-desc">{FIELD_HINTS[focusedField] ?? ""}</div>
                 </div>
                 <div className="details-footer-actions">
-                    {managedIdentitySupported && onManageIdentity && (
-                        <button className="btn-secondary" onClick={onManageIdentity}>Managed Identity…</button>
-                    )}
                     <button className="btn-secondary" onClick={onUpdate}>Update Assembly</button>
                     <button className="btn-danger" onClick={onUnregister}>Unregister</button>
                     <button className="btn-primary" onClick={() => void handleSave()} disabled={saving}>

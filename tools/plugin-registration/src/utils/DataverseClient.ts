@@ -1,5 +1,4 @@
-import type { ManagedIdentity, ManagedIdentityInput, PluginAssembly, PluginPackage, PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, SolutionOption, StepImage, ServiceEndpoint } from "../models/interfaces";
-import { MI_CREDENTIAL_SOURCE_MANAGED } from "../models/interfaces";
+import type { PluginAssembly, PluginPackage, PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, StepImage, ServiceEndpoint } from "../models/interfaces";
 
 const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -16,38 +15,11 @@ function buildPackageBind(packageId: string): string {
   return `/pluginpackages(${packageId})`;
 }
 
-/** Build the @odata.bind value for the managedidentities collection. Validates the GUID first. */
-function buildManagedIdentityBind(identityId: string): string {
-  if (!isGuid(identityId)) {
-    throw new Error(`Invalid managed identity ID: "${identityId}"`);
-  }
-  return `/managedidentities(${identityId})`;
-}
-
-const MANAGED_IDENTITY_SELECT = "managedidentityid,name,applicationid,tenantid,subjectscope,version,credentialsource";
-
-function toManagedIdentity(m: Record<string, unknown>): ManagedIdentity {
-  return {
-    managedidentityid: m["managedidentityid"] as string,
-    name: (m["name"] as string) ?? "",
-    applicationid: (m["applicationid"] as string) ?? "",
-    tenantid: (m["tenantid"] as string) ?? "",
-    subjectscope: (m["subjectscope"] as number) ?? 1,
-    version: m["version"] != null ? (m["version"] as number) : null,
-    credentialsource: m["credentialsource"] != null ? (m["credentialsource"] as number) : undefined,
-  };
-}
-
 export class DataverseClient {
-  /**
-   * @param withManagedIdentity Also read the managed identity lookup. Only pass true when
-   * {@link isManagedIdentitySupported} said so, or the query fails on the missing column.
-   */
-  async fetchAssemblies(withManagedIdentity = false): Promise<PluginAssembly[]> {
+  async fetchAssemblies(): Promise<PluginAssembly[]> {
     try {
-      const identityColumn = withManagedIdentity ? ",_managedidentityid_value" : "";
       const response = await window.dataverseAPI.queryData(
-        `pluginassemblies?$select=pluginassemblyid,name,version,culture,publickeytoken,sourcetype,isolationmode,description,_packageid_value${identityColumn},createdon,modifiedon&$orderby=name`,
+        "pluginassemblies?$select=pluginassemblyid,name,version,culture,publickeytoken,sourcetype,isolationmode,description,_packageid_value,createdon,modifiedon&$orderby=name",
         "primary",
       );
       return (response.value as Record<string, unknown>[]).map((a) => ({
@@ -60,7 +32,6 @@ export class DataverseClient {
         isolationmode: a["isolationmode"] as number,
         description: (a["description"] as string) ?? "",
         _packageid_value: (a["_packageid_value"] as string) ?? undefined,
-        _managedidentityid_value: (a["_managedidentityid_value"] as string) ?? undefined,
         createdon: a["createdon"] as string | undefined,
         modifiedon: a["modifiedon"] as string | undefined,
       }));
@@ -314,12 +285,10 @@ export class DataverseClient {
 
   // ── Plugin Package methods ──
 
-  /** @param withManagedIdentity See {@link fetchAssemblies}. */
-  async fetchPackages(withManagedIdentity = false): Promise<PluginPackage[]> {
+  async fetchPackages(): Promise<PluginPackage[]> {
     try {
-      const identityColumn = withManagedIdentity ? ",_managedidentityid_value" : "";
       const response = await window.dataverseAPI.queryData(
-        `pluginpackages?$select=pluginpackageid,name,uniquename,version,ismanaged${identityColumn},createdon,modifiedon&$orderby=name`,
+        "pluginpackages?$select=pluginpackageid,name,uniquename,version,ismanaged,createdon,modifiedon&$orderby=name",
         "primary",
       );
       return (response.value as Record<string, unknown>[]).map((p) => ({
@@ -328,7 +297,6 @@ export class DataverseClient {
         uniquename: (p["uniquename"] as string) ?? "",
         version: (p["version"] as string) ?? "",
         ismanaged: (p["ismanaged"] as boolean) ?? false,
-        _managedidentityid_value: (p["_managedidentityid_value"] as string) ?? undefined,
         createdon: p["createdon"] as string | undefined,
         modifiedon: p["modifiedon"] as string | undefined,
       }));
@@ -370,179 +338,6 @@ export class DataverseClient {
       const msg = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to delete package: ${msg}`);
     }
-  }
-
-  // ── Managed identity methods ──
-
-  /**
-   * True when plug-in assemblies and packages can be linked to a managed identity, i.e. the
-   * environment has the managedidentity table. Any error counts as "not supported".
-   */
-  async isManagedIdentitySupported(): Promise<boolean> {
-    try {
-      await window.dataverseAPI.getEntityMetadata("managedidentity", true, ["LogicalName"]);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /** The identities plug-ins can use (credential source "managed"), ordered by name. */
-  async fetchManagedIdentities(): Promise<ManagedIdentity[]> {
-    try {
-      const response = await window.dataverseAPI.queryData(
-        `managedidentities?$select=${MANAGED_IDENTITY_SELECT}&$filter=credentialsource eq ${MI_CREDENTIAL_SOURCE_MANAGED}&$orderby=name`,
-        "primary",
-      );
-      return (response.value as Record<string, unknown>[]).map(toManagedIdentity);
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to fetch managed identities: ${msg}`);
-    }
-  }
-
-  /** One identity whatever its credential source, or null when it doesn't exist. */
-  async fetchManagedIdentity(identityId: string): Promise<ManagedIdentity | null> {
-    if (!isGuid(identityId)) {
-      return null;
-    }
-    try {
-      const response = await window.dataverseAPI.queryData(
-        `managedidentities?$select=${MANAGED_IDENTITY_SELECT}&$filter=managedidentityid eq '${identityId}'&$top=1`,
-        "primary",
-      );
-      const values = response.value as Record<string, unknown>[];
-      return values.length > 0 ? toManagedIdentity(values[0]) : null;
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to fetch managed identity: ${msg}`);
-    }
-  }
-
-  /** Names of all managed identities by id, for showing the linked identity on assemblies and packages. */
-  async fetchManagedIdentityNames(): Promise<Map<string, string>> {
-    try {
-      const response = await window.dataverseAPI.queryData("managedidentities?$select=managedidentityid,name", "primary");
-      return new Map((response.value as Record<string, unknown>[]).map((m) => [m["managedidentityid"] as string, (m["name"] as string) ?? ""]));
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to fetch managed identity names: ${msg}`);
-    }
-  }
-
-  /** Creates a managed identity and, when a solution is given, adds it to that solution. Returns the new id. */
-  async createManagedIdentity(identity: ManagedIdentityInput, solutionUniqueName?: string): Promise<string> {
-    let id: string;
-    try {
-      const result = await window.dataverseAPI.create(
-        "managedidentity",
-        {
-          name: identity.name,
-          applicationid: identity.applicationid,
-          tenantid: identity.tenantid,
-          subjectscope: identity.subjectscope,
-          version: identity.version,
-          credentialsource: MI_CREDENTIAL_SOURCE_MANAGED,
-        },
-        "primary",
-      );
-      id = result.id;
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to create managed identity: ${msg}`);
-    }
-
-    if (solutionUniqueName) {
-      try {
-        await this.addToSolution(id, "managedidentity", solutionUniqueName);
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        throw new Error(`The managed identity was created, but adding it to solution "${solutionUniqueName}" failed: ${msg}`);
-      }
-    }
-    return id;
-  }
-
-  async updateManagedIdentity(identityId: string, identity: ManagedIdentityInput): Promise<void> {
-    try {
-      await window.dataverseAPI.update("managedidentity", identityId, {
-        name: identity.name,
-        applicationid: identity.applicationid,
-        tenantid: identity.tenantid,
-        subjectscope: identity.subjectscope,
-        version: identity.version,
-      });
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to update managed identity: ${msg}`);
-    }
-  }
-
-  async deleteManagedIdentity(identityId: string): Promise<void> {
-    try {
-      await window.dataverseAPI.delete("managedidentity", identityId);
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to delete managed identity: ${msg}`);
-    }
-  }
-
-  /**
-   * Sets or clears the managed identity of a plug-in assembly or package.
-   * Dataverse refuses the link unless the assembly or package is signed with a certificate.
-   */
-  async linkManagedIdentity(kind: "assembly" | "package", recordId: string, identityId: string | null): Promise<void> {
-    const entity = kind === "assembly" ? "pluginassembly" : "pluginpackage";
-    try {
-      await window.dataverseAPI.update(entity, recordId, {
-        "managedidentityid@odata.bind": identityId ? buildManagedIdentityBind(identityId) : null,
-      });
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to ${identityId ? "link" : "remove"} the managed identity: ${msg}`);
-    }
-  }
-
-  /** Unmanaged, visible solutions other than Default, for adding new components to. */
-  async fetchUnmanagedSolutions(): Promise<SolutionOption[]> {
-    try {
-      const response = await window.dataverseAPI.queryData(
-        "solutions?$select=uniquename,friendlyname&$filter=ismanaged eq false and isvisible eq true and uniquename ne 'Default'&$orderby=friendlyname",
-        "primary",
-      );
-      return (response.value as Record<string, unknown>[]).map((s) => ({
-        uniquename: s["uniquename"] as string,
-        friendlyname: (s["friendlyname"] as string) ?? (s["uniquename"] as string),
-      }));
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to fetch solutions: ${msg}`);
-    }
-  }
-
-  /** Adds a record to an unmanaged solution, looking up the component type of its table. */
-  private async addToSolution(componentId: string, entityLogicalName: string, solutionUniqueName: string): Promise<void> {
-    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(entityLogicalName)) {
-      throw new Error(`Invalid entity name: "${entityLogicalName}"`);
-    }
-    const definitions = await window.dataverseAPI.queryData(
-      `solutioncomponentdefinitions?$select=solutioncomponenttype&$filter=primaryentityname eq '${entityLogicalName}'&$top=1`,
-      "primary",
-    );
-    const componentType = (definitions.value[0]?.["solutioncomponenttype"] as number | undefined) ?? undefined;
-    if (componentType === undefined) {
-      throw new Error(`Unable to find the solution component type for table ${entityLogicalName}`);
-    }
-    await window.dataverseAPI.execute({
-      operationName: "AddSolutionComponent",
-      operationType: "action",
-      parameters: {
-        ComponentId: componentId,
-        ComponentType: componentType,
-        SolutionUniqueName: solutionUniqueName,
-        AddRequiredComponents: false,
-      },
-    });
   }
 
   async registerStep(

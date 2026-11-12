@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AssemblyDetails } from "./components/AssemblyDetails";
 import { BottomGrid } from "./components/BottomGrid";
 import { ImageDetails } from "./components/ImageDetails";
-import { ManagedIdentityDialog } from "./components/ManagedIdentityDialog";
 import { PackageDetails } from "./components/PackageDetails";
 import { PluginTree } from "./components/PluginTree";
 import { PluginTypeDetails } from "./components/PluginTypeDetails";
@@ -175,9 +174,6 @@ export default function App() {
     const [steps, setSteps] = useState<Map<string, ProcessingStep[]>>(new Map());
     const [images, setImages] = useState<Map<string, StepImage[]>>(new Map());
     const [serviceEndpoints, setServiceEndpoints] = useState<ServiceEndpoint[]>([]);
-    // Managed identities: only shown when the environment has the managedidentity table
-    const [managedIdentitySupported, setManagedIdentitySupported] = useState(false);
-    const [managedIdentityNames, setManagedIdentityNames] = useState<Map<string, string>>(new Map());
     const [endpointSteps, setEndpointSteps] = useState<Map<string, ProcessingStep[]>>(new Map());
 
     // Tree state
@@ -217,7 +213,6 @@ export default function App() {
     const [showUpdateEndpoint, setShowUpdateEndpoint] = useState(false);
     const [showRegisterEndpointStep, setShowRegisterEndpointStep] = useState(false);
     const [showUpdateEndpointStep, setShowUpdateEndpointStep] = useState(false);
-    const [showManagedIdentity, setShowManagedIdentity] = useState(false);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -256,20 +251,12 @@ export default function App() {
         setEndpointSteps(new Map());
         setSelectedNode(null);
         setExpandedIds(new Set());
-        // The managed identity lookup only exists where the managedidentity table does, so check first
-        const miSupported = await client.isManagedIdentitySupported();
-        setManagedIdentitySupported(miSupported);
-        setManagedIdentityNames(new Map());
         // Fetch independently — one failure must not block the other
-        const [assembliesResult, endpointsResult, packagesResult, identityNamesResult] = await Promise.allSettled([
-            client.fetchAssemblies(miSupported),
+        const [assembliesResult, endpointsResult, packagesResult] = await Promise.allSettled([
+            client.fetchAssemblies(),
             client.fetchServiceEndpoints(),
-            client.fetchPackages(miSupported),
-            miSupported ? client.fetchManagedIdentityNames() : Promise.resolve(new Map<string, string>()),
+            client.fetchPackages(),
         ]);
-        if (identityNamesResult.status === "fulfilled") {
-            setManagedIdentityNames(identityNamesResult.value);
-        }
         if (assembliesResult.status === "fulfilled") {
             setAssemblies(assembliesResult.value);
         } else {
@@ -976,29 +963,6 @@ export default function App() {
     // ── Computed selection state ──
     const selectedAssembly = selectedNode?.type === "assembly" ? (selectedNode.data as PluginAssembly) : null;
     const selectedPackage = selectedNode?.type === "package" ? (selectedNode.data as PluginPackage) : null;
-
-    // Managed identity target: an assembly that is part of a plug-in package uses the package's identity
-    const managedIdentityTarget = useMemo(() => {
-        if (selectedPackage) {
-            return { kind: "package" as const, id: selectedPackage.pluginpackageid, name: selectedPackage.name, identityId: selectedPackage._managedidentityid_value, note: undefined };
-        }
-        if (selectedAssembly) {
-            const parent = selectedAssembly._packageid_value ? packages.find((p) => p.pluginpackageid === selectedAssembly._packageid_value) : undefined;
-            if (parent) {
-                return {
-                    kind: "package" as const,
-                    id: parent.pluginpackageid,
-                    name: parent.name,
-                    identityId: parent._managedidentityid_value,
-                    note: `Assembly ${selectedAssembly.name} is part of this package, so the identity is set on the package.`,
-                };
-            }
-            return { kind: "assembly" as const, id: selectedAssembly.pluginassemblyid, name: selectedAssembly.name, identityId: selectedAssembly._managedidentityid_value, note: undefined };
-        }
-        return null;
-    }, [selectedAssembly, selectedPackage, packages]);
-    const canManageIdentity = managedIdentitySupported && managedIdentityTarget !== null;
-    const managedIdentityName = (id?: string) => (id ? managedIdentityNames.get(id) ?? id : undefined);
     const selectedPluginType = getSelectedPluginType();
     const selectedStep = selectedNode?.type === "step" ? (selectedNode.data as ProcessingStep) : null;
     const selectedImage = selectedNode?.type === "image" ? (selectedNode.data as StepImage) : null;
@@ -1051,25 +1015,6 @@ export default function App() {
     const canRegisterImage = !!selectedStep;
     const isStepSelected = !!selectedStep;
     const stepIsEnabled = selectedStep?.statecode === 0;
-
-    // ── Managed identity actions ──
-    const handleSaveManagedIdentity = async (identityId: string | null, identitiesChanged: boolean) => {
-        if (!managedIdentityTarget) return;
-        if ((identityId ?? undefined) === managedIdentityTarget.identityId) {
-            setShowManagedIdentity(false);
-            if (identitiesChanged) void loadAll();
-            return;
-        }
-        try {
-            await client.linkManagedIdentity(managedIdentityTarget.kind, managedIdentityTarget.id, identityId);
-            notify(identityId ? `Managed identity linked to ${managedIdentityTarget.name}.` : `Managed identity removed from ${managedIdentityTarget.name}.`);
-            setShowManagedIdentity(false);
-            void loadAll();
-        } catch (err: unknown) {
-            notify(err instanceof Error ? err.message : String(err), "error");
-            throw err; // re-throw so the dialog can show the error inline
-        }
-    };
 
     const handleUpdateSelected = () => {
         if (selectedPackage) setShowUpdatePackage(true);
@@ -1268,17 +1213,6 @@ export default function App() {
                     </button>
                 </div>
 
-                {canManageIdentity && (
-                    <>
-                        <div className="toolbar-separator" />
-                        <div className="toolbar-group">
-                            <button className="toolbar-btn" onClick={() => setShowManagedIdentity(true)} title="Link a managed identity to the selected assembly or package">
-                                Managed Identity
-                            </button>
-                        </div>
-                    </>
-                )}
-
                 <div className="toolbar-separator" />
 
                 <div className="toolbar-group">
@@ -1384,9 +1318,6 @@ export default function App() {
                     {selectedPackage && (
                         <PackageDetails
                             pkg={selectedPackage}
-                            managedIdentitySupported={managedIdentitySupported}
-                            managedIdentityName={managedIdentityName(selectedPackage._managedidentityid_value)}
-                            onManageIdentity={() => setShowManagedIdentity(true)}
                             onUpdate={() => setShowUpdatePackage(true)}
                             onDelete={() => void handleDeletePackage()}
                         />
@@ -1394,10 +1325,6 @@ export default function App() {
                     {selectedAssembly && (
                         <AssemblyDetails
                             assembly={selectedAssembly}
-                            managedIdentitySupported={managedIdentitySupported}
-                            managedIdentityName={managedIdentityName(managedIdentityTarget?.identityId)}
-                            identityFromPackage={managedIdentityTarget?.kind === "package" ? managedIdentityTarget.name : undefined}
-                            onManageIdentity={() => setShowManagedIdentity(true)}
                             onSave={(desc) => handleSaveAssemblyDescription(desc)}
                             onUpdate={() => setShowUpdateAssembly(true)}
                             onUnregister={() => void handleUnregisterAssembly()}
@@ -1441,18 +1368,6 @@ export default function App() {
             </div>
 
             {/* Dialogs */}
-            {managedIdentityTarget && (
-                <ManagedIdentityDialog
-                    isOpen={showManagedIdentity}
-                    targetLabel={`${managedIdentityTarget.kind === "package" ? "Package" : "Assembly"}: ${managedIdentityTarget.name}`}
-                    targetNote={managedIdentityTarget.note}
-                    defaultIdentityName={`${managedIdentityTarget.name} Identity`}
-                    currentIdentityId={managedIdentityTarget.identityId}
-                    onSave={(identityId, identitiesChanged) => handleSaveManagedIdentity(identityId, identitiesChanged)}
-                    onIdentitiesChanged={() => void loadAll()}
-                    onClose={() => setShowManagedIdentity(false)}
-                />
-            )}
             <RegisterPackageDialog
                 isOpen={showRegisterPackage}
                 isUpdate={false}
