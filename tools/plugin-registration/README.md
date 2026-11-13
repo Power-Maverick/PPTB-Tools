@@ -15,6 +15,7 @@ Register and manage Microsoft Dataverse plugin assemblies, custom workflow activ
         - [SDK Message Processing Steps](#sdk-message-processing-steps)
         - [Service Endpoints](#service-endpoints)
         - [Managed Identities](#managed-identities)
+        - [Custom APIs](#custom-apis)
     - [Technical Stack](#technical-stack)
     - [Troubleshooting](#troubleshooting)
     - [Contributing](#contributing)
@@ -41,6 +42,7 @@ Register and manage Microsoft Dataverse plugin assemblies, custom workflow activ
 - ✅ Dark/light theme support
 - ✅ Unsecure and Secure Config management
 - ✅ Managed identities for plug-in assemblies and packages: link, create, edit and delete identities
+- ✅ Custom APIs: create, edit and delete APIs with their request parameters and response properties
 
 ## Installation
 
@@ -147,6 +149,20 @@ A managed identity lets a plug-in get tokens for Azure resources (Key Vault, Sto
 - New identities use **version 2**, which Microsoft recommends. Editing an identity can upgrade its version but not downgrade it.
 
 See [Set up managed identity for Dataverse plug-ins](https://learn.microsoft.com/power-platform/admin/set-up-managed-identity).
+
+### Custom APIs
+
+A Custom API defines your own Dataverse message, with request parameters and response properties, and optionally a plug-in type that runs it. Choose **View → Custom APIs** to list every API with its request parameters and response properties beneath it. Choose **Register → New Custom API** to create one, or select an API, parameter or property and choose **Update** or **Unregister**.
+
+- The view and the menu option only appear when the environment has the `customapi` table.
+- A new API goes into the unmanaged solution you choose. Its unique name must start with that solution's publisher prefix, which the dialog fills in for you. The API and its parameters and properties are created in one request, then each is added to the solution.
+- Request parameters and response properties are edited in the same dialog as the API. Parameters and properties you add later join every unmanaged solution the API is already in.
+- Dataverse fixes some fields at creation: the unique name, binding type, bound table, allowed step type and Is Function of the API, and the unique name, type, table and Is Optional of a parameter or property. These are read-only when editing. To change one, delete the record and create it again.
+- A managed API that doesn't allow customization is read-only, except that you can add optional request parameters. Managed APIs, parameters and properties can't be deleted here; remove them through their managed solution.
+- Each change in an edit is saved on its own. If one fails, the API is reloaded, so check what was saved before trying again.
+- To run code when the API is called, link a plug-in type, or register a step on the API's message from a plug-in type like any other message. Messages of private APIs are listed too.
+
+See [Custom API tables](https://learn.microsoft.com/power-apps/developer/data-platform/custom-api-tables).
 
 ## Technical Stack
 

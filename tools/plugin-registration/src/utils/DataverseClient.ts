@@ -1,11 +1,80 @@
-import type { ManagedIdentity, ManagedIdentityInput, PluginAssembly, PluginPackage, PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, SolutionOption, StepImage, ServiceEndpoint } from "../models/interfaces";
+import type { CustomApi, CustomApiField, CustomApiRequestParameter, ManagedIdentity, ManagedIdentityInput, PluginAssembly, PluginPackage, PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, SolutionOption, StepImage, ServiceEndpoint } from "../models/interfaces";
 import { MI_CREDENTIAL_SOURCE_MANAGED } from "../models/interfaces";
+import type { CustomApiChildTable } from "./customApiRules";
+import { customApiCreateRecord, isEmptyPlan, isGuid, planCustomApiUpdate, REQUEST_TABLE, RESPONSE_TABLE, validateCustomApi } from "./customApiRules";
 
-const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** A plug-in type offered as the handler of a Custom API. */
+/** Thrown when a Custom API was created but could not be added to its solution. Carries the new API's id. */
+export class CustomApiCreatedError extends Error {
+  constructor(readonly customApiId: string, message: string) {
+    super(message);
+    this.name = "CustomApiCreatedError";
+  }
+}
 
-/** Validate that a string is a Dataverse-format GUID (case-insensitive hex, hyphenated, no braces). */
-function isGuid(value: string): boolean {
-  return GUID_REGEX.test(value);
+export interface CustomApiPluginTypeOption {
+  plugintypeid: string;
+  typename: string;
+  pluginassemblyid: string;
+}
+
+const CUSTOM_API_SELECT =
+  "customapiid,name,uniquename,displayname,description,bindingtype,boundentitylogicalname,allowedcustomprocessingsteptype,_plugintypeid_value,_sdkmessageid_value,executeprivilegename,isfunction,isprivate,workflowsdkstepenabled,ismanaged,iscustomizable";
+const FIELD_SELECT = "_customapiid_value,name,uniquename,displayname,description,type,logicalentityname,ismanaged,iscustomizable";
+const REQUEST_SELECT = `customapirequestparameterid,${FIELD_SELECT},isoptional`;
+const RESPONSE_SELECT = `customapiresponsepropertyid,${FIELD_SELECT}`;
+
+/** iscustomizable is a managed property: { Value: boolean, ... }. A missing value means customizable. */
+function readCustomizable(value: unknown): boolean {
+  if (value && typeof value === "object" && "Value" in value) return (value as { Value: unknown }).Value !== false;
+  return value !== false;
+}
+
+function toCustomApi(a: Record<string, unknown>): CustomApi {
+  return {
+    customapiid: a["customapiid"] as string,
+    name: (a["name"] as string) ?? "",
+    uniquename: (a["uniquename"] as string) ?? "",
+    displayname: (a["displayname"] as string) ?? "",
+    description: (a["description"] as string) ?? "",
+    // An absent choice must not quietly become Global/None and change the contract on save.
+    bindingtype: (a["bindingtype"] as number) ?? -1,
+    boundentitylogicalname: (a["boundentitylogicalname"] as string) ?? "",
+    allowedcustomprocessingsteptype: (a["allowedcustomprocessingsteptype"] as number) ?? -1,
+    plugintypeid: (a["_plugintypeid_value"] as string) ?? undefined,
+    sdkmessageid: (a["_sdkmessageid_value"] as string) ?? undefined,
+    executeprivilegename: (a["executeprivilegename"] as string) ?? "",
+    isfunction: (a["isfunction"] as boolean) ?? false,
+    isprivate: (a["isprivate"] as boolean) ?? false,
+    workflowsdkstepenabled: (a["workflowsdkstepenabled"] as boolean) ?? false,
+    ismanaged: (a["ismanaged"] as boolean) ?? false,
+    iscustomizable: readCustomizable(a["iscustomizable"]),
+    requestParameters: [],
+    responseProperties: [],
+  };
+}
+
+function toField(f: Record<string, unknown>, id: string): CustomApiField {
+  return {
+    id,
+    customapiid: (f["_customapiid_value"] as string) ?? "",
+    name: (f["name"] as string) ?? "",
+    uniquename: (f["uniquename"] as string) ?? "",
+    displayname: (f["displayname"] as string) ?? "",
+    description: (f["description"] as string) ?? "",
+    type: (f["type"] as number) ?? -1,
+    logicalentityname: (f["logicalentityname"] as string) ?? "",
+    ismanaged: (f["ismanaged"] as boolean) ?? false,
+    iscustomizable: readCustomizable(f["iscustomizable"]),
+  };
+}
+
+function toRequestParameter(r: Record<string, unknown>): CustomApiRequestParameter {
+  return { ...toField(r, r["customapirequestparameterid"] as string), isoptional: (r["isoptional"] as boolean) ?? false };
+}
+
+function toResponseProperty(r: Record<string, unknown>): CustomApiField {
+  return toField(r, r["customapiresponsepropertyid"] as string);
 }
 
 /** Build the @odata.bind value for the pluginpackages collection. Validates the GUID first. */
@@ -535,18 +604,15 @@ export class DataverseClient {
     }
   }
 
-  /** Adds a record to an unmanaged solution, looking up the component type of its table. */
-  private async addToSolution(componentId: string, entityLogicalName: string, solutionUniqueName: string): Promise<void> {
-    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(entityLogicalName)) {
-      throw new Error(`Invalid entity name: "${entityLogicalName}"`);
-    }
-    const definitions = await window.dataverseAPI.queryData(
-      `solutioncomponentdefinitions?$select=solutioncomponenttype&$filter=primaryentityname eq '${entityLogicalName}'&$top=1`,
-      "primary",
-    );
-    const componentType = (definitions.value[0]?.["solutioncomponenttype"] as number | undefined) ?? undefined;
+  /**
+   * Adds a record to an unmanaged solution, looking up the component type of its table. Pass a map to
+   * reuse component types already looked up when adding several records.
+   */
+  private async addToSolution(componentId: string, entityLogicalName: string, solutionUniqueName: string, componentTypes?: Map<string, number>): Promise<void> {
+    let componentType = componentTypes?.get(entityLogicalName);
     if (componentType === undefined) {
-      throw new Error(`Unable to find the solution component type for table ${entityLogicalName}`);
+      componentType = await this.fetchSolutionComponentType(entityLogicalName);
+      componentTypes?.set(entityLogicalName, componentType);
     }
     await window.dataverseAPI.execute({
       operationName: "AddSolutionComponent",
@@ -558,6 +624,203 @@ export class DataverseClient {
         AddRequiredComponents: false,
       },
     });
+  }
+
+  private async fetchSolutionComponentType(entityLogicalName: string): Promise<number> {
+    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(entityLogicalName)) {
+      throw new Error(`Invalid entity name: "${entityLogicalName}"`);
+    }
+    const definitions = await window.dataverseAPI.queryData(
+      `solutioncomponentdefinitions?$select=solutioncomponenttype&$filter=primaryentityname eq '${entityLogicalName}'&$top=1`,
+      "primary",
+    );
+    const componentType = (definitions.value[0]?.["solutioncomponenttype"] as number | undefined) ?? undefined;
+    if (componentType === undefined) {
+      throw new Error(`Unable to find the solution component type for table ${entityLogicalName}`);
+    }
+    return componentType;
+  }
+
+  // ── Custom API methods ──
+
+  /** True when the environment has the Custom API tables. Any error counts as "not supported". */
+  async isCustomApiSupported(): Promise<boolean> {
+    try {
+      await window.dataverseAPI.getEntityMetadata("customapi", true, ["LogicalName"]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Every Custom API with its request parameters and response properties, ordered by unique name. */
+  async fetchCustomApis(): Promise<CustomApi[]> {
+    try {
+      const [apis, requests, responses] = await Promise.all([
+        window.dataverseAPI.queryData(`customapis?$select=${CUSTOM_API_SELECT}&$orderby=uniquename`, "primary"),
+        window.dataverseAPI.queryData(`customapirequestparameters?$select=${REQUEST_SELECT}&$orderby=uniquename`, "primary"),
+        window.dataverseAPI.queryData(`customapiresponseproperties?$select=${RESPONSE_SELECT}&$orderby=uniquename`, "primary"),
+      ]);
+      const result = (apis.value as Record<string, unknown>[]).map(toCustomApi);
+      const byId = new Map(result.map((a) => [a.customapiid.toLowerCase(), a]));
+      for (const r of requests.value as Record<string, unknown>[]) {
+        byId.get(String(r["_customapiid_value"] ?? "").toLowerCase())?.requestParameters.push(toRequestParameter(r));
+      }
+      for (const r of responses.value as Record<string, unknown>[]) {
+        byId.get(String(r["_customapiid_value"] ?? "").toLowerCase())?.responseProperties.push(toResponseProperty(r));
+      }
+      return result;
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to fetch Custom APIs: ${msg}`);
+    }
+  }
+
+  /** Plug-in types that can handle a Custom API (not workflow activities), ordered by type name. */
+  async fetchCustomApiPluginTypes(): Promise<CustomApiPluginTypeOption[]> {
+    try {
+      const response = await window.dataverseAPI.queryData(
+        "plugintypes?$select=plugintypeid,typename,_pluginassemblyid_value&$filter=isworkflowactivity eq false&$orderby=typename",
+        "primary",
+      );
+      return (response.value as Record<string, unknown>[]).map((t) => ({
+        plugintypeid: t["plugintypeid"] as string,
+        typename: (t["typename"] as string) ?? "",
+        pluginassemblyid: (t["_pluginassemblyid_value"] as string) ?? "",
+      }));
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to fetch plug-in types: ${msg}`);
+    }
+  }
+
+  /** The customization prefix of an unmanaged solution's publisher. */
+  async fetchPublisherPrefix(solutionUniqueName: string): Promise<string> {
+    const name = solutionUniqueName.replace(/'/g, "''");
+    const response = await window.dataverseAPI.queryData(
+      `solutions?$select=uniquename&$filter=uniquename eq '${name}' and ismanaged eq false&$expand=publisherid($select=customizationprefix)`,
+      "primary",
+    );
+    const values = response.value as Record<string, unknown>[];
+    const publisher = values.length === 1 ? (values[0]["publisherid"] as Record<string, unknown> | null) : null;
+    const prefix = publisher?.["customizationprefix"] as string | undefined;
+    if (!prefix) {
+      throw new Error(`The unmanaged solution "${solutionUniqueName}" or its publisher prefix could not be found.`);
+    }
+    return prefix;
+  }
+
+  /**
+   * Creates a Custom API with its request parameters and response properties in one request, then adds
+   * the API and its children to the solution. Unique names must use the solution publisher's prefix.
+   * Returns the new API's id.
+   */
+  async createCustomApi(api: CustomApi, solutionUniqueName: string): Promise<string> {
+    if (!solutionUniqueName) throw new Error("Failed to create the Custom API: select an unmanaged solution.");
+    let id: string;
+    try {
+      const prefix = await this.fetchPublisherPrefix(solutionUniqueName);
+      const errors = validateCustomApi(api, undefined, prefix);
+      if (errors.length > 0) throw new Error(errors.join("\n"));
+      const result = await window.dataverseAPI.create("customapi", customApiCreateRecord(api), "primary");
+      id = result.id;
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create the Custom API: ${msg}`);
+    }
+
+    try {
+      const componentTypes = new Map<string, number>();
+      await this.addToSolution(id, "customapi", solutionUniqueName, componentTypes);
+      const filter = `$filter=_customapiid_value eq ${id}`;
+      const childSets: [CustomApiChildTable, string][] = [[REQUEST_TABLE, "customapirequestparameters"], [RESPONSE_TABLE, "customapiresponseproperties"]];
+      for (const [table, entitySet] of childSets) {
+        const children = await window.dataverseAPI.queryData(`${entitySet}?$select=${table}id&${filter}`, "primary");
+        for (const child of children.value as Record<string, unknown>[]) {
+          await this.addToSolution(child[`${table}id`] as string, table, solutionUniqueName, componentTypes);
+        }
+      }
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new CustomApiCreatedError(id, `The Custom API was created, but adding it to solution "${solutionUniqueName}" failed: ${msg}`);
+    }
+    return id;
+  }
+
+  /**
+   * Saves the differences between the saved API and the edited draft. Removed children are deleted first,
+   * so a new child can reuse a removed name. New children join every unmanaged solution the API is in.
+   * Returns false when there was nothing to save. Dataverse saves each write on its own, so after a
+   * failure part of the edit may already be saved; reload the API before trying again.
+   */
+  async updateCustomApi(original: CustomApi, draft: CustomApi): Promise<boolean> {
+    const errors = validateCustomApi(draft, original);
+    if (errors.length > 0) throw new Error(`Failed to update the Custom API: ${errors.join("\n")}`);
+    const plan = planCustomApiUpdate(original, draft);
+    if (isEmptyPlan(plan)) return false;
+
+    let solutions: string[] = [];
+    try {
+      if (plan.creates.length > 0) solutions = await this.fetchUnmanagedSolutionsContaining(original.customapiid);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to update the Custom API: ${msg}`);
+    }
+
+    const componentTypes = new Map<string, number>();
+    try {
+      for (const d of plan.deletes) await window.dataverseAPI.delete(d.table, d.id, "primary");
+      if (Object.keys(plan.apiChanges).length > 0) await window.dataverseAPI.update("customapi", original.customapiid, plan.apiChanges, "primary");
+      for (const u of plan.updates) await window.dataverseAPI.update(u.table, u.id, u.changes, "primary");
+      for (const c of plan.creates) {
+        const created = await window.dataverseAPI.create(c.table, c.record, "primary");
+        for (const solution of solutions) await this.addToSolution(created.id, c.table, solution, componentTypes);
+      }
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to update the Custom API. Some changes may already be saved; reload before trying again. ${msg}`);
+    }
+    return true;
+  }
+
+  /** Deletes an unmanaged Custom API. Dataverse deletes its parameters, properties and message with it. */
+  async deleteCustomApi(api: CustomApi): Promise<void> {
+    if (api.ismanaged) throw new Error("A managed Custom API must be removed through its managed solution.");
+    try {
+      await window.dataverseAPI.delete("customapi", api.customapiid, "primary");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to delete the Custom API: ${msg}`);
+    }
+  }
+
+  /** Deletes one unmanaged request parameter or response property. */
+  async deleteCustomApiField(table: CustomApiChildTable, field: CustomApiField): Promise<void> {
+    const kind = table === REQUEST_TABLE ? "request parameter" : "response property";
+    if (field.ismanaged) throw new Error(`A managed ${kind} must be removed through its managed solution.`);
+    try {
+      await window.dataverseAPI.delete(table, field.id, "primary");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to delete the ${kind}: ${msg}`);
+    }
+  }
+
+  /** Unique names of the unmanaged, visible solutions (other than Default) that contain a record. */
+  private async fetchUnmanagedSolutionsContaining(componentId: string): Promise<string[]> {
+    if (!isGuid(componentId)) throw new Error(`Invalid component ID: "${componentId}"`);
+    const components = await window.dataverseAPI.queryData(
+      `solutioncomponents?$select=_solutionid_value&$filter=objectid eq ${componentId}`,
+      "primary",
+    );
+    const solutionIds = [...new Set((components.value as Record<string, unknown>[]).map((c) => c["_solutionid_value"] as string).filter(isGuid))];
+    if (solutionIds.length === 0) return [];
+    const idFilter = solutionIds.map((s) => `solutionid eq ${s}`).join(" or ");
+    const solutions = await window.dataverseAPI.queryData(
+      `solutions?$select=uniquename&$filter=(${idFilter}) and ismanaged eq false and isvisible eq true and uniquename ne 'Default'&$orderby=uniquename`,
+      "primary",
+    );
+    return (solutions.value as Record<string, unknown>[]).map((s) => s["uniquename"] as string).filter(Boolean);
   }
 
   async registerStep(

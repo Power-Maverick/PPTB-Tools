@@ -141,7 +141,80 @@ export interface ServiceEndpoint {
   modifiedon?: string;
 }
 
-export type TreeNodeType = 'assembly' | 'plugintype' | 'step' | 'image' | 'entity-group' | 'message-group' | 'package-group' | 'serviceendpoint' | 'package';
+// ── Custom APIs ──
+// Option set values match the Dataverse customapi, customapirequestparameter and customapiresponseproperty tables.
+
+export const CUSTOM_API_BINDING_TYPES: Record<number, string> = { 0: "Global", 1: "Entity", 2: "Entity Collection" };
+export const CUSTOM_API_BINDING_GLOBAL = 0;
+export const CUSTOM_API_BINDING_ENTITY = 1;
+export const CUSTOM_API_BINDING_ENTITY_COLLECTION = 2;
+
+export const CUSTOM_API_STEP_TYPES: Record<number, string> = { 0: "None", 1: "Async Only", 2: "Sync and Async" };
+
+export const CUSTOM_API_PARAMETER_TYPES: Record<number, string> = {
+  0: "Boolean",
+  1: "DateTime",
+  2: "Decimal",
+  3: "Entity",
+  4: "EntityCollection",
+  5: "EntityReference",
+  6: "Float",
+  7: "Integer",
+  8: "Money",
+  9: "Picklist",
+  10: "String",
+  11: "StringArray",
+  12: "Guid",
+};
+export const CUSTOM_API_TYPE_ENTITY = 3;
+export const CUSTOM_API_TYPE_ENTITY_COLLECTION = 4;
+export const CUSTOM_API_TYPE_ENTITY_REFERENCE = 5;
+export const CUSTOM_API_TYPE_STRING_ARRAY = 11;
+
+/** Fields shared by request parameters and response properties. An empty id marks a row not yet saved. */
+export interface CustomApiField {
+  id: string;
+  customapiid: string;
+  name: string;
+  uniquename: string;
+  displayname: string;
+  description: string;
+  type: number; // see CUSTOM_API_PARAMETER_TYPES
+  logicalentityname: string;
+  ismanaged: boolean;
+  iscustomizable: boolean;
+}
+
+export interface CustomApiRequestParameter extends CustomApiField {
+  isoptional: boolean;
+}
+
+export type CustomApiResponseProperty = CustomApiField;
+
+/** A Custom API with its request parameters and response properties. An empty customapiid marks a new API. */
+export interface CustomApi {
+  customapiid: string;
+  name: string;
+  uniquename: string;
+  displayname: string;
+  description: string;
+  bindingtype: number; // see CUSTOM_API_BINDING_TYPES
+  boundentitylogicalname: string;
+  allowedcustomprocessingsteptype: number; // see CUSTOM_API_STEP_TYPES
+  plugintypeid?: string;
+  /** The message Dataverse generates for the API; steps are registered on it. */
+  sdkmessageid?: string;
+  executeprivilegename: string;
+  isfunction: boolean;
+  isprivate: boolean;
+  workflowsdkstepenabled: boolean;
+  ismanaged: boolean;
+  iscustomizable: boolean;
+  requestParameters: CustomApiRequestParameter[];
+  responseProperties: CustomApiResponseProperty[];
+}
+
+export type TreeNodeType = 'assembly' | 'plugintype' | 'step' | 'image' | 'entity-group' | 'message-group' | 'package-group' | 'serviceendpoint' | 'package' | 'customapi' | 'customapi-requestparameter' | 'customapi-responseproperty';
 
 export interface VirtualGroupData {
   groupName: string;
@@ -152,7 +225,7 @@ export interface TreeNode {
   id: string;
   type: TreeNodeType;
   name: string;
-  data: PluginAssembly | PluginType | ProcessingStep | StepImage | VirtualGroupData | ServiceEndpoint | PluginPackage;
+  data: PluginAssembly | PluginType | ProcessingStep | StepImage | VirtualGroupData | ServiceEndpoint | PluginPackage | CustomApi | CustomApiField;
   children?: TreeNode[];
   isExpanded?: boolean;
   isWorkflowActivity?: boolean;

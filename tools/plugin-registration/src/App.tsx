@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AssemblyDetails } from "./components/AssemblyDetails";
 import { BottomGrid } from "./components/BottomGrid";
+import { CustomApiDetails } from "./components/CustomApiDetails";
 import { ImageDetails } from "./components/ImageDetails";
 import { ManagedIdentityDialog } from "./components/ManagedIdentityDialog";
 import { PackageDetails } from "./components/PackageDetails";
 import { PluginTree } from "./components/PluginTree";
 import { PluginTypeDetails } from "./components/PluginTypeDetails";
 import { RegisterAssemblyDialog } from "./components/RegisterAssemblyDialog";
+import { RegisterCustomApiDialog } from "./components/RegisterCustomApiDialog";
 import { RegisterEndpointStepDialog } from "./components/RegisterEndpointStepDialog";
 import { RegisterImageDialog } from "./components/RegisterImageDialog";
 import { RegisterPackageDialog } from "./components/RegisterPackageDialog";
@@ -14,8 +16,29 @@ import { RegisterServiceEndpointDialog } from "./components/RegisterServiceEndpo
 import { RegisterStepDialog } from "./components/RegisterStepDialog";
 import { ServiceEndpointDetails } from "./components/ServiceEndpointDetails";
 import { StepDetails } from "./components/StepDetails";
-import type { PluginAssembly, PluginPackage, PluginType, ProcessingStep, ServiceEndpoint, StepImage, TreeNode } from "./models/interfaces";
-import { DataverseClient } from "./utils/DataverseClient";
+import type { CustomApi, CustomApiField, PluginAssembly, PluginPackage, PluginType, ProcessingStep, ServiceEndpoint, StepImage, TreeNode } from "./models/interfaces";
+import { REQUEST_TABLE, RESPONSE_TABLE } from "./utils/customApiRules";
+import { CustomApiCreatedError, DataverseClient } from "./utils/DataverseClient";
+
+type ViewMode = 'assemblies' | 'packages' | 'customapis';
+
+const VIEW_LABELS: Record<ViewMode, string> = { assemblies: 'Assemblies', packages: 'Packages', customapis: 'Custom APIs' };
+
+/** Tree nodes for the Custom APIs view: each API with its request parameters and response properties. */
+function buildCustomApiNodes(customApis: CustomApi[], expandedIds: Set<string>): TreeNode[] {
+    return customApis.map((api) => ({
+        id: api.customapiid,
+        type: "customapi" as const,
+        name: api.uniquename,
+        data: api,
+        children: [
+            ...api.requestParameters.map((p) => ({ id: p.id, type: "customapi-requestparameter" as const, name: p.uniquename, data: p })),
+            ...api.responseProperties.map((p) => ({ id: p.id, type: "customapi-responseproperty" as const, name: p.uniquename, data: p })),
+        ],
+        isExpanded: expandedIds.has(api.customapiid),
+        childrenLoaded: true,
+    }));
+}
 
 const client = new DataverseClient();
 
@@ -30,8 +53,11 @@ function buildTreeNodes(
     endpointSteps: Map<string, ProcessingStep[]>,
     showPlugins: boolean,
     showEndpoints: boolean,
-    viewMode: 'assemblies' | 'packages',
+    viewMode: ViewMode,
+    customApis: CustomApi[],
 ): TreeNode[] {
+    if (viewMode === 'customapis') return buildCustomApiNodes(customApis, expandedIds);
+
     // Inner helper: build a single assembly node (recursive into types/steps/images)
     const buildAssemblyNode = (asm: PluginAssembly): TreeNode => {
         const types = pluginTypes.get(asm.pluginassemblyid) ?? [];
@@ -179,6 +205,10 @@ export default function App() {
     const [managedIdentitySupported, setManagedIdentitySupported] = useState(false);
     const [managedIdentityNames, setManagedIdentityNames] = useState<Map<string, string>>(new Map());
     const [endpointSteps, setEndpointSteps] = useState<Map<string, ProcessingStep[]>>(new Map());
+    // Custom APIs: only offered when the environment has the customapi table
+    const [customApiSupported, setCustomApiSupported] = useState(false);
+    const [customApis, setCustomApis] = useState<CustomApi[]>([]);
+    const [pluginTypeNames, setPluginTypeNames] = useState<Map<string, string>>(new Map());
 
     // Tree state
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -195,7 +225,7 @@ export default function App() {
     const [bulkToggling, setBulkToggling] = useState(false);
 
     // View mode: 'assemblies' (default, flat list) | 'packages' (grouped under package nodes)
-    const [viewMode, setViewMode] = useState<'assemblies' | 'packages'>('assemblies');
+    const [viewMode, setViewMode] = useState<ViewMode>('assemblies');
 
     // Register dropdown
     const [showRegisterDropdown, setShowRegisterDropdown] = useState(false);
@@ -218,6 +248,8 @@ export default function App() {
     const [showRegisterEndpointStep, setShowRegisterEndpointStep] = useState(false);
     const [showUpdateEndpointStep, setShowUpdateEndpointStep] = useState(false);
     const [showManagedIdentity, setShowManagedIdentity] = useState(false);
+    const [showRegisterCustomApi, setShowRegisterCustomApi] = useState(false);
+    const [showUpdateCustomApi, setShowUpdateCustomApi] = useState(false);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -257,16 +289,25 @@ export default function App() {
         setSelectedNode(null);
         setExpandedIds(new Set());
         // The managed identity lookup only exists where the managedidentity table does, so check first
-        const miSupported = await client.isManagedIdentitySupported();
+        const [miSupported, apiSupported] = await Promise.all([client.isManagedIdentitySupported(), client.isCustomApiSupported()]);
         setManagedIdentitySupported(miSupported);
         setManagedIdentityNames(new Map());
+        setCustomApiSupported(apiSupported);
+        setCustomApis([]);
+        if (!apiSupported) setViewMode((v) => (v === 'customapis' ? 'assemblies' : v));
         // Fetch independently — one failure must not block the other
-        const [assembliesResult, endpointsResult, packagesResult, identityNamesResult] = await Promise.allSettled([
+        const [assembliesResult, endpointsResult, packagesResult, identityNamesResult, customApisResult, pluginTypeNamesResult] = await Promise.allSettled([
             client.fetchAssemblies(miSupported),
             client.fetchServiceEndpoints(),
             client.fetchPackages(miSupported),
             miSupported ? client.fetchManagedIdentityNames() : Promise.resolve(new Map<string, string>()),
+            apiSupported ? client.fetchCustomApis() : Promise.resolve([] as CustomApi[]),
+            apiSupported ? client.fetchCustomApiPluginTypes() : Promise.resolve([]),
         ]);
+        // Without names the details pane shows the plug-in type's id; never keep another environment's names.
+        setPluginTypeNames(pluginTypeNamesResult.status === "fulfilled"
+            ? new Map(pluginTypeNamesResult.value.map((t) => [t.plugintypeid.toLowerCase(), t.typename]))
+            : new Map());
         if (identityNamesResult.status === "fulfilled") {
             setManagedIdentityNames(identityNamesResult.value);
         }
@@ -286,6 +327,12 @@ export default function App() {
             setPackages(packagesResult.value);
         } else {
             const msg = packagesResult.reason instanceof Error ? packagesResult.reason.message : String(packagesResult.reason);
+            setError((prev) => (prev ? `${prev}\n${msg}` : msg));
+        }
+        if (customApisResult.status === "fulfilled") {
+            setCustomApis(customApisResult.value);
+        } else {
+            const msg = customApisResult.reason instanceof Error ? customApisResult.reason.message : String(customApisResult.reason);
             setError((prev) => (prev ? `${prev}\n${msg}` : msg));
         }
         setLoading(false);
@@ -973,9 +1020,112 @@ export default function App() {
         }
     };
 
+    // ── Custom API actions ──
+
+    /**
+     * Reloads the Custom APIs, and the plug-in type names shown for them, and selects the given API,
+     * parameter or property with fresh data.
+     */
+    const refreshCustomApis = async (selectId?: string) => {
+        const [apis, types] = await Promise.all([client.fetchCustomApis(), client.fetchCustomApiPluginTypes().catch(() => undefined)]);
+        setCustomApis(apis);
+        if (types) setPluginTypeNames(new Map(types.map((t) => [t.plugintypeid.toLowerCase(), t.typename])));
+        if (!selectId) return;
+        const id = selectId.toLowerCase();
+        const node = buildCustomApiNodes(apis, new Set())
+            .flatMap((n) => [n, ...(n.children ?? [])])
+            .find((n) => n.id.toLowerCase() === id);
+        setSelectedNode(node ?? null);
+        if (node?.type === "customapi") setExpandedIds((prev) => new Set(prev).add(node.id));
+    };
+
+    const handleCreateCustomApi = async (draft: CustomApi, solutionUniqueName?: string) => {
+        let newId: string | undefined;
+        try {
+            newId = await client.createCustomApi(draft, solutionUniqueName ?? "");
+            notify(`Custom API ${draft.uniquename} registered.`);
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            // Not created: keep the dialog open with the error. Created but not added to the solution:
+            // close it, since saving again would try to create the API a second time.
+            if (!(err instanceof CustomApiCreatedError)) throw err;
+            newId = err.customApiId;
+        }
+        setShowRegisterCustomApi(false);
+        // Show the new API where it lives, whichever view it was registered from.
+        setViewMode('customapis');
+        await refreshCustomApis(newId).catch((err: unknown) => notify(err instanceof Error ? err.message : String(err), "error"));
+    };
+
+    const handleUpdateCustomApi = async (draft: CustomApi) => {
+        if (!editedCustomApi) return;
+        const selectedId = selectedNode?.id;
+        try {
+            const changed = await client.updateCustomApi(editedCustomApi, draft);
+            notify(changed ? `Custom API ${draft.uniquename} updated.` : "No changes to save.");
+            setShowUpdateCustomApi(false);
+            if (changed) await refreshCustomApis(selectedId);
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            // Part of the edit may be saved; reload so the next attempt starts from the server's state. Select the
+            // API itself, since the edit may have deleted the selected parameter and the dialog needs an API.
+            await refreshCustomApis(editedCustomApi.customapiid).catch(() => undefined);
+            throw err; // keep the dialog open with the error
+        }
+    };
+
+    const handleDeleteCustomApi = async () => {
+        if (selectedNode?.type !== "customapi") return;
+        const api = selectedNode.data as CustomApi;
+        if (api.ismanaged) {
+            notify("This Custom API is managed. Remove it through its managed solution.", "error");
+            return;
+        }
+        if (!window.confirm(`Delete Custom API "${api.uniquename}"?\n\nIts request parameters, response properties and message are deleted with it.`)) return;
+        try {
+            await client.deleteCustomApi(api);
+            notify("Custom API deleted.");
+            setSelectedNode(null);
+            await refreshCustomApis();
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+        }
+    };
+
+    const handleDeleteCustomApiField = async () => {
+        if (selectedNode?.type !== "customapi-requestparameter" && selectedNode?.type !== "customapi-responseproperty") return;
+        const field = selectedNode.data as CustomApiField;
+        const isRequest = selectedNode.type === "customapi-requestparameter";
+        const kind = isRequest ? "request parameter" : "response property";
+        if (field.ismanaged) {
+            notify(`This ${kind} is managed. Remove it through its managed solution.`, "error");
+            return;
+        }
+        const api = customApis.find((a) => a.customapiid.toLowerCase() === field.customapiid.toLowerCase());
+        if (!isRequest && api?.isfunction && api.responseProperties.length <= 1) {
+            notify("A function must have at least one response property. Add another before deleting this one.", "error");
+            return;
+        }
+        if (!window.confirm(`Delete ${kind} "${field.uniquename}"? Callers and plug-ins that use it may stop working.`)) return;
+        try {
+            await client.deleteCustomApiField(isRequest ? REQUEST_TABLE : RESPONSE_TABLE, field);
+            notify(`The ${kind} was deleted.`);
+            await refreshCustomApis(field.customapiid);
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+        }
+    };
+
     // ── Computed selection state ──
     const selectedAssembly = selectedNode?.type === "assembly" ? (selectedNode.data as PluginAssembly) : null;
     const selectedPackage = selectedNode?.type === "package" ? (selectedNode.data as PluginPackage) : null;
+    const selectedCustomApi = selectedNode?.type === "customapi" ? (selectedNode.data as CustomApi) : null;
+    const selectedCustomApiField = selectedNode?.type === "customapi-requestparameter" || selectedNode?.type === "customapi-responseproperty"
+        ? { kind: selectedNode.type === "customapi-requestparameter" ? "request" as const : "response" as const, value: selectedNode.data as CustomApiField }
+        : null;
+    // The API being edited: the selected API, or the API of the selected parameter or property
+    const editedCustomApi = selectedCustomApi
+        ?? (selectedCustomApiField ? customApis.find((a) => a.customapiid.toLowerCase() === selectedCustomApiField.value.customapiid.toLowerCase()) ?? null : null);
 
     // Managed identity target: an assembly that is part of a plug-in package uses the package's identity
     const managedIdentityTarget = useMemo(() => {
@@ -1045,8 +1195,8 @@ export default function App() {
     })();
 
     // Context-sensitive toolbar state
-    const canUpdate = !!(selectedAssembly || selectedStep || selectedImage || selectedEndpoint || selectedPackage);
-    const canUnregister = !!(selectedAssembly || selectedStep || selectedImage || selectedEndpoint || selectedPackage);
+    const canUpdate = !!(selectedAssembly || selectedStep || selectedImage || selectedEndpoint || selectedPackage || editedCustomApi);
+    const canUnregister = !!(selectedAssembly || selectedStep || selectedImage || selectedEndpoint || selectedPackage || editedCustomApi);
     const canRegisterStep = !!(selectedPluginType && !selectedPluginType.isworkflowactivity);
     const canRegisterImage = !!selectedStep;
     const isStepSelected = !!selectedStep;
@@ -1078,6 +1228,7 @@ export default function App() {
         else if (selectedStep) setShowUpdateStep(true);
         else if (selectedImage) setShowUpdateImage(true);
         else if (selectedEndpoint) setShowUpdateEndpoint(true);
+        else if (editedCustomApi) setShowUpdateCustomApi(true);
     };
 
     const handleUnregisterSelected = () => {
@@ -1086,6 +1237,8 @@ export default function App() {
         else if (selectedStep) void handleUnregisterStep();
         else if (selectedImage) void handleUnregisterImage();
         else if (selectedEndpoint) void handleUnregisterServiceEndpoint();
+        else if (selectedCustomApi) void handleDeleteCustomApi();
+        else if (selectedCustomApiField) void handleDeleteCustomApiField();
     };
 
     // Double-click tree node → open update dialog
@@ -1111,6 +1264,9 @@ export default function App() {
         } else if (node.type === "serviceendpoint") {
             setSelectedNode(node);
             setShowUpdateEndpoint(true);
+        } else if (node.type === "customapi" || node.type === "customapi-requestparameter" || node.type === "customapi-responseproperty") {
+            setSelectedNode(node);
+            setShowUpdateCustomApi(true);
         }
     };
 
@@ -1127,7 +1283,7 @@ export default function App() {
     const bottomSteps = selectedPluginType ? (steps.get(selectedPluginType.plugintypeid) ?? []) : [];
     const bottomImages = selectedStep ? (images.get(selectedStep.sdkmessageprocessingstepid) ?? []) : [];
 
-    const rawTreeNodes = buildTreeNodes(assemblies, packages, pluginTypes, steps, images, expandedIds, serviceEndpoints, endpointSteps, showPlugins, showEndpoints, viewMode);
+    const rawTreeNodes = buildTreeNodes(assemblies, packages, pluginTypes, steps, images, expandedIds, serviceEndpoints, endpointSteps, showPlugins, showEndpoints, viewMode, customApis);
 
     const treeNodes = searchTerm
         ? filterTreeForSearch(rawTreeNodes, searchTerm.toLowerCase())
@@ -1179,6 +1335,17 @@ export default function App() {
                             >
                                 New Package
                             </div>
+                            {customApiSupported && (
+                                <div
+                                    className="toolbar-dropdown-item"
+                                    onClick={() => {
+                                        setShowRegisterCustomApi(true);
+                                        setShowRegisterDropdown(false);
+                                    }}
+                                >
+                                    New Custom API
+                                </div>
+                            )}
                             {canRegisterStep && (
                                 <div
                                     className="toolbar-dropdown-item"
@@ -1237,7 +1404,7 @@ export default function App() {
                 {/* View dropdown */}
                 <div className="toolbar-group" ref={viewDropdownRef}>
                     <button className="toolbar-btn" onClick={() => setShowViewDropdown((v) => !v)}>
-                        View: {viewMode === 'packages' ? 'Packages' : 'Assemblies'} <span className="dropdown-arrow">▾</span>
+                        View: {VIEW_LABELS[viewMode]} <span className="dropdown-arrow">▾</span>
                     </button>
                     {showViewDropdown && (
                         < div className="toolbar-dropdown">
@@ -1253,6 +1420,14 @@ export default function App() {
                             >
                                 Packages
                             </div>
+                            {customApiSupported && (
+                                <div
+                                    className={`toolbar-dropdown-item${viewMode === 'customapis' ? ' toolbar-dropdown-item--active' : ''}`}
+                                    onClick={() => { setViewMode('customapis'); setShowViewDropdown(false); setSelectedNode(null); }}
+                                >
+                                    Custom APIs
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -1373,7 +1548,9 @@ export default function App() {
                         emptyMessage={
                             searchTerm
                                 ? `No results for "${searchTerm}"`
-                                : "No assemblies found. Click Register → New Assembly to add one."
+                                : viewMode === 'customapis'
+                                    ? "No Custom APIs found. Click Register → New Custom API to add one."
+                                    : "No assemblies found. Click Register → New Assembly to add one."
                         }
                     />
                 </div>
@@ -1423,6 +1600,15 @@ export default function App() {
                             onUnregister={() => void handleUnregisterImage()}
                         />
                     )}
+                    {editedCustomApi && (selectedCustomApi || selectedCustomApiField) && (
+                        <CustomApiDetails
+                            api={editedCustomApi}
+                            field={selectedCustomApiField ?? undefined}
+                            pluginTypeName={editedCustomApi.plugintypeid ? pluginTypeNames.get(editedCustomApi.plugintypeid.toLowerCase()) : undefined}
+                            onUpdate={() => setShowUpdateCustomApi(true)}
+                            onDelete={() => void (selectedCustomApi ? handleDeleteCustomApi() : handleDeleteCustomApiField())}
+                        />
+                    )}
                     {selectedEndpoint && (
                         <ServiceEndpointDetails
                             endpoint={selectedEndpoint}
@@ -1451,6 +1637,21 @@ export default function App() {
                     onSave={(identityId, identitiesChanged) => handleSaveManagedIdentity(identityId, identitiesChanged)}
                     onIdentitiesChanged={() => void loadAll()}
                     onClose={() => setShowManagedIdentity(false)}
+                />
+            )}
+            <RegisterCustomApiDialog
+                isOpen={showRegisterCustomApi}
+                assemblies={assemblies}
+                onSave={(draft, solution) => handleCreateCustomApi(draft, solution)}
+                onClose={() => setShowRegisterCustomApi(false)}
+            />
+            {editedCustomApi && (
+                <RegisterCustomApiDialog
+                    isOpen={showUpdateCustomApi}
+                    existing={editedCustomApi}
+                    assemblies={assemblies}
+                    onSave={(draft) => handleUpdateCustomApi(draft)}
+                    onClose={() => setShowUpdateCustomApi(false)}
                 />
             )}
             <RegisterPackageDialog
