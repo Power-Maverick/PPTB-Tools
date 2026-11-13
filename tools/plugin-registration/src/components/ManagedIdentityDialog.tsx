@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ManagedIdentity } from "../models/interfaces";
 import { SUBJECT_SCOPES } from "../models/interfaces";
-import { DataverseClient } from "../utils/DataverseClient";
+import { DataverseClient, managedIdentityLabel } from "../utils/DataverseClient";
 import { EditManagedIdentityDialog } from "./EditManagedIdentityDialog";
 
 const client = new DataverseClient();
@@ -127,7 +127,7 @@ export function ManagedIdentityDialog({
 
     const handleDelete = async () => {
         if (!selected) return;
-        if (!window.confirm(`Delete the managed identity "${selected.name}"?\n\nPlug-ins that use it will no longer be able to get tokens.`)) return;
+        if (!window.confirm(`Delete the managed identity "${managedIdentityLabel(selected)}"?\n\nPlug-ins that use it will no longer be able to get tokens.`)) return;
         setError("");
         try {
             await client.deleteManagedIdentity(selected.managedidentityid);
@@ -170,10 +170,13 @@ export function ManagedIdentityDialog({
                                 <option value="">{loading ? "Loading…" : "(None)"}</option>
                                 {identities.map((i) => (
                                     <option key={i.managedidentityid} value={i.managedidentityid}>
-                                        {i.name || i.applicationid}
+                                        {managedIdentityLabel(i)}
                                     </option>
                                 ))}
                             </select>
+                            {selected && !selected.name.trim() && (
+                                <div className="form-hint">This identity has no name. Choose Edit… to give it one.</div>
+                            )}
                         </div>
                         <div className="form-row" style={{ display: "flex", gap: 8 }}>
                             <button className="btn-secondary" disabled={loading || loadFailed} onClick={() => setEditor({})}>New…</button>

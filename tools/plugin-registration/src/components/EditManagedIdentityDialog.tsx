@@ -40,7 +40,8 @@ export function EditManagedIdentityDialog({ isOpen, existing, defaultName, onSav
 
     useEffect(() => {
         if (!isOpen) return;
-        setName(existing?.name ?? defaultName);
+        // Identities created outside the tool may have no name; suggest one so saving an edit names it.
+        setName(existing?.name?.trim() || defaultName);
         setApplicationId(existing?.applicationid ?? "");
         setTenantId(existing?.tenantid ?? "");
         setSubjectScope(existing?.subjectscope ?? 1);

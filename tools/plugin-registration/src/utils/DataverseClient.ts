@@ -24,7 +24,17 @@ function buildManagedIdentityBind(identityId: string): string {
   return `/managedidentities(${identityId})`;
 }
 
-const MANAGED_IDENTITY_SELECT = "managedidentityid,name,applicationid,tenantid,subjectscope,version,credentialsource";
+/**
+ * Display label for a managed identity. Identities created through the Web API (as in Microsoft's
+ * setup steps) often have no name, so fall back to a label built from the application ID.
+ */
+export function managedIdentityLabel(identity: { name?: string | null; applicationid?: string | null }): string {
+  const name = identity.name?.trim();
+  if (name) return name;
+  return identity.applicationid ? `(No name) App ID ${identity.applicationid}` : "(No name)";
+}
+
+const MANAGED_IDENTITY_SELECT ="managedidentityid,name,applicationid,tenantid,subjectscope,version,credentialsource";
 
 function toManagedIdentity(m: Record<string, unknown>): ManagedIdentity {
   return {
@@ -419,11 +429,16 @@ export class DataverseClient {
     }
   }
 
-  /** Names of all managed identities by id, for showing the linked identity on assemblies and packages. */
+  /** Display labels (see {@link managedIdentityLabel}) of all managed identities by id, for showing the linked identity on assemblies and packages. */
   async fetchManagedIdentityNames(): Promise<Map<string, string>> {
     try {
-      const response = await window.dataverseAPI.queryData("managedidentities?$select=managedidentityid,name", "primary");
-      return new Map((response.value as Record<string, unknown>[]).map((m) => [m["managedidentityid"] as string, (m["name"] as string) ?? ""]));
+      const response = await window.dataverseAPI.queryData("managedidentities?$select=managedidentityid,name,applicationid", "primary");
+      return new Map(
+        (response.value as Record<string, unknown>[]).map((m) => [
+          m["managedidentityid"] as string,
+          managedIdentityLabel({ name: m["name"] as string | undefined, applicationid: m["applicationid"] as string | undefined }),
+        ]),
+      );
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to fetch managed identity names: ${msg}`);
