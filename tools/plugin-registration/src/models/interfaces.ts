@@ -9,6 +9,7 @@ export interface PluginAssembly {
   description: string;
   content?: string; // base64 encoded assembly
   _packageid_value?: string; // GUID of the parent pluginpackage, null = standalone
+  _managedidentityid_value?: string; // GUID of the linked managedidentity (online only)
   createdon?: string;
   modifiedon?: string;
 }
@@ -83,8 +84,39 @@ export interface PluginPackage {
   version: string;
   content?: string; // base64 encoded .nupkg (write-only on create/update)
   ismanaged?: boolean;
+  _managedidentityid_value?: string; // GUID of the linked managedidentity (online only)
   createdon?: string;
   modifiedon?: string;
+}
+
+/**
+ * A Dataverse managedidentity record. Plug-in assemblies and packages use it to get tokens through
+ * IManagedIdentityService, with a federated identity credential on the app registration in Entra ID.
+ */
+export interface ManagedIdentity {
+  managedidentityid: string;
+  name: string;
+  applicationid: string;
+  tenantid: string;
+  subjectscope: number; // see SUBJECT_SCOPES
+  version: number | null; // empty = the original, deprecated format (version 0)
+  credentialsource?: number; // 2 = IsManaged, the kind plug-ins use
+}
+
+/** Values the managed identity dialogs edit; the id is empty for a new identity. */
+export type ManagedIdentityInput = Omit<ManagedIdentity, "managedidentityid" | "credentialsource">;
+
+export const SUBJECT_SCOPES: Record<number, string> = { 0: "Global", 1: "Environment", 2: "DevOnly" };
+
+/** credentialsource value for identities used by plug-ins. */
+export const MI_CREDENTIAL_SOURCE_MANAGED = 2;
+
+/** Version 2 builds the federated credential subject from the certificate DN hashes; Microsoft recommends it. */
+export const RECOMMENDED_MI_VERSION = 2;
+
+export interface SolutionOption {
+  uniquename: string;
+  friendlyname: string;
 }
 
 export interface ServiceEndpoint {
