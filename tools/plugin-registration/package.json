@@ -15,6 +15,11 @@
     }
   ],
   "license": "GPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Power-Maverick/PPTB-Tools.git",
+    "directory": "tools/plugin-registration"
+  },
   "configurations": {
     "repository": "https://github.com/Power-Maverick/PPTB-Tools/tree/main/tools/plugin-registration",
     "readmeUrl": "https://raw.githubusercontent.com/Power-Maverick/PPTB-Tools/refs/heads/main/tools/plugin-registration/README.md"
