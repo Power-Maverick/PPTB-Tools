@@ -1,19 +1,22 @@
-const assert = require("node:assert/strict");
-const { test } = require("node:test");
-const fs = require("node:fs");
-const path = require("node:path");
-const vm = require("node:vm");
-const ts = require("typescript");
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { runInNewContext } from "node:vm";
+import { test } from "vitest";
+import * as ts from "typescript";
+
+const testDirectory = dirname(fileURLToPath(import.meta.url));
 
 function loadSource(relativePath, window = {}) {
-    const filename = path.resolve(__dirname, "../src", relativePath);
-    const { outputText } = ts.transpileModule(fs.readFileSync(filename, "utf8"), {
+    const filename = resolve(testDirectory, "../src", relativePath);
+    const { outputText } = ts.transpileModule(readFileSync(filename, "utf8"), {
         compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
     });
     const exports = {};
-    vm.runInNewContext(outputText, {
+    runInNewContext(outputText, {
         exports, window, console, setTimeout,
-        require: (name) => loadSource(path.relative(path.resolve(__dirname, "../src"), path.resolve(path.dirname(filename), `${name}.ts`)), window),
+        require: (name) => loadSource(relative(resolve(testDirectory, "../src"), resolve(dirname(filename), `${name}.ts`)), window),
     }, { filename });
     return exports;
 }
