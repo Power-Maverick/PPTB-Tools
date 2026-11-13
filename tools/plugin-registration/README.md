@@ -70,6 +70,18 @@ Preview production build:
 npm run preview
 ```
 
+### Publishing
+
+The [Publish Plugin Registration workflow](../../.github/workflows/publish-plugin-registration.yml) installs dependencies, builds, tests, and publishes `@power-maverick/tool-plugin-registration` publicly to npm when a pull request containing changes under `tools/plugin-registration/` is merged into `main`, or when manually dispatched on `main`. Update the package version before merging a release if that version already exists on npm.
+
+To publish manually, open GitHub **Actions > Publish Plugin Registration > Run workflow**, select **main**, and click **Run workflow**. Manual runs on other branches skip the publish job.
+
+Configure an npm trusted publisher for this package using the `Power-Maverick/PPTB-Tools` repository and the `publish-plugin-registration.yml` workflow filename. The workflow uses OIDC rather than a stored npm token.
+
+Keep the top-level `repository.url` in [package.json](./package.json) set to `git+https://github.com/Power-Maverick/PPTB-Tools.git`, with `repository.directory` set to `tools/plugin-registration`. npm verifies this repository against GitHub Actions provenance; `configurations.repository` is separate PPTB metadata and does not satisfy that check. A missing or mismatched npm repository URL causes an `E422` provenance verification failure.
+
+After correcting a failed release's metadata, merge a new pull request or manually dispatch the workflow on the updated `main` branch to publish the corrected package. Re-running the original failed workflow uses its original commit, not the updated manifest.
+
 ## Usage in ToolBox
 
 1. Build the tool:

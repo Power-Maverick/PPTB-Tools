@@ -1,7 +1,7 @@
 {
     "name": "@power-maverick/tool-data-migrator",
     "displayName": "Data Migrator",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "description": "Migrate data from one Dataverse environment to another with auto-mapping and smart operations",
     "icon": "icons/dataMigrator.svg",
     "contributors": [
