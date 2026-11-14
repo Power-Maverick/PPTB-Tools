@@ -20,6 +20,9 @@ function getTypeLabel(node: TreeNode): string {
         case "package-group": return "Package Group";
         case "package": return "Package";
         case "serviceendpoint": return node.isWebhook ? "Webhook" : "Service Endpoint";
+        case "customapi": return "Custom API";
+        case "customapi-requestparameter": return "Request Parameter";
+        case "customapi-responseproperty": return "Response Property";
     }
 }
 
@@ -37,6 +40,9 @@ function getIconClass(node: TreeNode): string {
     if (node.type === "message-group") return "node-icon node-icon-message";
     if (node.type === "package-group") return "node-icon node-icon-package";
     if (node.type === "serviceendpoint") return node.isWebhook ? "node-icon node-icon-webhook" : "node-icon node-icon-endpoint";
+    if (node.type === "customapi") return "node-icon node-icon-customapi";
+    if (node.type === "customapi-requestparameter") return "node-icon node-icon-customapi-request";
+    if (node.type === "customapi-responseproperty") return "node-icon node-icon-customapi-response";
     return "node-icon node-icon-image";
 }
 
@@ -49,6 +55,9 @@ function getIconText(node: TreeNode): string {
     if (node.type === "message-group") return "M";
     if (node.type === "package-group") return "K";
     if (node.type === "serviceendpoint") return node.isWebhook ? "W" : "E";
+    if (node.type === "customapi") return "C";
+    if (node.type === "customapi-requestparameter") return "Rq";
+    if (node.type === "customapi-responseproperty") return "Rp";
     return "I";
 }
 
@@ -70,7 +79,8 @@ function FlatNode({ node, depth, selectedId, onSelectNode, onToggleExpand, onDou
     // OR children have been fetched and there is at least one child.
     // package-group nodes are synthesized with their children already attached (e.g. orphan
     // assemblies under a package), so allow them to toggle whenever they actually have children.
-    const canHaveChildren = node.type !== "image" && node.type !== "entity-group" && node.type !== "message-group";
+    const canHaveChildren = node.type !== "image" && node.type !== "entity-group" && node.type !== "message-group"
+        && node.type !== "customapi-requestparameter" && node.type !== "customapi-responseproperty";
     const showToggle = canHaveChildren && (
         !node.childrenLoaded || (node.children?.length ?? 0) > 0
     );

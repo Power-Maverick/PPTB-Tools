@@ -403,6 +403,18 @@ body {
     background-color: #7719aa;
 }
 
+.node-icon-customapi {
+    background-color: #8a3707;
+}
+
+.node-icon-customapi-request {
+    background-color: #498205;
+}
+
+.node-icon-customapi-response {
+    background-color: #005b70;
+}
+
 .tree-node-type {
     font-size: 11px;
     color: var(--text-secondary);
@@ -820,6 +832,80 @@ button:disabled {
     width: 15px;
     height: 15px;
     cursor: pointer;
+}
+
+/* ── Custom API dialog ── */
+.dialog.dialog-wide {
+    width: 860px;
+}
+
+.form-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 14px;
+}
+
+.form-inline {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.form-inline .form-select {
+    flex: 1;
+}
+
+.form-inline-end {
+    justify-content: flex-end;
+}
+
+.form-subsection {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color, #d0d0d0);
+    border-radius: 4px;
+}
+
+.form-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    margin: 6px 0 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.field-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-bottom: 12px;
+}
+
+.field-table th {
+    background-color: var(--grid-header-bg);
+    border: 1px solid var(--border-color);
+    padding: 3px 6px;
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.field-table td {
+    border: 1px solid var(--border-color);
+    padding: 2px 4px;
+    vertical-align: middle;
+}
+
+.field-table .form-input,
+.field-table .form-select {
+    padding: 3px 6px;
+}
+
+.field-table-empty {
+    color: var(--text-secondary);
+    font-style: italic;
+    text-align: center;
 }
 
 /* ── Loading / Error ── */
