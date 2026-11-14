@@ -1,4 +1,4 @@
-import type { CustomApi, CustomApiField, CustomApiRequestParameter } from "../models/interfaces";
+import type { CustomApi, CustomApiField, CustomApiRequestParameter, NewSolutionInput } from "../models/interfaces";
 import {
   CUSTOM_API_BINDING_ENTITY,
   CUSTOM_API_BINDING_ENTITY_COLLECTION,
@@ -54,7 +54,9 @@ export function isLocked(record: { ismanaged: boolean; iscustomizable: boolean }
 /** Suggests a unique name from a display name: letters, digits and underscores only. */
 export function suggestUniqueName(displayName: string, prefix = ""): string {
   const body = displayName.replace(/[^A-Za-z0-9_]/g, "");
-  return prefix ? `${prefix}_${body}` : body;
+  if (prefix) return `${prefix}_${body}`;
+  // A unique name can't start with a digit.
+  return /^[0-9]/.test(body) ? `_${body}` : body;
 }
 
 /** Whether a table logical name can be given for this parameter type. */
@@ -379,5 +381,40 @@ export function newCustomApiField(customApiId: string): CustomApiRequestParamete
     ismanaged: false,
     iscustomizable: true,
     isoptional: false,
+  };
+}
+
+// ── New solutions ──
+
+// Two to four parts, each a 32-bit integer as Dataverse stores them.
+const SOLUTION_VERSION = /^\d{1,10}(\.\d{1,10}){1,3}$/;
+const MAX_VERSION_PART = 2147483647;
+
+/** Validates a new unmanaged solution, as XrmToolBox does. Returns the problems found. */
+export function validateNewSolution(solution: NewSolutionInput): string[] {
+  const errors: string[] = [];
+  if (!solution.friendlyname.trim()) errors.push("Solution display name is required.");
+  else if (solution.friendlyname.length > 256) errors.push("Solution display name cannot exceed 256 characters.");
+  if (!solution.uniquename) errors.push("Solution unique name is required.");
+  else if (solution.uniquename.length > 65 || !IDENTIFIER.test(solution.uniquename)) {
+    errors.push("Solution unique name must start with a letter or underscore and contain only letters, digits, and underscores (65 characters maximum).");
+  }
+  const version = solution.version.trim();
+  if (!SOLUTION_VERSION.test(version) || version.split(".").some((part) => Number(part) > MAX_VERSION_PART)) {
+    errors.push("Enter a solution version such as 1.0.0.0.");
+  }
+  if (!isGuid(solution.publisherid)) errors.push("Select a solution publisher.");
+  return errors;
+}
+
+/** The solution record to create, with the version padded to four parts. */
+export function solutionCreateRecord(solution: NewSolutionInput): Record<string, unknown> {
+  const parts = solution.version.trim().split(".");
+  while (parts.length < 4) parts.push("0");
+  return {
+    uniquename: solution.uniquename,
+    friendlyname: solution.friendlyname.trim(),
+    version: parts.map((p) => String(Number(p))).join("."),
+    "publisherid@odata.bind": `/publishers(${solution.publisherid})`,
   };
 }

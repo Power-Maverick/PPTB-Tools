@@ -267,3 +267,57 @@ describe("deleting", () => {
             .rejects.toThrow("A managed response property must be removed through its managed solution.");
     });
 });
+
+describe("fetchStepsForMessage", () => {
+    const MESSAGE_ID = "88888888-8888-4888-8888-888888888888";
+    const PLUGIN_TYPE_ID = "22222222-2222-4222-8222-222222222222";
+
+    it("loads the message's steps and sets each step's plug-in type or service endpoint", async () => {
+        queryAnswers = [["sdkmessageprocessingsteps?", [
+            { sdkmessageprocessingstepid: "s1", name: "Plug-in step", stage: 40, _sdkmessageid_value: MESSAGE_ID, sdkmessageid: { name: "sample_Echo" }, eventhandler_plugintype: { plugintypeid: PLUGIN_TYPE_ID }, eventhandler_serviceendpoint: null },
+            { sdkmessageprocessingstepid: "s2", name: "Endpoint step", stage: 40, _sdkmessageid_value: MESSAGE_ID, sdkmessageid: { name: "sample_Echo" }, eventhandler_plugintype: null, eventhandler_serviceendpoint: { serviceendpointid: SOLUTION_ID } },
+        ]]];
+
+        const steps = await client.fetchStepsForMessage(MESSAGE_ID);
+
+        expect(queryData.mock.calls[0][0]).toContain(`$filter=_sdkmessageid_value eq ${MESSAGE_ID}`);
+        expect(steps.map((s) => [s.name, s.messageName, s.plugintypeid, s.serviceendpointid])).toEqual([
+            ["Plug-in step", "sample_Echo", PLUGIN_TYPE_ID, undefined],
+            ["Endpoint step", "sample_Echo", undefined, SOLUTION_ID],
+        ]);
+    });
+
+    it("rejects an invalid message id without querying", async () => {
+        await expect(client.fetchStepsForMessage("x' or 1 eq 1")).rejects.toThrow("Invalid message ID");
+        expect(queryData).not.toHaveBeenCalled();
+    });
+});
+
+describe("solutions", () => {
+    const PUBLISHER_ID = "99999999-9999-4999-8999-999999999999";
+
+    it("lists only editable publishers with a customization prefix", async () => {
+        queryAnswers = [["publishers?", [
+            { publisherid: PUBLISHER_ID, friendlyname: "Contoso", customizationprefix: "sample" },
+            { publisherid: SOLUTION_ID, friendlyname: "Microsoft", customizationprefix: "" },
+        ]]];
+        await expect(client.fetchPublishers()).resolves.toEqual([{ publisherid: PUBLISHER_ID, friendlyname: "Contoso", customizationprefix: "sample" }]);
+        expect(queryData.mock.calls[0][0]).toContain("$filter=isreadonly eq false");
+    });
+
+    it("creates an unmanaged solution bound to its publisher", async () => {
+        const created = await client.createSolution({ friendlyname: " Custom APIs ", uniquename: "CustomApis", version: "1.0", publisherid: PUBLISHER_ID });
+        expect(created).toEqual({ uniquename: "CustomApis", friendlyname: "Custom APIs" });
+        expect(create).toHaveBeenCalledWith("solution", {
+            uniquename: "CustomApis",
+            friendlyname: "Custom APIs",
+            version: "1.0.0.0",
+            "publisherid@odata.bind": `/publishers(${PUBLISHER_ID})`,
+        }, "primary");
+    });
+
+    it("refuses an invalid solution without creating anything", async () => {
+        await expect(client.createSolution({ friendlyname: "", uniquename: "1bad", version: "one", publisherid: "" })).rejects.toThrow("Failed to create the solution");
+        expect(create).not.toHaveBeenCalled();
+    });
+});

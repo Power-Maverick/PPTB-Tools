@@ -103,7 +103,7 @@ export function CustomApiDetails({ api, field, pluginTypeName, onUpdate, onDelet
                 <div className="field-hint">
                     <div className="field-hint-label">Custom API</div>
                     <div className="field-hint-desc">
-                        Register steps on its message ({api.uniquename}) from a plug-in type, like any other message.
+                        Steps on its message ({api.uniquename}) are listed under it. Register them from a plug-in type, like any other message.
                     </div>
                 </div>
                 <div className="details-footer-actions">

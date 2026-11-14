@@ -24,8 +24,16 @@ type ViewMode = 'assemblies' | 'packages' | 'customapis';
 
 const VIEW_LABELS: Record<ViewMode, string> = { assemblies: 'Assemblies', packages: 'Packages', customapis: 'Custom APIs' };
 
-/** Tree nodes for the Custom APIs view: each API with its request parameters and response properties. */
-function buildCustomApiNodes(customApis: CustomApi[], expandedIds: Set<string>): TreeNode[] {
+/**
+ * Tree nodes for the Custom APIs view: each API with its request parameters, response properties and,
+ * once loaded, the steps registered on its message with their images.
+ */
+function buildCustomApiNodes(
+    customApis: CustomApi[],
+    expandedIds: Set<string>,
+    customApiSteps: Map<string, ProcessingStep[]> = new Map(),
+    images: Map<string, StepImage[]> = new Map(),
+): TreeNode[] {
     return customApis.map((api) => ({
         id: api.customapiid,
         type: "customapi" as const,
@@ -34,6 +42,20 @@ function buildCustomApiNodes(customApis: CustomApi[], expandedIds: Set<string>):
         children: [
             ...api.requestParameters.map((p) => ({ id: p.id, type: "customapi-requestparameter" as const, name: p.uniquename, data: p })),
             ...api.responseProperties.map((p) => ({ id: p.id, type: "customapi-responseproperty" as const, name: p.uniquename, data: p })),
+            ...(customApiSteps.get(api.customapiid.toLowerCase()) ?? []).map((step) => ({
+                id: step.sdkmessageprocessingstepid,
+                type: "step" as const,
+                name: step.name,
+                data: step,
+                children: (images.get(step.sdkmessageprocessingstepid) ?? []).map((img) => ({
+                    id: img.sdkmessageprocessingstepimageid,
+                    type: "image" as const,
+                    name: img.name,
+                    data: img,
+                })),
+                isExpanded: expandedIds.has(step.sdkmessageprocessingstepid),
+                childrenLoaded: images.has(step.sdkmessageprocessingstepid),
+            })),
         ],
         isExpanded: expandedIds.has(api.customapiid),
         childrenLoaded: true,
@@ -55,8 +77,9 @@ function buildTreeNodes(
     showEndpoints: boolean,
     viewMode: ViewMode,
     customApis: CustomApi[],
+    customApiSteps: Map<string, ProcessingStep[]>,
 ): TreeNode[] {
-    if (viewMode === 'customapis') return buildCustomApiNodes(customApis, expandedIds);
+    if (viewMode === 'customapis') return buildCustomApiNodes(customApis, expandedIds, customApiSteps, images);
 
     // Inner helper: build a single assembly node (recursive into types/steps/images)
     const buildAssemblyNode = (asm: PluginAssembly): TreeNode => {
@@ -208,6 +231,8 @@ export default function App() {
     // Custom APIs: only offered when the environment has the customapi table
     const [customApiSupported, setCustomApiSupported] = useState(false);
     const [customApis, setCustomApis] = useState<CustomApi[]>([]);
+    // Steps on each Custom API's message, keyed by lowercase API id; loaded when the API is expanded
+    const [customApiSteps, setCustomApiSteps] = useState<Map<string, ProcessingStep[]>>(new Map());
     const [pluginTypeNames, setPluginTypeNames] = useState<Map<string, string>>(new Map());
 
     // Tree state
@@ -294,6 +319,7 @@ export default function App() {
         setManagedIdentityNames(new Map());
         setCustomApiSupported(apiSupported);
         setCustomApis([]);
+        setCustomApiSteps(new Map());
         if (!apiSupported) setViewMode((v) => (v === 'customapis' ? 'assemblies' : v));
         // Fetch independently — one failure must not block the other
         const [assembliesResult, endpointsResult, packagesResult, identityNamesResult, customApisResult, pluginTypeNamesResult] = await Promise.allSettled([
@@ -443,33 +469,19 @@ export default function App() {
                     break;
                 }
             }
-            for (const [, ss] of steps) {
-                const step = ss.find((s: ProcessingStep) => s.sdkmessageprocessingstepid === nodeId);
-                if (step && !images.has(nodeId)) {
-                    try {
-                        const imgs = await client.fetchImages(nodeId);
-                        setImages((prev: Map<string, StepImage[]>) => new Map(prev).set(nodeId, imgs));
-                    } catch (err) {
-                        console.error(err);
-                    }
-                    break;
-                }
-            }
-            // Also check endpoint steps for image loading
-            for (const [, ss] of endpointSteps) {
-                const step = ss.find((s: ProcessingStep) => s.sdkmessageprocessingstepid === nodeId);
-                if (step && !images.has(nodeId)) {
-                    try {
-                        const imgs = await client.fetchImages(nodeId);
-                        setImages((prev: Map<string, StepImage[]>) => new Map(prev).set(nodeId, imgs));
-                    } catch (err) {
-                        console.error(err);
-                    }
-                    break;
+            // A step can be listed under its plug-in type or endpoint and under a Custom API; load its images once.
+            const isStep = [...steps.values(), ...endpointSteps.values(), ...customApiSteps.values()]
+                .some((ss) => ss.some((st: ProcessingStep) => st.sdkmessageprocessingstepid === nodeId));
+            if (isStep && !images.has(nodeId)) {
+                try {
+                    const imgs = await client.fetchImages(nodeId);
+                    setImages((prev: Map<string, StepImage[]>) => new Map(prev).set(nodeId, imgs));
+                } catch (err) {
+                    console.error(err);
                 }
             }
         },
-        [assemblies, pluginTypes, steps, images, serviceEndpoints, endpointSteps],
+        [assemblies, pluginTypes, steps, images, serviceEndpoints, endpointSteps, customApiSteps],
     );
 
     const notify = (message: string, type: "success" | "error" = "success") => {
@@ -688,6 +700,11 @@ export default function App() {
                 setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
                 const updated = s.find((st) => st.sdkmessageprocessingstepid === step.sdkmessageprocessingstepid);
                 if (updated) setSelectedNode((prev) => prev ? { ...prev, data: updated } : prev);
+            } else if (step.serviceendpointid) {
+                const s = await client.fetchStepsForEndpoint(step.serviceendpointid);
+                setEndpointSteps((prev) => new Map(prev).set(step.serviceendpointid!, s));
+                const updated = s.find((st) => st.sdkmessageprocessingstepid === step.sdkmessageprocessingstepid);
+                if (updated) setSelectedNode((prev) => prev ? { ...prev, data: updated } : prev);
             }
         } catch (err: unknown) {
             notify(err instanceof Error ? err.message : String(err), "error");
@@ -706,6 +723,9 @@ export default function App() {
             if (ptId) {
                 const s = await client.fetchSteps(ptId);
                 setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(ptId, s));
+            } else if (step.serviceendpointid) {
+                const s = await client.fetchStepsForEndpoint(step.serviceendpointid);
+                setEndpointSteps((prev) => new Map(prev).set(step.serviceendpointid!, s));
             }
         } catch (err: unknown) {
             notify(err instanceof Error ? err.message : String(err), "error");
@@ -1020,6 +1040,45 @@ export default function App() {
         }
     };
 
+    // ── Custom API steps ──
+
+    // Every step action refreshes the plug-in type or endpoint step lists. Steps under Custom APIs are a
+    // second view of the same records, so drop them then and let the effect below reload what is shown.
+    const customApiStepsGeneration = useRef(0);
+    const customApiStepsLoading = useRef(new Set<string>());
+    useEffect(() => {
+        customApiStepsGeneration.current += 1;
+        customApiStepsLoading.current.clear();
+        setCustomApiSteps(new Map());
+    }, [steps, endpointSteps]);
+
+    // Load the steps of each expanded Custom API that has a message, in the Custom APIs view only.
+    useEffect(() => {
+        if (viewMode !== 'customapis') return;
+        const loading = customApiStepsLoading.current;
+        const missing = customApis.filter((a) => {
+            const id = a.customapiid.toLowerCase();
+            return a.sdkmessageid && expandedIds.has(a.customapiid) && !customApiSteps.has(id) && !loading.has(id);
+        });
+        for (const api of missing) {
+            const id = api.customapiid.toLowerCase();
+            const generation = customApiStepsGeneration.current;
+            loading.add(id);
+            void client.fetchStepsForMessage(api.sdkmessageid!)
+                .catch((err: unknown) => {
+                    if (generation === customApiStepsGeneration.current) notify(err instanceof Error ? err.message : String(err), "error");
+                    return [] as ProcessingStep[];
+                })
+                .then((list) => {
+                    // Steps changed while loading: the effect loads this API again with fresh data.
+                    if (generation !== customApiStepsGeneration.current) return;
+                    loading.delete(id);
+                    setCustomApiSteps((prev) => new Map(prev).set(id, list));
+                });
+        }
+        // notify is recreated each render and only shows a toast
+    }, [viewMode, customApis, expandedIds, customApiSteps]);
+
     // ── Custom API actions ──
 
     /**
@@ -1170,20 +1229,38 @@ export default function App() {
                 const pt = pts.find((p) => p.plugintypeid === step.plugintypeid);
                 if (pt) return pt;
             }
+            // Steps under a Custom API don't need their assembly loaded: the step dialog needs only the type's id and name.
+            const typename = step.plugintypeid ? pluginTypeNames.get(step.plugintypeid.toLowerCase()) : undefined;
+            if (step.plugintypeid && typename) {
+                return {
+                    plugintypeid: step.plugintypeid, name: typename, typename, friendlyname: typename, description: "",
+                    isworkflowactivity: false, workflowactivitygroupname: "", pluginassemblyid: "", assemblyname: "",
+                };
+            }
         }
         return null;
     })();
 
+    // The Update Step dialog needs the step's plug-in type. Without it, don't leave the dialog pending to pop up later.
+    const stepPluginTypeMissing = selectedNode?.type === "step" && !(selectedNode.data as ProcessingStep).serviceendpointid && !stepPluginType;
+    useEffect(() => {
+        if (showUpdateStep && stepPluginTypeMissing) {
+            setShowUpdateStep(false);
+            notify("This step's plug-in type couldn't be found. Refresh and try again.", "error");
+        }
+        // notify only shows a toast
+    }, [showUpdateStep, stepPluginTypeMissing]);
+
     // Flat stepId → ProcessingStep lookup built once per steps change, used by imageStep below.
     const stepById = useMemo(() => {
         const map = new Map<string, ProcessingStep>();
-        for (const [, ss] of steps) {
+        for (const [, ss] of [...steps, ...customApiSteps]) {
             for (const s of ss) {
                 map.set(s.sdkmessageprocessingstepid, s);
             }
         }
         return map;
-    }, [steps]);
+    }, [steps, customApiSteps]);
 
     // When an image node is selected, find its parent step so the update-image dialog can be rendered.
     const imageStep: ProcessingStep | null = (() => {
@@ -1283,7 +1360,7 @@ export default function App() {
     const bottomSteps = selectedPluginType ? (steps.get(selectedPluginType.plugintypeid) ?? []) : [];
     const bottomImages = selectedStep ? (images.get(selectedStep.sdkmessageprocessingstepid) ?? []) : [];
 
-    const rawTreeNodes = buildTreeNodes(assemblies, packages, pluginTypes, steps, images, expandedIds, serviceEndpoints, endpointSteps, showPlugins, showEndpoints, viewMode, customApis);
+    const rawTreeNodes = buildTreeNodes(assemblies, packages, pluginTypes, steps, images, expandedIds, serviceEndpoints, endpointSteps, showPlugins, showEndpoints, viewMode, customApis, customApiSteps);
 
     const treeNodes = searchTerm
         ? filterTreeForSearch(rawTreeNodes, searchTerm.toLowerCase())

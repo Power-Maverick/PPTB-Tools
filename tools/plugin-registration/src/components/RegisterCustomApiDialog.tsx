@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import type { CustomApi, CustomApiField, CustomApiRequestParameter, PluginAssembly, SolutionOption } from "../models/interfaces";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { CustomApi, CustomApiField, CustomApiRequestParameter, NewSolutionInput, PluginAssembly, PublisherOption, SolutionOption } from "../models/interfaces";
 import {
     CUSTOM_API_BINDING_GLOBAL,
     CUSTOM_API_BINDING_TYPES,
     CUSTOM_API_PARAMETER_TYPES,
     CUSTOM_API_STEP_TYPES,
 } from "../models/interfaces";
-import { canSpecifyTable, isLocked, newCustomApi, newCustomApiField, suggestUniqueName, validateCustomApi } from "../utils/customApiRules";
+import { canSpecifyTable, isLocked, newCustomApi, newCustomApiField, suggestUniqueName, validateCustomApi, validateNewSolution } from "../utils/customApiRules";
 import type { CustomApiPluginTypeOption } from "../utils/DataverseClient";
 import { DataverseClient } from "../utils/DataverseClient";
 
@@ -51,6 +51,14 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
     const [prefix, setPrefix] = useState("");
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState<string[]>([]);
+    // Creating a solution from the dialog, as XrmToolBox does
+    const [newSolution, setNewSolution] = useState<NewSolutionInput | null>(null);
+    const [newSolutionNameTouched, setNewSolutionNameTouched] = useState(false);
+    const [publishers, setPublishers] = useState<PublisherOption[] | null>(null);
+    const [creatingSolution, setCreatingSolution] = useState(false);
+    const [loadingPublishers, setLoadingPublishers] = useState(false);
+    // Changes each time the dialog opens, so results that arrive after it closed are ignored.
+    const session = useRef(0);
 
     // Start from the saved API each time the dialog opens, and again when it is reloaded after a failed save
     // (part of that save may be stored). A reload keeps the error that explains it.
@@ -65,6 +73,11 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
         if (!isOpen) return;
         let cancelled = false;
         setSolutionUniqueName("");
+        session.current += 1;
+        setNewSolution(null);
+        setPublishers(null);
+        setLoadingPublishers(false);
+        setCreatingSolution(false);
         setPrefix("");
         setSaving(false);
         setErrors([]);
@@ -146,6 +159,70 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
 
     const removeField = (kind: FieldKind, index: number) => {
         setDraft((d) => ({ ...d, [listKey(kind)]: d[listKey(kind)].filter((_, i) => i !== index) }));
+    };
+
+    const openNewSolution = () => {
+        // With a single publisher there is nothing to choose.
+        setNewSolution({ friendlyname: "", uniquename: "", version: "1.0.0.0", publisherid: publishers?.length === 1 ? publishers[0].publisherid : "" });
+        setNewSolutionNameTouched(false);
+        if (publishers !== null || loadingPublishers) return;
+        const current = session.current;
+        setLoadingPublishers(true);
+        client.fetchPublishers()
+            .then((list) => {
+                if (current !== session.current) return;
+                setPublishers(list);
+                if (list.length === 1) setNewSolution((n) => (n && !n.publisherid ? { ...n, publisherid: list[0].publisherid } : n));
+            })
+            // Publishers stay unloaded, so opening the panel again retries.
+            .catch((err: unknown) => current === session.current && setErrors([err instanceof Error ? err.message : String(err)]))
+            .finally(() => current === session.current && setLoadingPublishers(false));
+    };
+
+    const editNewSolution = (changes: Partial<NewSolutionInput>) => {
+        setNewSolution((n) => {
+            if (!n) return n;
+            const next = { ...n, ...changes };
+            // Suggest the unique name from the display name until the user types one.
+            if (changes.friendlyname !== undefined && !newSolutionNameTouched) next.uniquename = suggestUniqueName(changes.friendlyname).slice(0, 65);
+            return next;
+        });
+    };
+
+    const handleCreateSolution = async () => {
+        if (!newSolution) return;
+        const found = validateNewSolution(newSolution);
+        const uniquename = newSolution.uniquename.toLowerCase();
+        if (solutions.some((x) => x.uniquename.toLowerCase() === uniquename)) {
+            found.push(`A solution named ${newSolution.uniquename} already exists. Select it in the list instead.`);
+        }
+        if (found.length > 0) {
+            setErrors(found);
+            return;
+        }
+        const current = session.current;
+        setCreatingSolution(true);
+        setErrors([]);
+        try {
+            const created = await client.createSolution(newSolution);
+            if (current !== session.current) return;
+            setSolutions((list) => [...list, created].sort((a, b) => a.friendlyname.localeCompare(b.friendlyname)));
+            setSolutionUniqueName(created.uniquename);
+            setNewSolution(null);
+        } catch (err: unknown) {
+            if (current !== session.current) return;
+            setErrors([err instanceof Error ? err.message : String(err)]);
+            // The create may be saved although it reported an error. The name wasn't in the list before, so a
+            // solution with it now is the one just created: offer it instead of a create that would clash.
+            const list = await client.fetchUnmanagedSolutions().catch(() => undefined);
+            const createdAnyway = list?.find((x) => x.uniquename.toLowerCase() === uniquename);
+            if (current !== session.current || !list || !createdAnyway) return;
+            setSolutions(list);
+            setSolutionUniqueName(createdAnyway.uniquename);
+            setNewSolution(null);
+        } finally {
+            if (current === session.current) setCreatingSolution(false);
+        }
     };
 
     const handleSave = async () => {
@@ -268,12 +345,58 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
                     {!isEdit && (
                         <div className="form-row">
                             <label className="form-label">Solution *</label>
-                            <select className="form-select" value={solutionUniqueName} onChange={(e) => setSolutionUniqueName(e.target.value)}>
-                                <option value="">(Select an unmanaged solution)</option>
-                                {solutions.map((s) => (
-                                    <option key={s.uniquename} value={s.uniquename}>{s.friendlyname}</option>
-                                ))}
-                            </select>
+                            <div className="form-inline">
+                                <select className="form-select" value={solutionUniqueName} onChange={(e) => setSolutionUniqueName(e.target.value)} disabled={!!newSolution}>
+                                    <option value="">(Select an unmanaged solution)</option>
+                                    {solutions.map((s) => (
+                                        <option key={s.uniquename} value={s.uniquename}>{s.friendlyname}</option>
+                                    ))}
+                                </select>
+                                {!newSolution && (
+                                    <button className="btn-secondary" onClick={openNewSolution} disabled={saving}>New solution…</button>
+                                )}
+                            </div>
+                            {newSolution && (
+                                <div className="form-subsection">
+                                    <div className="form-section-title">New Solution</div>
+                                    <div className="form-columns">
+                                        <div className="form-row">
+                                            <label className="form-label">Display Name *</label>
+                                            <input className="form-input" value={newSolution.friendlyname} maxLength={256}
+                                                onChange={(e) => editNewSolution({ friendlyname: e.target.value })} />
+                                        </div>
+                                        <div className="form-row">
+                                            <label className="form-label">Unique Name *</label>
+                                            <input className="form-input" value={newSolution.uniquename} maxLength={65}
+                                                onChange={(e) => {
+                                                    setNewSolutionNameTouched(true);
+                                                    editNewSolution({ uniquename: e.target.value });
+                                                }} />
+                                        </div>
+                                        <div className="form-row">
+                                            <label className="form-label">Publisher *</label>
+                                            <select className="form-select" value={newSolution.publisherid} onChange={(e) => editNewSolution({ publisherid: e.target.value })}>
+                                                <option value="">{loadingPublishers ? "Loading…" : "(Select a publisher)"}</option>
+                                                {(publishers ?? []).map((pub) => (
+                                                    <option key={pub.publisherid} value={pub.publisherid}>{`${pub.friendlyname} (${pub.customizationprefix})`}</option>
+                                                ))}
+                                            </select>
+                                            {publishers?.length === 0 && <div className="form-hint">No publishers with a prefix exist. Create one in Power Apps first.</div>}
+                                        </div>
+                                        <div className="form-row">
+                                            <label className="form-label">Version *</label>
+                                            <input className="form-input" value={newSolution.version} maxLength={50}
+                                                onChange={(e) => editNewSolution({ version: e.target.value })} />
+                                        </div>
+                                    </div>
+                                    <div className="form-inline form-inline-end">
+                                        <button className="btn-secondary" onClick={() => setNewSolution(null)} disabled={creatingSolution}>Cancel</button>
+                                        <button className="btn-primary" onClick={() => void handleCreateSolution()} disabled={creatingSolution}>
+                                            {creatingSolution ? "Creating…" : "Create Solution"}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                             <div className="form-hint">
                                 The API and its parameters are added to this solution. Its publisher prefix starts the unique name{prefix ? ` (${prefix}_)` : ""}.
                             </div>

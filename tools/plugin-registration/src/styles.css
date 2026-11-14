@@ -845,6 +845,27 @@ button:disabled {
     column-gap: 14px;
 }
 
+.form-inline {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.form-inline .form-select {
+    flex: 1;
+}
+
+.form-inline-end {
+    justify-content: flex-end;
+}
+
+.form-subsection {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color, #d0d0d0);
+    border-radius: 4px;
+}
+
 .form-section-title {
     font-size: 12px;
     font-weight: 600;

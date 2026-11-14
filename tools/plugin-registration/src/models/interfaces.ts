@@ -119,6 +119,21 @@ export interface SolutionOption {
   friendlyname: string;
 }
 
+/** A publisher that can own a new solution: one with a customization prefix. */
+export interface PublisherOption {
+  publisherid: string;
+  friendlyname: string;
+  customizationprefix: string;
+}
+
+/** The fields needed to create an unmanaged solution. */
+export interface NewSolutionInput {
+  friendlyname: string;
+  uniquename: string;
+  version: string;
+  publisherid: string;
+}
+
 export interface ServiceEndpoint {
   serviceendpointid: string;
   name: string;

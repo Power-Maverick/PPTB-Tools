@@ -1,9 +1,40 @@
-import type { CustomApi, CustomApiField, CustomApiRequestParameter, ManagedIdentity, ManagedIdentityInput, PluginAssembly, PluginPackage, PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, SolutionOption, StepImage, ServiceEndpoint } from "../models/interfaces";
+import type { CustomApi, CustomApiField, CustomApiRequestParameter, ManagedIdentity, ManagedIdentityInput, NewSolutionInput, PluginAssembly, PluginPackage, PluginType, ProcessingStep, PublisherOption, SdkMessage, SdkMessageFilter, SolutionOption, StepImage, ServiceEndpoint } from "../models/interfaces";
 import { MI_CREDENTIAL_SOURCE_MANAGED } from "../models/interfaces";
 import type { CustomApiChildTable } from "./customApiRules";
-import { customApiCreateRecord, isEmptyPlan, isGuid, planCustomApiUpdate, REQUEST_TABLE, RESPONSE_TABLE, validateCustomApi } from "./customApiRules";
+import { customApiCreateRecord, isEmptyPlan, isGuid, planCustomApiUpdate, REQUEST_TABLE, RESPONSE_TABLE, solutionCreateRecord, validateCustomApi, validateNewSolution } from "./customApiRules";
 
-/** A plug-in type offered as the handler of a Custom API. */
+/** Step columns and expands that {@link toProcessingStep} reads. */
+const STEP_SELECT = "sdkmessageprocessingstepid,name,description,rank,mode,stage,filteringattributes,asyncautodelete,statecode,_impersonatinguserid_value,_sdkmessageid_value,_sdkmessagefilterid_value,configuration,_sdkmessageprocessingstepsecureconfigid_value,supporteddeployment";
+const STEP_EXPAND = "sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)";
+
+/**
+ * Maps a sdkmessageprocessingstep row, queried with its message name and filter table expanded, to a
+ * step. The caller sets the step's handler: plugintypeid or serviceendpointid.
+ */
+function toProcessingStep(s: Record<string, unknown>): ProcessingStep {
+  const msgExpand = s["sdkmessageid"] as Record<string, unknown> | null;
+  const filterExpand = s["sdkmessagefilterid"] as Record<string, unknown> | null;
+  return {
+    sdkmessageprocessingstepid: s["sdkmessageprocessingstepid"] as string,
+    name: s["name"] as string,
+    description: (s["description"] as string) ?? "",
+    rank: (s["rank"] as number) ?? 1,
+    mode: (s["mode"] as number) ?? 0,
+    stage: (s["stage"] as number) ?? 40,
+    sdkmessageid: (s["_sdkmessageid_value"] as string) ?? "",
+    messageName: (msgExpand?.["name"] as string) ?? "",
+    sdkmessagefilterid: (s["_sdkmessagefilterid_value"] as string) ?? "",
+    primaryEntityName: (filterExpand?.["primaryobjecttypecode"] as string) ?? "none",
+    filteringattributes: (s["filteringattributes"] as string) ?? "",
+    asyncautodelete: (s["asyncautodelete"] as boolean) ?? false,
+    statecode: (s["statecode"] as number) ?? 0,
+    impersonatinguserid: (s["_impersonatinguserid_value"] as string) ?? undefined,
+    configuration: (s["configuration"] as string) ?? undefined,
+    secureconfigid: (s["_sdkmessageprocessingstepsecureconfigid_value"] as string) ?? undefined,
+    supporteddeployment: s["supporteddeployment"] != null ? (s["supporteddeployment"] as number) : undefined,
+  };
+}
+
 /** Thrown when a Custom API was created but could not be added to its solution. Carries the new API's id. */
 export class CustomApiCreatedError extends Error {
   constructor(readonly customApiId: string, message: string) {
@@ -12,6 +43,7 @@ export class CustomApiCreatedError extends Error {
   }
 }
 
+/** A plug-in type offered as the handler of a Custom API. */
 export interface CustomApiPluginTypeOption {
   plugintypeid: string;
   typename: string;
@@ -177,33 +209,10 @@ export class DataverseClient {
   async fetchSteps(pluginTypeId: string): Promise<ProcessingStep[]> {
     try {
       const response = await window.dataverseAPI.queryData(
-        `sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,description,rank,mode,stage,filteringattributes,asyncautodelete,statecode,_impersonatinguserid_value,_sdkmessageid_value,_sdkmessagefilterid_value,configuration,_sdkmessageprocessingstepsecureconfigid_value,supporteddeployment&$filter=_eventhandler_value eq '${pluginTypeId}'&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)&$orderby=name`,
+        `sdkmessageprocessingsteps?$select=${STEP_SELECT}&$filter=_eventhandler_value eq '${pluginTypeId}'&$expand=${STEP_EXPAND}&$orderby=name`,
         "primary",
       );
-      return (response.value as Record<string, unknown>[]).map((s) => {
-        const msgExpand = s["sdkmessageid"] as Record<string, unknown> | null;
-        const filterExpand = s["sdkmessagefilterid"] as Record<string, unknown> | null;
-        return {
-          sdkmessageprocessingstepid: s["sdkmessageprocessingstepid"] as string,
-          name: s["name"] as string,
-          description: (s["description"] as string) ?? "",
-          rank: (s["rank"] as number) ?? 1,
-          mode: (s["mode"] as number) ?? 0,
-          stage: (s["stage"] as number) ?? 40,
-          sdkmessageid: (s["_sdkmessageid_value"] as string) ?? "",
-          messageName: (msgExpand?.["name"] as string) ?? "",
-          sdkmessagefilterid: (s["_sdkmessagefilterid_value"] as string) ?? "",
-          primaryEntityName: (filterExpand?.["primaryobjecttypecode"] as string) ?? "none",
-          filteringattributes: (s["filteringattributes"] as string) ?? "",
-          asyncautodelete: (s["asyncautodelete"] as boolean) ?? false,
-          statecode: (s["statecode"] as number) ?? 0,
-          plugintypeid: pluginTypeId,
-          impersonatinguserid: (s["_impersonatinguserid_value"] as string) ?? undefined,
-          configuration: (s["configuration"] as string) ?? undefined,
-          secureconfigid: (s["_sdkmessageprocessingstepsecureconfigid_value"] as string) ?? undefined,
-          supporteddeployment: s["supporteddeployment"] != null ? (s["supporteddeployment"] as number) : undefined,
-        };
-      });
+      return (response.value as Record<string, unknown>[]).map((s) => ({ ...toProcessingStep(s), plugintypeid: pluginTypeId }));
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to fetch steps: ${msg}`);
@@ -806,6 +815,65 @@ export class DataverseClient {
     }
   }
 
+  /**
+   * Steps registered on a message, such as a Custom API's. Each step's handler is set from its event
+   * handler: a plug-in type or a service endpoint.
+   */
+  async fetchStepsForMessage(messageId: string): Promise<ProcessingStep[]> {
+    if (!isGuid(messageId)) throw new Error(`Invalid message ID: "${messageId}"`);
+    try {
+      const response = await window.dataverseAPI.queryData(
+        `sdkmessageprocessingsteps?$select=${STEP_SELECT}&$filter=_sdkmessageid_value eq ${messageId}&$expand=${STEP_EXPAND},eventhandler_plugintype($select=plugintypeid),eventhandler_serviceendpoint($select=serviceendpointid)&$orderby=name`,
+        "primary",
+      );
+      return (response.value as Record<string, unknown>[]).map((s) => {
+        const pluginType = s["eventhandler_plugintype"] as Record<string, unknown> | null;
+        const endpoint = s["eventhandler_serviceendpoint"] as Record<string, unknown> | null;
+        return {
+          ...toProcessingStep(s),
+          plugintypeid: (pluginType?.["plugintypeid"] as string) ?? undefined,
+          serviceendpointid: (endpoint?.["serviceendpointid"] as string) ?? undefined,
+        };
+      });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to fetch steps for message: ${msg}`);
+    }
+  }
+
+  /** Publishers that can own a new solution: editable ones with a customization prefix, ordered by name. */
+  async fetchPublishers(): Promise<PublisherOption[]> {
+    try {
+      const response = await window.dataverseAPI.queryData(
+        "publishers?$select=publisherid,friendlyname,customizationprefix&$filter=isreadonly eq false&$orderby=friendlyname",
+        "primary",
+      );
+      return (response.value as Record<string, unknown>[])
+        .map((p) => ({
+          publisherid: p["publisherid"] as string,
+          friendlyname: (p["friendlyname"] as string) ?? "",
+          customizationprefix: (p["customizationprefix"] as string) ?? "",
+        }))
+        .filter((p) => p.customizationprefix.trim() !== "");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to fetch publishers: ${msg}`);
+    }
+  }
+
+  /** Creates an unmanaged solution and returns it as a solution choice. */
+  async createSolution(solution: NewSolutionInput): Promise<SolutionOption> {
+    const errors = validateNewSolution(solution);
+    if (errors.length > 0) throw new Error(`Failed to create the solution: ${errors.join("\n")}`);
+    try {
+      await window.dataverseAPI.create("solution", solutionCreateRecord(solution), "primary");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create the solution: ${msg}`);
+    }
+    return { uniquename: solution.uniquename, friendlyname: solution.friendlyname.trim() };
+  }
+
   /** Unique names of the unmanaged, visible solutions (other than Default) that contain a record. */
   private async fetchUnmanagedSolutionsContaining(componentId: string): Promise<string[]> {
     if (!isGuid(componentId)) throw new Error(`Invalid component ID: "${componentId}"`);
@@ -1054,32 +1122,10 @@ export class DataverseClient {
   async fetchStepsForEndpoint(endpointId: string): Promise<ProcessingStep[]> {
     try {
       const response = await window.dataverseAPI.queryData(
-        `sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,description,rank,mode,stage,filteringattributes,asyncautodelete,statecode,_sdkmessageid_value,_sdkmessagefilterid_value,configuration,_sdkmessageprocessingstepsecureconfigid_value,supporteddeployment&$filter=_eventhandler_value eq '${endpointId}'&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)&$orderby=name`,
+        `sdkmessageprocessingsteps?$select=${STEP_SELECT}&$filter=_eventhandler_value eq '${endpointId}'&$expand=${STEP_EXPAND}&$orderby=name`,
         "primary",
       );
-      return (response.value as Record<string, unknown>[]).map((s) => {
-        const msgExpand = s["sdkmessageid"] as Record<string, unknown> | null;
-        const filterExpand = s["sdkmessagefilterid"] as Record<string, unknown> | null;
-        return {
-          sdkmessageprocessingstepid: s["sdkmessageprocessingstepid"] as string,
-          name: s["name"] as string,
-          description: (s["description"] as string) ?? "",
-          rank: (s["rank"] as number) ?? 1,
-          mode: (s["mode"] as number) ?? 0,
-          stage: (s["stage"] as number) ?? 40,
-          sdkmessageid: (s["_sdkmessageid_value"] as string) ?? "",
-          messageName: (msgExpand?.["name"] as string) ?? "",
-          sdkmessagefilterid: (s["_sdkmessagefilterid_value"] as string) ?? "",
-          primaryEntityName: (filterExpand?.["primaryobjecttypecode"] as string) ?? "none",
-          filteringattributes: (s["filteringattributes"] as string) ?? "",
-          asyncautodelete: (s["asyncautodelete"] as boolean) ?? false,
-          statecode: (s["statecode"] as number) ?? 0,
-          serviceendpointid: endpointId,
-          configuration: (s["configuration"] as string) ?? undefined,
-          secureconfigid: (s["_sdkmessageprocessingstepsecureconfigid_value"] as string) ?? undefined,
-          supporteddeployment: s["supporteddeployment"] != null ? (s["supporteddeployment"] as number) : undefined,
-        };
-      });
+      return (response.value as Record<string, unknown>[]).map((s) => ({ ...toProcessingStep(s), serviceendpointid: endpointId }));
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to fetch steps for endpoint: ${msg}`);

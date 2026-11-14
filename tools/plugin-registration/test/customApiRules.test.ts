@@ -8,6 +8,7 @@ import {
     planCustomApiUpdate,
     suggestUniqueName,
     validateCustomApi,
+    validateNewSolution,
 } from "../src/utils/customApiRules";
 
 const API_ID = "11111111-1111-4111-8111-111111111111";
@@ -281,5 +282,27 @@ describe("suggestUniqueName", () => {
     it("drops characters a unique name can't have and adds the prefix", () => {
         expect(suggestUniqueName("Get Account Score!", "sample")).toBe("sample_GetAccountScore");
         expect(suggestUniqueName("Input value")).toBe("Inputvalue");
+        expect(suggestUniqueName("2025 Release")).toBe("_2025Release");
+    });
+});
+
+describe("validateNewSolution", () => {
+    const valid = { friendlyname: "Custom APIs", uniquename: "CustomApis", version: "1.0.0.0", publisherid: PLUGIN_TYPE_ID };
+
+    it("accepts a complete solution and versions with two to four parts", () => {
+        expect(validateNewSolution(valid)).toEqual([]);
+        expect(validateNewSolution({ ...valid, version: "2.1" })).toEqual([]);
+    });
+
+    it("reports each missing or invalid field", () => {
+        expect(validateNewSolution({ friendlyname: " ", uniquename: "Has Space", version: "1", publisherid: "" })).toEqual([
+            "Solution display name is required.",
+            "Solution unique name must start with a letter or underscore and contain only letters, digits, and underscores (65 characters maximum).",
+            "Enter a solution version such as 1.0.0.0.",
+            "Select a solution publisher.",
+        ]);
+        expect(validateNewSolution({ ...valid, uniquename: "a".repeat(66) })).toHaveLength(1);
+        expect(validateNewSolution({ ...valid, version: "1.0.0.2147483648" })).toEqual(["Enter a solution version such as 1.0.0.0."]);
+        expect(validateNewSolution({ ...valid, version: "1.0.0.99999999999999999999" })).toEqual(["Enter a solution version such as 1.0.0.0."]);
     });
 });
