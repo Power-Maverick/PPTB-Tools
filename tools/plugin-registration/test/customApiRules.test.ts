@@ -104,6 +104,22 @@ describe("validateCustomApi for a new API", () => {
         expect(validateCustomApi(draft)).toEqual(["Response property 'Rows' cannot specify a table logical name for this type."]);
     });
 
+    it("checks an API enabled for workflow: not a function, and only types workflows can pass", () => {
+        expect(validateCustomApi(draftApi({ workflowsdkstepenabled: true, requestParameters: [request()] }))).toEqual([]);
+        expect(validateCustomApi(draftApi({ workflowsdkstepenabled: true, isfunction: true, responseProperties: [request()] }))).toContain(
+            "A Custom API enabled for workflow cannot be a function.",
+        );
+        const unsupported = [3, 4, 11].map((type, i) => request({ type, uniquename: `P${i}`, name: `P${i}`, displayname: `P${i}` }));
+        const errors = validateCustomApi(draftApi({ workflowsdkstepenabled: true, requestParameters: unsupported }));
+        expect(errors.filter((e) => e.endsWith("has a type that is not supported by workflow for this binding."))).toHaveLength(3);
+
+        const reference = [request({ type: 5 })];
+        expect(validateCustomApi(draftApi({ workflowsdkstepenabled: true, requestParameters: reference }))).toContain(
+            "Request parameter 'Input' has a type that is not supported by workflow for this binding.",
+        );
+        expect(validateCustomApi(draftApi({ workflowsdkstepenabled: true, bindingtype: 1, boundentitylogicalname: "account", requestParameters: reference }))).toEqual([]);
+    });
+
     it("refuses an unset choice read from Dataverse", () => {
         expect(validateCustomApi(draftApi({ bindingtype: -1 }))).toContain("Select a valid binding type.");
     });
@@ -211,6 +227,10 @@ describe("customApiCreateRecord", () => {
                 { name: "Output", displayname: "Output", description: null, uniquename: "Output", type: 5, logicalentityname: "account" },
             ],
         });
+    });
+
+    it("sends Enabled for Workflow when it is set", () => {
+        expect(customApiCreateRecord(draftApi({ workflowsdkstepenabled: true }))).toMatchObject({ workflowsdkstepenabled: true });
     });
 
     it("leaves out empty child lists and a missing plug-in type", () => {

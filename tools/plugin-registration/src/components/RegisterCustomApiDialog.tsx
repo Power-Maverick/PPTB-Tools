@@ -477,21 +477,31 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
                     </div>
                     <div style={{ display: "flex", gap: 20 }}>
                         <label className="form-checkbox-row">
-                            <input type="checkbox" checked={draft.isfunction} disabled={isEdit} onChange={(e) => set("isfunction", e.target.checked)} />
+                            <input type="checkbox" checked={draft.isfunction} disabled={isEdit || draft.workflowsdkstepenabled}
+                                title={!isEdit && draft.workflowsdkstepenabled ? "A Custom API enabled for workflow can't be a function." : undefined}
+                                onChange={(e) => set("isfunction", e.target.checked)} />
                             Is Function
                         </label>
                         <label className="form-checkbox-row">
                             <input type="checkbox" checked={draft.isprivate} disabled={locked} onChange={(e) => set("isprivate", e.target.checked)} />
                             Is Private
                         </label>
-                        <label className="form-checkbox-row" title="Shown for reference; this tool doesn't change it.">
-                            <input type="checkbox" checked={draft.workflowsdkstepenabled} disabled />
+                        <label className="form-checkbox-row"
+                            title={isEdit ? "Fixed when the Custom API is created." : draft.isfunction ? "A function can't be enabled for workflow." : "Offer this API as a step in classic workflows."}>
+                            <input type="checkbox" checked={draft.workflowsdkstepenabled} disabled={isEdit || draft.isfunction}
+                                onChange={(e) => set("workflowsdkstepenabled", e.target.checked)} />
                             Enabled for Workflow
                         </label>
                     </div>
+                    {!isEdit && draft.workflowsdkstepenabled && (
+                        <div className="form-hint" style={{ marginBottom: 10 }}>
+                            Classic workflows can't pass Entity, EntityCollection or StringArray values, and accept EntityReference only on an
+                            entity-bound API. This can't be changed after the API is created.
+                        </div>
+                    )}
                     {isEdit && (
                         <div className="form-hint" style={{ marginBottom: 10 }}>
-                            Unique name, binding, bound table, step type and Is Function can't change after creation. Neither can a saved
+                            Unique name, binding, bound table, step type, Is Function and Enabled for Workflow can't change after creation. Neither can a saved
                             parameter's unique name, type, table or Is Optional.
                         </div>
                     )}
