@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CustomApi, CustomApiRequestParameter } from "../src/models/interfaces";
 import {
     customApiCreateRecord,
+    customApiStepLimit,
     isEmptyPlan,
     newCustomApi,
     newCustomApiField,
@@ -280,6 +281,7 @@ describe("planCustomApiUpdate", () => {
 
         const plan = planCustomApiUpdate(original, draft);
         expect(plan.deletes).toEqual([{ table: "customapiresponseproperty", id: RESPONSE_ID }]);
+        expect(plan.creates[0].replaces).toBeUndefined();
         expect(plan.updates).toEqual([{ table: "customapirequestparameter", id: REQUEST_ID, changes: { displayname: "Input text" } }]);
         expect(plan.creates).toEqual([
             {
@@ -295,6 +297,20 @@ describe("planCustomApiUpdate", () => {
                 },
             },
         ]);
+    });
+
+    it("pairs a new child with the removed child whose unique name it reuses, in the same table only", () => {
+        const original = savedApi();
+        const draft = copy(original);
+        draft.requestParameters = [{ ...newCustomApiField(API_ID), name: "Input", uniquename: " input ", displayname: "Input" }];
+        draft.responseProperties = [{ ...newCustomApiField(API_ID), name: "Input", uniquename: "Input", displayname: "Input" }];
+
+        const plan = planCustomApiUpdate(original, draft);
+        expect(plan.creates.map((c) => [c.table, c.replaces])).toEqual([
+            ["customapirequestparameter", REQUEST_ID],
+            ["customapiresponseproperty", undefined],
+        ]);
+        expect(plan.deletes).toEqual([{ table: "customapiresponseproperty", id: RESPONSE_ID }]);
     });
 });
 
@@ -324,5 +340,24 @@ describe("validateNewSolution", () => {
         expect(validateNewSolution({ ...valid, uniquename: "a".repeat(66) })).toHaveLength(1);
         expect(validateNewSolution({ ...valid, version: "1.0.0.2147483648" })).toEqual(["Enter a solution version such as 1.0.0.0."]);
         expect(validateNewSolution({ ...valid, version: "1.0.0.99999999999999999999" })).toEqual(["Enter a solution version such as 1.0.0.0."]);
+    });
+});
+
+describe("customApiStepLimit", () => {
+    const MESSAGE_ID = "88888888-8888-4888-8888-888888888888";
+    const api = (allowedcustomprocessingsteptype: number) => [draftApi({ sdkmessageid: MESSAGE_ID, allowedcustomprocessingsteptype })];
+
+    it("blocks steps on an API that allows none, and limits Async Only to async steps", () => {
+        expect(customApiStepLimit(MESSAGE_ID, api(0))).toMatchObject({ allowsSteps: false, asyncOnly: false });
+        expect(customApiStepLimit(MESSAGE_ID.toUpperCase(), api(1))).toMatchObject({ allowsSteps: true, asyncOnly: true });
+        expect(customApiStepLimit(MESSAGE_ID, api(1))?.hint).toContain("sample_Echo");
+    });
+
+    it("sets no limit for Sync and Async, an unset value, another message or no message", () => {
+        expect(customApiStepLimit(MESSAGE_ID, api(2))).toBeUndefined();
+        expect(customApiStepLimit(MESSAGE_ID, api(-1))).toBeUndefined();
+        expect(customApiStepLimit(PLUGIN_TYPE_ID, api(0))).toBeUndefined();
+        expect(customApiStepLimit("", api(0))).toBeUndefined();
+        expect(customApiStepLimit(MESSAGE_ID, [draftApi({ allowedcustomprocessingsteptype: 0 })])).toBeUndefined();
     });
 });

@@ -18,7 +18,7 @@ import { ServiceEndpointDetails } from "./components/ServiceEndpointDetails";
 import { StepDetails } from "./components/StepDetails";
 import type { CustomApi, CustomApiField, PluginAssembly, PluginPackage, PluginType, ProcessingStep, ServiceEndpoint, StepImage, TreeNode } from "./models/interfaces";
 import { REQUEST_TABLE, RESPONSE_TABLE } from "./utils/customApiRules";
-import { CustomApiCreatedError, DataverseClient } from "./utils/DataverseClient";
+import { CustomApiCreatedError, customApiStepsBlockDelete, DataverseClient } from "./utils/DataverseClient";
 
 type ViewMode = 'assemblies' | 'packages' | 'customapis';
 
@@ -1140,7 +1140,18 @@ export default function App() {
             notify("This Custom API is managed. Remove it through its managed solution.", "error");
             return;
         }
-        if (!window.confirm(`Delete Custom API "${api.uniquename}"?\n\nIts request parameters, response properties and message are deleted with it.`)) return;
+        try {
+            // Steps on the API's message would go with it, so ask for them to be removed first.
+            const steps = api.sdkmessageid ? await client.fetchStepsForMessage(api.sdkmessageid) : [];
+            if (steps.length > 0) {
+                notify(`Can't delete Custom API "${api.uniquename}": ${customApiStepsBlockDelete(steps.length)}`, "error");
+                return;
+            }
+        } catch (err: unknown) {
+            notify(err instanceof Error ? err.message : String(err), "error");
+            return;
+        }
+        if (!window.confirm(`Delete Custom API "${api.uniquename}"?\n\nIts request parameters, response properties and message are deleted with it. No steps are registered on it.`)) return;
         try {
             await client.deleteCustomApi(api);
             notify("Custom API deleted.");
@@ -1762,6 +1773,7 @@ export default function App() {
             />
             {(selectedPluginType || stepPluginType) && (
                 <RegisterStepDialog
+                    customApis={customApis}
                     isOpen={showRegisterStep}
                     isUpdate={false}
                     pluginType={(selectedPluginType ?? stepPluginType)!}
@@ -1771,6 +1783,7 @@ export default function App() {
             )}
             {selectedStep && stepPluginType && (
                 <RegisterStepDialog
+                    customApis={customApis}
                     isOpen={showUpdateStep}
                     isUpdate={true}
                     pluginType={stepPluginType}
@@ -1822,6 +1835,7 @@ export default function App() {
             />
             {(selectedEndpoint ?? parentEndpoint) && (
                 <RegisterEndpointStepDialog
+                    customApis={customApis}
                     isOpen={showRegisterEndpointStep}
                     isUpdate={false}
                     endpoint={(selectedEndpoint ?? parentEndpoint)!}
@@ -1831,6 +1845,7 @@ export default function App() {
             )}
             {selectedEndpointStep && parentEndpoint && (
                 <RegisterEndpointStepDialog
+                    customApis={customApis}
                     isOpen={showUpdateEndpointStep}
                     isUpdate={true}
                     endpoint={parentEndpoint}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import type { PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, SystemUser } from "../models/interfaces";
+import type { CustomApi, PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, SystemUser } from "../models/interfaces";
+import { customApiStepLimit } from "../utils/customApiRules";
 import { DataverseClient } from "../utils/DataverseClient";
 import { AttributePickerDialog } from "./AttributePickerDialog";
 import { UserPickerDialog } from "./UserPickerDialog";
@@ -9,6 +10,8 @@ interface RegisterStepDialogProps {
     isUpdate: boolean;
     pluginType: PluginType;
     existingStep?: ProcessingStep;
+    /** Loaded Custom APIs, so a step on one's message respects its Allowed Custom Processing Step Type. */
+    customApis?: readonly CustomApi[];
     onRegister: (stepData: Partial<ProcessingStep> & { messageId: string; filterId?: string; pluginTypeId: string; configuration?: string; secureconfig?: string; supporteddeployment?: number }) => Promise<void>;
     onClose: () => void;
 }
@@ -21,12 +24,14 @@ function asyncAllowed(stage: number): boolean {
 }
 
 const client = new DataverseClient();
+const NO_CUSTOM_APIS: readonly CustomApi[] = [];
 
 export function RegisterStepDialog({
     isOpen,
     isUpdate,
     pluginType,
     existingStep,
+    customApis = NO_CUSTOM_APIS,
     onRegister,
     onClose,
 }: RegisterStepDialogProps) {
@@ -180,6 +185,16 @@ export function RegisterStepDialog({
             .finally(() => setSystemUserLoading(false));
     }, [impersonationMode, systemUserId]);
 
+    // A Custom API's Allowed Custom Processing Step Type limits the steps on its message.
+    const stepLimit = customApiStepLimit(selectedMessageId, customApis);
+    const asyncOnly = stepLimit?.asyncOnly ?? false;
+    const stepsBlocked = stepLimit ? !stepLimit.allowsSteps : false;
+    useEffect(() => {
+        if (!isOpen || !asyncOnly) return;
+        setStage(40);
+        setMode(1);
+    }, [isOpen, asyncOnly]);
+
     if (!isOpen) return null;
 
     const selectedMessage = messages.find((m) => m.sdkmessageid === selectedMessageId);
@@ -217,7 +232,7 @@ export function RegisterStepDialog({
     };
 
     const handleSubmit = async () => {
-        if (!selectedMessageId) return;
+        if (!selectedMessageId || stepsBlocked) return;
         setSaving(true);
         setSubmitError("");
         try {
@@ -312,21 +327,24 @@ export function RegisterStepDialog({
                         <div className="form-row">
                             <label className="form-label">Stage</label>
                             <select className="form-select" value={stage} onChange={(e) => handleStageChange(Number(e.target.value))}>
-                                <option value={10}>Pre-Validation</option>
-                                <option value={20}>Pre-Operation</option>
+                                <option value={10} disabled={asyncOnly}>Pre-Validation</option>
+                                <option value={20} disabled={asyncOnly}>Pre-Operation</option>
                                 <option value={40}>Post-Operation</option>
                             </select>
                         </div>
                         <div className="form-row">
                             <label className="form-label">Execution Mode</label>
                             <select className="form-select" value={mode} onChange={(e) => setMode(Number(e.target.value))}>
-                                <option value={0}>Synchronous</option>
+                                <option value={0} disabled={asyncOnly}>Synchronous</option>
                                 <option value={1} disabled={!asyncEnabled}>
                                     Asynchronous{!asyncEnabled ? " (Post-Operation only)" : ""}
                                 </option>
                             </select>
-                            {!asyncEnabled && (
+                            {!asyncEnabled && !stepLimit && (
                                 <div className="form-hint">Asynchronous execution is only available for Post-Operation steps.</div>
+                            )}
+                            {stepLimit && (
+                                <div className={stepsBlocked ? "form-submit-error" : "form-hint"}>{stepLimit.hint}</div>
                             )}
                         </div>
                         <div className="form-row">
@@ -494,7 +512,7 @@ export function RegisterStepDialog({
                         <button
                             className="btn-primary"
                             onClick={() => void handleSubmit()}
-                            disabled={saving || !selectedMessageId || !name}
+                            disabled={saving || !selectedMessageId || !name || stepsBlocked}
                         >
                             {saving ? "Saving…" : isUpdate ? "Update" : "Register"}
                         </button>

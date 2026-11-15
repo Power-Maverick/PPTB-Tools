@@ -43,6 +43,23 @@ export class CustomApiCreatedError extends Error {
   }
 }
 
+/**
+ * Dataverse's answer when a table doesn't exist: 0x80060888 ("Could not find an entity with specified
+ * entity name") or a 404. The host passes errors on as text, so this matches the code and phrases.
+ */
+const MISSING_TABLE = /0x80060888|could not find|does not exist|\b404\b/i;
+
+export function isMissingTableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : JSON.stringify(error ?? "");
+  return MISSING_TABLE.test(message);
+}
+
+/** Why a Custom API with registered steps can't be deleted yet. */
+export function customApiStepsBlockDelete(stepCount: number): string {
+  const steps = stepCount === 1 ? "1 step is" : `${stepCount} steps are`;
+  return `${steps} registered on this Custom API's message. Delete those steps first.`;
+}
+
 /** A plug-in type offered as the handler of a Custom API. */
 export interface CustomApiPluginTypeOption {
   plugintypeid: string;
@@ -60,6 +77,13 @@ const RESPONSE_SELECT = `customapiresponsepropertyid,${FIELD_SELECT}`;
 function readCustomizable(value: unknown): boolean {
   if (value && typeof value === "object" && "Value" in value) return (value as { Value: unknown }).Value !== false;
   return value !== false;
+}
+
+/** Rows per page when reading a whole table; Dataverse's largest page. */
+const QUERY_PAGE_SIZE = 5000;
+
+function byUniqueName(a: { uniquename: string }, b: { uniquename: string }): number {
+  return a.uniquename.localeCompare(b.uniquename, undefined, { sensitivity: "base" });
 }
 
 function toCustomApi(a: Record<string, unknown>): CustomApi {
@@ -652,13 +676,35 @@ export class DataverseClient {
 
   // ── Custom API methods ──
 
-  /** True when the environment has the Custom API tables. Any error counts as "not supported". */
+  /**
+   * True when the environment has the Custom API tables. Only a missing-table error counts as "not
+   * supported". Any other error (sign-in, network, throttling) keeps the view, so loading the APIs then
+   * reports the real problem instead of the view quietly disappearing.
+   */
   async isCustomApiSupported(): Promise<boolean> {
     try {
       await window.dataverseAPI.getEntityMetadata("customapi", true, ["LogicalName"]);
       return true;
-    } catch {
-      return false;
+    } catch (error: unknown) {
+      return !isMissingTableError(error);
+    }
+  }
+
+  /**
+   * Every row of a table. queryData returns only the first page and no next link, so this pages by the
+   * primary key itself: each page asks for rows after the last key of the one before.
+   */
+  private async queryAllRows(entitySet: string, select: string, key: string): Promise<Record<string, unknown>[]> {
+    const rows: Record<string, unknown>[] = [];
+    let after: string | undefined;
+    for (;;) {
+      const filter = after ? `&$filter=${key} gt ${after}` : "";
+      const page = (await window.dataverseAPI.queryData(`${entitySet}?$select=${select}${filter}&$orderby=${key}&$top=${QUERY_PAGE_SIZE}`, "primary")).value;
+      rows.push(...page);
+      if (page.length < QUERY_PAGE_SIZE) return rows;
+      const last = page[page.length - 1][key];
+      if (typeof last !== "string" || !isGuid(last)) throw new Error(`${entitySet} returned a row without a valid ${key}.`);
+      after = last;
     }
   }
 
@@ -666,17 +712,21 @@ export class DataverseClient {
   async fetchCustomApis(): Promise<CustomApi[]> {
     try {
       const [apis, requests, responses] = await Promise.all([
-        window.dataverseAPI.queryData(`customapis?$select=${CUSTOM_API_SELECT}&$orderby=uniquename`, "primary"),
-        window.dataverseAPI.queryData(`customapirequestparameters?$select=${REQUEST_SELECT}&$orderby=uniquename`, "primary"),
-        window.dataverseAPI.queryData(`customapiresponseproperties?$select=${RESPONSE_SELECT}&$orderby=uniquename`, "primary"),
+        this.queryAllRows("customapis", CUSTOM_API_SELECT, "customapiid"),
+        this.queryAllRows("customapirequestparameters", REQUEST_SELECT, "customapirequestparameterid"),
+        this.queryAllRows("customapiresponseproperties", RESPONSE_SELECT, "customapiresponsepropertyid"),
       ]);
-      const result = (apis.value as Record<string, unknown>[]).map(toCustomApi);
+      const result = apis.map(toCustomApi).sort(byUniqueName);
       const byId = new Map(result.map((a) => [a.customapiid.toLowerCase(), a]));
-      for (const r of requests.value as Record<string, unknown>[]) {
+      for (const r of requests) {
         byId.get(String(r["_customapiid_value"] ?? "").toLowerCase())?.requestParameters.push(toRequestParameter(r));
       }
-      for (const r of responses.value as Record<string, unknown>[]) {
+      for (const r of responses) {
         byId.get(String(r["_customapiid_value"] ?? "").toLowerCase())?.responseProperties.push(toResponseProperty(r));
+      }
+      for (const api of result) {
+        api.requestParameters.sort(byUniqueName);
+        api.responseProperties.sort(byUniqueName);
       }
       return result;
     } catch (error: unknown) {
@@ -757,10 +807,12 @@ export class DataverseClient {
   }
 
   /**
-   * Saves the differences between the saved API and the edited draft. Removed children are deleted first,
-   * so a new child can reuse a removed name. New children join every unmanaged solution the API is in.
-   * Returns false when there was nothing to save. Dataverse saves each write on its own, so after a
-   * failure part of the edit may already be saved; reload the API before trying again.
+   * Saves the differences between the saved API and the edited draft. Updates and creates come first and
+   * removed children are deleted last, so a failure leaves the contract as it was or only adds to it. The
+   * one exception is a removed child whose unique name a new child reuses: it is deleted just before that
+   * create. New children join every unmanaged solution the API is in. Returns false when there was nothing
+   * to save. Dataverse saves each write on its own, so after a failure part of the edit may already be
+   * saved; reload the API before trying again.
    */
   async updateCustomApi(original: CustomApi, draft: CustomApi): Promise<boolean> {
     const errors = validateCustomApi(draft, original);
@@ -778,13 +830,14 @@ export class DataverseClient {
 
     const componentTypes = new Map<string, number>();
     try {
-      for (const d of plan.deletes) await window.dataverseAPI.delete(d.table, d.id, "primary");
       if (Object.keys(plan.apiChanges).length > 0) await window.dataverseAPI.update("customapi", original.customapiid, plan.apiChanges, "primary");
       for (const u of plan.updates) await window.dataverseAPI.update(u.table, u.id, u.changes, "primary");
       for (const c of plan.creates) {
+        if (c.replaces) await window.dataverseAPI.delete(c.table, c.replaces, "primary");
         const created = await window.dataverseAPI.create(c.table, c.record, "primary");
         for (const solution of solutions) await this.addToSolution(created.id, c.table, solution, componentTypes);
       }
+      for (const d of plan.deletes) await window.dataverseAPI.delete(d.table, d.id, "primary");
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to update the Custom API. Some changes may already be saved; reload before trying again. ${msg}`);
@@ -792,10 +845,16 @@ export class DataverseClient {
     return true;
   }
 
-  /** Deletes an unmanaged Custom API. Dataverse deletes its parameters, properties and message with it. */
+  /**
+   * Deletes an unmanaged Custom API. Dataverse deletes its parameters, properties and message with it.
+   * Refuses while steps are registered on the API's message, so no step goes away without the user
+   * seeing it: delete those steps first.
+   */
   async deleteCustomApi(api: CustomApi): Promise<void> {
     if (api.ismanaged) throw new Error("A managed Custom API must be removed through its managed solution.");
     try {
+      const steps = api.sdkmessageid ? await this.fetchStepsForMessage(api.sdkmessageid) : [];
+      if (steps.length > 0) throw new Error(customApiStepsBlockDelete(steps.length));
       await window.dataverseAPI.delete("customapi", api.customapiid, "primary");
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);

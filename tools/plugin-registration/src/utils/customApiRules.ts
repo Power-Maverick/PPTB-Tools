@@ -6,6 +6,8 @@ import {
   CUSTOM_API_BINDING_TYPES,
   CUSTOM_API_PARAMETER_TYPES,
   CUSTOM_API_STEP_TYPES,
+  CUSTOM_API_STEPS_ASYNC_ONLY,
+  CUSTOM_API_STEPS_NONE,
   CUSTOM_API_TYPE_ENTITY,
   CUSTOM_API_TYPE_ENTITY_COLLECTION,
   CUSTOM_API_TYPE_ENTITY_REFERENCE,
@@ -301,11 +303,17 @@ function changedValues(original: Record<string, unknown>, updated: Record<string
 export interface CustomApiUpdatePlan {
   /** Changed fields of the API itself; empty when nothing changed. */
   apiChanges: Record<string, unknown>;
-  /** Saved children the draft no longer has. Delete these first, so a replacement can reuse the name. */
+  /**
+   * Saved children the draft no longer has and no new child replaces. Delete these last, so a failed save
+   * leaves the contract as it was or only adds to it.
+   */
   deletes: { table: CustomApiChildTable; id: string }[];
   updates: { table: CustomApiChildTable; id: string; changes: Record<string, unknown> }[];
-  /** New children, already bound to the API. */
-  creates: { table: CustomApiChildTable; record: Record<string, unknown> }[];
+  /**
+   * New children, already bound to the API. `replaces` is the id of a removed child with the same unique
+   * name; delete it just before this create, since Dataverse won't allow two children with one name.
+   */
+  creates: { table: CustomApiChildTable; record: Record<string, unknown>; replaces?: string }[];
 }
 
 export function isEmptyPlan(plan: CustomApiUpdatePlan): boolean {
@@ -329,12 +337,21 @@ export function planCustomApiUpdate(original: CustomApi, draft: CustomApi): Cust
   ];
   for (const [saved, edited, table] of children) {
     const keptIds = new Set(edited.filter((f) => f.id).map((f) => f.id.toLowerCase()));
+    const removedByName = new Map<string, string>();
     for (const removed of saved) {
-      if (!keptIds.has(removed.id.toLowerCase())) plan.deletes.push({ table, id: removed.id });
+      if (!keptIds.has(removed.id.toLowerCase())) removedByName.set(removed.uniquename.trim().toLowerCase(), removed.id);
     }
     for (const field of edited) {
       if (!field.id) {
-        plan.creates.push({ table, record: { ...fieldCreateRecord(field, table === REQUEST_TABLE), "CustomAPIId@odata.bind": customApiBind(original.customapiid) } });
+        const record = { ...fieldCreateRecord(field, table === REQUEST_TABLE), "CustomAPIId@odata.bind": customApiBind(original.customapiid) };
+        const key = field.uniquename.trim().toLowerCase();
+        const replaces = removedByName.get(key);
+        if (replaces) {
+          removedByName.delete(key);
+          plan.creates.push({ table, record, replaces });
+        } else {
+          plan.creates.push({ table, record });
+        }
         continue;
       }
       const previous = saved.find((s) => sameId(s.id, field.id));
@@ -342,6 +359,7 @@ export function planCustomApiUpdate(original: CustomApi, draft: CustomApi): Cust
       const changes = changedValues(mutableField(previous), mutableField(field));
       if (Object.keys(changes).length > 0) plan.updates.push({ table, id: field.id, changes });
     }
+    for (const id of removedByName.values()) plan.deletes.push({ table, id });
   }
   return plan;
 }
@@ -417,4 +435,31 @@ export function solutionCreateRecord(solution: NewSolutionInput): Record<string,
     version: parts.map((p) => String(Number(p))).join("."),
     "publisherid@odata.bind": `/publishers(${solution.publisherid})`,
   };
+}
+
+/** What a Custom API's Allowed Custom Processing Step Type permits for steps on its message. */
+export interface CustomApiStepLimit {
+  /** False when the API allows no steps (None). */
+  allowsSteps: boolean;
+  /** True when only asynchronous Post-Operation steps are allowed (Async Only). */
+  asyncOnly: boolean;
+  /** Explains the limit to the user. */
+  hint: string;
+}
+
+/**
+ * The step limit of the Custom API that owns a message, or undefined when the message isn't a known
+ * Custom API's or allows sync and async steps alike.
+ */
+export function customApiStepLimit(messageId: string, apis: readonly CustomApi[]): CustomApiStepLimit | undefined {
+  if (!messageId) return undefined;
+  const api = apis.find((a) => a.sdkmessageid && sameId(a.sdkmessageid, messageId));
+  if (!api) return undefined;
+  if (api.allowedcustomprocessingsteptype === CUSTOM_API_STEPS_NONE) {
+    return { allowsSteps: false, asyncOnly: false, hint: `Custom API ${api.uniquename} doesn't allow steps on its message (Allowed Custom Processing Step Type is None).` };
+  }
+  if (api.allowedcustomprocessingsteptype === CUSTOM_API_STEPS_ASYNC_ONLY) {
+    return { allowsSteps: true, asyncOnly: true, hint: `Custom API ${api.uniquename} allows only asynchronous Post-Operation steps (Allowed Custom Processing Step Type is Async Only).` };
+  }
+  return undefined;
 }

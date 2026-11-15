@@ -165,6 +165,8 @@ export const CUSTOM_API_BINDING_ENTITY = 1;
 export const CUSTOM_API_BINDING_ENTITY_COLLECTION = 2;
 
 export const CUSTOM_API_STEP_TYPES: Record<number, string> = { 0: "None", 1: "Async Only", 2: "Sync and Async" };
+export const CUSTOM_API_STEPS_NONE = 0;
+export const CUSTOM_API_STEPS_ASYNC_ONLY = 1;
 
 export const CUSTOM_API_PARAMETER_TYPES: Record<number, string> = {
   0: "Boolean",

@@ -62,13 +62,22 @@ function copy(api: CustomApi): CustomApi {
 }
 
 describe("isCustomApiSupported", () => {
-    it("is true when the customapi table exists and false on any error", async () => {
+    it("is true when the customapi table exists and false only when the table is missing", async () => {
         getEntityMetadata.mockResolvedValueOnce({ LogicalName: "customapi" });
         await expect(client.isCustomApiSupported()).resolves.toBe(true);
         expect(getEntityMetadata).toHaveBeenCalledWith("customapi", true, ["LogicalName"]);
 
-        getEntityMetadata.mockRejectedValueOnce(new Error("not found"));
+        getEntityMetadata.mockRejectedValueOnce(new Error("Could not find an entity with specified entity name: customapi (0x80060888)"));
         await expect(client.isCustomApiSupported()).resolves.toBe(false);
+        getEntityMetadata.mockRejectedValueOnce("Request failed with status 404");
+        await expect(client.isCustomApiSupported()).resolves.toBe(false);
+    });
+
+    it("keeps the view on other errors, so loading the APIs reports them", async () => {
+        for (const error of [new Error("401 Unauthorized"), new Error("Failed to fetch"), { status: 429, message: "Too many requests" }, new Error("Error 4040")]) {
+            getEntityMetadata.mockRejectedValueOnce(error);
+            await expect(client.isCustomApiSupported()).resolves.toBe(true);
+        }
     });
 });
 
@@ -100,6 +109,32 @@ describe("fetchCustomApis", () => {
         });
         expect(api.requestParameters).toEqual([expect.objectContaining({ id: REQUEST_ID, isoptional: true, iscustomizable: true, logicalentityname: "" })]);
         expect(api.responseProperties).toEqual([expect.objectContaining({ id: RESPONSE_ID, type: 0, iscustomizable: true })]);
+    });
+
+    it("reads every page of each table by key, then orders by unique name", async () => {
+        const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+        const fullPage = Array.from({ length: 5000 }, (_, i) => ({
+            customapirequestparameterid: id(i + 1), _customapiid_value: API_ID, uniquename: `P${String(5000 - i).padStart(4, "0")}`,
+        }));
+        const lastPage = [{ customapirequestparameterid: id(5001), _customapiid_value: API_ID, uniquename: "A" }];
+        queryData.mockImplementation(async (query: string) => {
+            if (query.startsWith("customapis?")) return { value: [{ customapiid: API_ID, uniquename: "b" }, { customapiid: SOLUTION_ID, uniquename: "A" }] };
+            if (query.startsWith("customapirequestparameters?")) return { value: query.includes(" gt ") ? lastPage : fullPage };
+            return { value: [] };
+        });
+
+        const apis = await client.fetchCustomApis();
+
+        const requestQueries = queryData.mock.calls.map(([q]) => q as string).filter((q) => q.startsWith("customapirequestparameters?"));
+        expect(requestQueries).toHaveLength(2);
+        expect(requestQueries[0]).toContain("$orderby=customapirequestparameterid&$top=5000");
+        expect(requestQueries[0]).not.toContain("$filter");
+        expect(requestQueries[1]).toContain(`$filter=customapirequestparameterid gt ${id(5000)}`);
+        expect(apis.map((a) => a.uniquename)).toEqual(["A", "b"]);
+        const params = apis[1].requestParameters;
+        expect(params).toHaveLength(5001);
+        expect(params[0].uniquename).toBe("A");
+        expect(params[1].uniquename).toBe("P0001");
     });
 
     it("keeps an unset choice as -1 so a save can't quietly change the contract", async () => {
@@ -198,7 +233,7 @@ describe("updateCustomApi", () => {
         expect(writes).toEqual([]);
     });
 
-    it("deletes first, then updates, then creates new children in the API's unmanaged solutions", async () => {
+    it("updates, then replaces a reused name just before its create, adding new children to the API's unmanaged solutions", async () => {
         queryAnswers = [
             ["solutioncomponents?", [{ _solutionid_value: SOLUTION_ID }, { _solutionid_value: SOLUTION_ID }]],
             ["solutions?$select=uniquename&$filter=(", [{ uniquename: "Contoso" }]],
@@ -214,9 +249,9 @@ describe("updateCustomApi", () => {
         await expect(client.updateCustomApi(original, draft)).resolves.toBe(true);
 
         expect(writes).toEqual([
-            `delete customapiresponseproperty ${RESPONSE_ID}`,
             `update customapi ${API_ID}`,
             `update customapirequestparameter ${REQUEST_ID}`,
+            `delete customapiresponseproperty ${RESPONSE_ID}`,
             "create customapiresponseproperty",
             `add ${NEW_CHILD_ID} to Contoso`,
         ]);
@@ -227,6 +262,22 @@ describe("updateCustomApi", () => {
         const solutionQuery = queryData.mock.calls.map((c) => c[0] as string).find((q) => q.startsWith("solutions?"));
         expect(solutionQuery).toContain(`solutionid eq ${SOLUTION_ID}`);
         expect(solutionQuery).toContain("ismanaged eq false and isvisible eq true and uniquename ne 'Default'");
+    });
+
+    it("deletes removed children last, so a failed create leaves them in place", async () => {
+        const original = savedApi();
+        const draft = copy(original);
+        draft.requestParameters = [{ ...newCustomApiField(API_ID), name: "Text", uniquename: "Text", displayname: "Text" }];
+
+        await client.updateCustomApi(original, draft);
+        expect(writes).toEqual(["create customapirequestparameter", `delete customapirequestparameter ${REQUEST_ID}`]);
+
+        writes.length = 0;
+        del.mockClear();
+        create.mockRejectedValueOnce(new Error("duplicate"));
+        await expect(client.updateCustomApi(original, draft)).rejects.toThrow("duplicate");
+        expect(writes).toEqual([]);
+        expect(del).not.toHaveBeenCalledWith("customapirequestparameter", REQUEST_ID, "primary");
     });
 
     it("refuses an edit to a fixed field without writing", async () => {
@@ -249,6 +300,19 @@ describe("updateCustomApi", () => {
 });
 
 describe("deleting", () => {
+    it("refuses to delete an API while steps are registered on its message", async () => {
+        const MESSAGE_ID = "88888888-8888-4888-8888-888888888888";
+        queryAnswers = [["sdkmessageprocessingsteps?", [{ sdkmessageprocessingstepid: "s1" }, { sdkmessageprocessingstepid: "s2" }]]];
+        await expect(client.deleteCustomApi({ ...savedApi(), sdkmessageid: MESSAGE_ID }))
+            .rejects.toThrow("2 steps are registered on this Custom API's message. Delete those steps first.");
+        expect(queryData.mock.calls[0][0]).toContain(`_sdkmessageid_value eq ${MESSAGE_ID}`);
+        expect(del).not.toHaveBeenCalled();
+
+        queryAnswers = [];
+        await client.deleteCustomApi({ ...savedApi(), sdkmessageid: MESSAGE_ID });
+        expect(del).toHaveBeenCalledWith("customapi", API_ID, "primary");
+    });
+
     it("deletes an unmanaged API, and refuses a managed one", async () => {
         await client.deleteCustomApi(savedApi());
         expect(del).toHaveBeenCalledWith("customapi", API_ID, "primary");

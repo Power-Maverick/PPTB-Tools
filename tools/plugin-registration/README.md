@@ -154,14 +154,15 @@ See [Set up managed identity for Dataverse plug-ins](https://learn.microsoft.com
 
 A Custom API defines your own Dataverse message, with request parameters and response properties, and optionally a plug-in type that runs it. Choose **View → Custom APIs** to list every API with its request parameters and response properties beneath it. Expanding an API also lists the steps registered on its message. Choose **Register → New Custom API** to create one, or select an API, parameter or property and choose **Update** or **Unregister**.
 
-- The view and the menu option only appear when the environment has the `customapi` table.
+- The view and the menu option only appear when the environment has the `customapi` table. If the check fails for another reason (sign-in, network), the view stays and loading the APIs shows the error.
 - A new API goes into the unmanaged solution you choose, or one you create from the dialog with **New solution…**. Its unique name must start with that solution's publisher prefix, which the dialog fills in for you. The API and its parameters and properties are created in one request, then each is added to the solution.
 - Request parameters and response properties are edited in the same dialog as the API. Parameters and properties you add later join every unmanaged solution the API is already in.
 - Dataverse fixes some fields at creation: the unique name, binding type, bound table, allowed step type, Is Function and Enabled for Workflow of the API, and the unique name, type, table and Is Optional of a parameter or property. These are read-only when editing. To change one, delete the record and create it again.
 - **Enabled for Workflow** offers the API as a step in classic workflows. It can only be set when creating the API. Such an API can't be a function, and its parameters can't be Entity, EntityCollection or StringArray, or EntityReference unless the API is entity-bound.
 - A managed API that doesn't allow customization keeps its existing fields, and new request parameters added to it must be optional. Managed APIs, parameters and properties can't be deleted here; remove them through their managed solution.
-- Each change in an edit is saved on its own. If one fails, the API is reloaded, so check what was saved before trying again.
-- To run code when the API is called, link a plug-in type, or register a step on the API's message from a plug-in type like any other message. Messages of private APIs are listed too.
+- Each change in an edit is saved on its own. Changes and additions are saved first and removed parameters and properties are deleted last, so a failed save never leaves the API with fewer parameters than before. The exception is a removed parameter or property whose unique name a new one reuses: it is deleted just before its replacement is created. If a change fails, the API is reloaded, so check what was saved before trying again.
+- An API can't be deleted while steps are registered on its message. Delete those steps first.
+- To run code when the API is called, link a plug-in type, or register a step on the API's message from a plug-in type like any other message. Messages of private APIs are listed too. The step dialogs follow the API's **Allowed Custom Processing Step Type**: with None no step can be registered, and with Async Only the step is fixed to asynchronous Post-Operation.
 
 See [Custom API tables](https://learn.microsoft.com/power-apps/developer/data-platform/custom-api-tables).
 
