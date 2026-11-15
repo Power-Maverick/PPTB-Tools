@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- ERD Generator 2.0.7: raised the `follow-redirects` override to `^1.16.2` (shrinkwrap now pins 1.16.3) to clear high-severity advisory GHSA-mrwp-f3q8-3g9p, which affects 1.16.0 to 1.16.1.
+
 ### Added
 - Data Migrator: selectable sources and up to five destinations, repeated playlist combinations, destination-specific system mappings, and final migration confirmation.
 - Initial monorepo structure with npm workspaces
