@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Copilot Studio Cost & Usage Analyzer: Azure costs tab using PPTB's Azure API (subscription selection, Power Platform billing-plan filter, actual/amortized costs, grouping, daily chart, per-currency totals, CSV export, Stop), plus a Prerequisites & permissions dialog with live checks and copyable administrator details.
+- Copilot Studio Cost & Usage Analyzer: direct delegated API reports with CSV export, environment/feature/model/channel filters, period comparisons, coverage metadata, spike indicators, and a month-end estimate based on the last 30 complete UTC days.
 - Data Migrator: selectable sources and up to five destinations, repeated playlist combinations, destination-specific system mappings, and final migration confirmation.
 - Initial monorepo structure with npm workspaces
 - ERD Generator package (`@dvdt-tools/erd-generator`)
