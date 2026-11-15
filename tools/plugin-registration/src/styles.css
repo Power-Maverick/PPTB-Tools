@@ -1187,3 +1187,38 @@ button:disabled {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+/* ── Searchable name list (tables, privileges) ── */
+.name-combobox-list {
+    position: fixed;
+    margin: 0;
+    padding: 2px 0;
+    list-style: none;
+    overflow-y: auto;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    z-index: 1000;
+}
+
+.name-combobox-item {
+    padding: 5px 10px;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.name-combobox-item--active {
+    background-color: var(--bg-hover);
+}
+
+.name-combobox-more {
+    padding: 5px 10px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    border-top: 1px solid var(--border-color);
+    cursor: default;
+}

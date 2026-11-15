@@ -9,11 +9,9 @@ import {
 import { canSpecifyTable, isLocked, newCustomApi, newCustomApiField, suggestUniqueName, validateCustomApi, validateKnownNames, validateNewSolution } from "../utils/customApiRules";
 import type { CustomApiPluginTypeOption } from "../utils/DataverseClient";
 import { DataverseClient } from "../utils/DataverseClient";
+import { NameCombobox } from "./NameCombobox";
 
 const client = new DataverseClient();
-
-const TABLE_LIST_ID = "custom-api-tables";
-const PRIVILEGE_LIST_ID = "custom-api-privileges";
 
 type FieldKind = "request" | "response";
 
@@ -361,10 +359,9 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
                                         </select>
                                     </td>
                                     <td>
-                                        <input className="form-input" value={f.logicalentityname} maxLength={100} placeholder={canSpecifyTable(f.type, isRequest) ? "Any table" : ""}
-                                            list={fixed ? undefined : TABLE_LIST_ID}
-                                            disabled={fixed || !canSpecifyTable(f.type, isRequest)}
-                                            onChange={(e) => updateField(kind, i, { logicalentityname: e.target.value.trim() })} />
+                                        <NameCombobox value={f.logicalentityname} maxLength={100} placeholder={canSpecifyTable(f.type, isRequest) ? "Any table" : ""}
+                                            options={tableNames} aria-label="Table" disabled={fixed || !canSpecifyTable(f.type, isRequest)}
+                                            onChange={(value) => updateField(kind, i, { logicalentityname: value })} />
                                     </td>
                                     {isRequest && (
                                         <td style={{ textAlign: "center" }}>
@@ -510,9 +507,9 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
                         </div>
                         <div className="form-row">
                             <label className="form-label">Bound Table Logical Name{draft.bindingtype > CUSTOM_API_BINDING_GLOBAL ? " *" : ""}</label>
-                            <input className="form-input" value={draft.boundentitylogicalname} maxLength={100} list={isEdit ? undefined : TABLE_LIST_ID}
+                            <NameCombobox value={draft.boundentitylogicalname} maxLength={100} options={tableNames} aria-label="Bound table logical name"
                                 disabled={isEdit || draft.bindingtype === CUSTOM_API_BINDING_GLOBAL}
-                                onChange={(e) => set("boundentitylogicalname", e.target.value.trim())} />
+                                onChange={(value) => set("boundentitylogicalname", value)} />
                             {unknownBoundTable && <div className="form-hint form-hint-error">No table with this logical name exists in this environment.</div>}
                         </div>
                         <div className="form-row">
@@ -527,8 +524,8 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
                         </div>
                         <div className="form-row">
                             <label className="form-label">Execute Privilege Name</label>
-                            <input className="form-input" value={draft.executeprivilegename} maxLength={100} disabled={locked} list={locked ? undefined : PRIVILEGE_LIST_ID}
-                                placeholder="Anyone can call it" onChange={(e) => set("executeprivilegename", e.target.value.trim())} />
+                            <NameCombobox value={draft.executeprivilegename} maxLength={100} disabled={locked} options={privilegeNames} aria-label="Execute privilege name"
+                                placeholder="Anyone can call it" onChange={(value) => set("executeprivilegename", value)} />
                             {unknownPrivilege && <div className="form-hint form-hint-error">No privilege with this name exists in this environment.</div>}
                         </div>
                     </div>
@@ -588,12 +585,6 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
                             )}
                         </div>
                     )}
-                    <datalist id={TABLE_LIST_ID}>
-                        {(tableNames ?? []).map((t) => <option key={t} value={t} />)}
-                    </datalist>
-                    <datalist id={PRIVILEGE_LIST_ID}>
-                        {(privilegeNames ?? []).map((n) => <option key={n} value={n} />)}
-                    </datalist>
                     {errors.length > 0 && (
                         <div className="form-submit-error" style={{ whiteSpace: "pre-line" }}>{errors.join("\n")}</div>
                     )}
