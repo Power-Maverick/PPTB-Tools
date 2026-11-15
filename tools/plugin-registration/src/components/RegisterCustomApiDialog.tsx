@@ -6,11 +6,14 @@ import {
     CUSTOM_API_PARAMETER_TYPES,
     CUSTOM_API_STEP_TYPES,
 } from "../models/interfaces";
-import { canSpecifyTable, isLocked, newCustomApi, newCustomApiField, suggestUniqueName, validateCustomApi, validateNewSolution } from "../utils/customApiRules";
+import { canSpecifyTable, isLocked, newCustomApi, newCustomApiField, suggestUniqueName, validateCustomApi, validateKnownNames, validateNewSolution } from "../utils/customApiRules";
 import type { CustomApiPluginTypeOption } from "../utils/DataverseClient";
 import { DataverseClient } from "../utils/DataverseClient";
 
 const client = new DataverseClient();
+
+const TABLE_LIST_ID = "custom-api-tables";
+const PRIVILEGE_LIST_ID = "custom-api-privileges";
 
 type FieldKind = "request" | "response";
 
@@ -28,8 +31,12 @@ interface RegisterCustomApiDialogProps {
     existing?: CustomApi;
     /** Loaded assemblies, used to group plug-in types by assembly. */
     assemblies: PluginAssembly[];
-    /** Saves the draft. solutionUniqueName is set when creating. The dialog stays open if this throws. */
-    onSave: (draft: CustomApi, solutionUniqueName?: string) => Promise<void>;
+    /**
+     * Saves the draft. solutionUniqueName is set when creating. When editing, childSolutions lists the solutions
+     * new parameters and properties join, or is undefined when the API's solutions couldn't be loaded. The dialog
+     * stays open if this throws.
+     */
+    onSave: (draft: CustomApi, solutionUniqueName?: string, childSolutions?: string[]) => Promise<void>;
     onClose: () => void;
 }
 
@@ -57,6 +64,12 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
     const [publishers, setPublishers] = useState<PublisherOption[] | null>(null);
     const [creatingSolution, setCreatingSolution] = useState(false);
     const [loadingPublishers, setLoadingPublishers] = useState(false);
+    // Names that exist in the environment, offered as suggestions and checked on save. Null until loaded.
+    const [tableNames, setTableNames] = useState<string[] | null>(null);
+    const [privilegeNames, setPrivilegeNames] = useState<string[] | null>(null);
+    // When editing: the unmanaged solutions the API is in, and those new parameters and properties join.
+    const [apiSolutions, setApiSolutions] = useState<string[] | null>(null);
+    const [childSolutions, setChildSolutions] = useState<Set<string>>(new Set());
     // Changes each time the dialog opens, so results that arrive after it closed are ignored.
     const session = useRef(0);
 
@@ -85,12 +98,44 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
             if (!cancelled) setErrors([err instanceof Error ? err.message : String(err)]);
         };
         client.fetchCustomApiPluginTypes().then((list) => !cancelled && setPluginTypes(list)).catch(fail);
+        // Suggestions only: without them the fields stay free text and names aren't checked.
+        client.fetchTableNames().then((list) => !cancelled && setTableNames(list)).catch((err: unknown) => console.warn(err));
+        client.fetchPrivilegeNames().then((list) => !cancelled && setPrivilegeNames(list)).catch((err: unknown) => console.warn(err));
         if (!existing) client.fetchUnmanagedSolutions().then((list) => !cancelled && setSolutions(list)).catch(fail);
         return () => {
             cancelled = true;
         };
         // Reload choices only when the dialog opens or changes between create and edit, not when the API reloads.
     }, [isOpen, isEdit]);
+
+    // The unmanaged solutions of the API being edited; new parameters and properties join the ones left ticked.
+    const editedApiId = existing?.customapiid;
+    useEffect(() => {
+        setApiSolutions(null);
+        setChildSolutions(new Set());
+        if (!isOpen || !editedApiId) return;
+        let cancelled = false;
+        client
+            .fetchUnmanagedSolutionsContaining(editedApiId)
+            .then((list) => {
+                if (cancelled) return;
+                setApiSolutions(list);
+                setChildSolutions(new Set(list));
+            })
+            // Unknown: the save then adds new children to every unmanaged solution the API is in.
+            .catch((err: unknown) => console.warn(err));
+        return () => {
+            cancelled = true;
+        };
+    }, [isOpen, editedApiId]);
+
+    const knownNames = useMemo(
+        () => ({
+            tables: tableNames ? new Set(tableNames) : undefined,
+            privileges: privilegeNames ? new Set(privilegeNames.map((n) => n.toLowerCase())) : undefined,
+        }),
+        [tableNames, privilegeNames],
+    );
 
     // The publisher prefix of the chosen solution starts the API's unique name.
     useEffect(() => {
@@ -133,6 +178,18 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
     if (!isOpen) return null;
 
     const set = <K extends keyof CustomApi>(key: K, value: CustomApi[K]) => setDraft((d) => ({ ...d, [key]: value }));
+
+    const nameErrors = validateKnownNames(draft, existing, knownNames);
+    const unknownBoundTable = nameErrors.some((e) => e.startsWith("Bound table "));
+    const unknownPrivilege = nameErrors.some((e) => e.startsWith("Execute privilege "));
+    const hasNewChildren = draft.requestParameters.some((f) => !f.id) || draft.responseProperties.some((f) => !f.id);
+    const toggleChildSolution = (name: string, on: boolean) =>
+        setChildSolutions((current) => {
+            const next = new Set(current);
+            if (on) next.add(name);
+            else next.delete(name);
+            return next;
+        });
 
     const listKey = (kind: FieldKind): "requestParameters" | "responseProperties" => (kind === "request" ? "requestParameters" : "responseProperties");
 
@@ -229,6 +286,7 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
         const found: string[] = [];
         if (!isEdit && !solutionUniqueName) found.push("Select an unmanaged solution.");
         found.push(...validateCustomApi(draft, existing, prefix || undefined));
+        found.push(...validateKnownNames(draft, existing, knownNames));
         if (found.length > 0) {
             setErrors(found);
             return;
@@ -236,7 +294,8 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
         setSaving(true);
         setErrors([]);
         try {
-            await onSave(draft, isEdit ? undefined : solutionUniqueName);
+            const chosen = apiSolutions ? apiSolutions.filter((x) => childSolutions.has(x)) : undefined;
+            await onSave(draft, isEdit ? undefined : solutionUniqueName, isEdit ? chosen : undefined);
         } catch (err: unknown) {
             setErrors([err instanceof Error ? err.message : String(err)]);
         } finally {
@@ -303,6 +362,7 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
                                     </td>
                                     <td>
                                         <input className="form-input" value={f.logicalentityname} maxLength={100} placeholder={canSpecifyTable(f.type, isRequest) ? "Any table" : ""}
+                                            list={fixed ? undefined : TABLE_LIST_ID}
                                             disabled={fixed || !canSpecifyTable(f.type, isRequest)}
                                             onChange={(e) => updateField(kind, i, { logicalentityname: e.target.value.trim() })} />
                                     </td>
@@ -450,9 +510,10 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
                         </div>
                         <div className="form-row">
                             <label className="form-label">Bound Table Logical Name{draft.bindingtype > CUSTOM_API_BINDING_GLOBAL ? " *" : ""}</label>
-                            <input className="form-input" value={draft.boundentitylogicalname} maxLength={100}
+                            <input className="form-input" value={draft.boundentitylogicalname} maxLength={100} list={isEdit ? undefined : TABLE_LIST_ID}
                                 disabled={isEdit || draft.bindingtype === CUSTOM_API_BINDING_GLOBAL}
                                 onChange={(e) => set("boundentitylogicalname", e.target.value.trim())} />
+                            {unknownBoundTable && <div className="form-hint form-hint-error">No table with this logical name exists in this environment.</div>}
                         </div>
                         <div className="form-row">
                             <label className="form-label">Allowed Custom Processing Step Type</label>
@@ -466,8 +527,9 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
                         </div>
                         <div className="form-row">
                             <label className="form-label">Execute Privilege Name</label>
-                            <input className="form-input" value={draft.executeprivilegename} maxLength={100} disabled={locked}
-                                onChange={(e) => set("executeprivilegename", e.target.value.trim())} />
+                            <input className="form-input" value={draft.executeprivilegename} maxLength={100} disabled={locked} list={locked ? undefined : PRIVILEGE_LIST_ID}
+                                placeholder="Anyone can call it" onChange={(e) => set("executeprivilegename", e.target.value.trim())} />
+                            {unknownPrivilege && <div className="form-hint form-hint-error">No privilege with this name exists in this environment.</div>}
                         </div>
                     </div>
                     <div className="form-row">
@@ -507,6 +569,31 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
                     )}
                     {renderFields("request")}
                     {renderFields("response")}
+                    {isEdit && hasNewChildren && apiSolutions && (
+                        <div className="form-subsection">
+                            <div className="form-section-title">Solutions for new parameters and properties</div>
+                            {apiSolutions.length === 0 ? (
+                                <div className="form-hint">This API isn't in any unmanaged solution, so new parameters and properties are only in the Default solution.</div>
+                            ) : (
+                                <>
+                                    <div className="form-hint">This API is in these unmanaged solutions. New parameters and properties are added to the ones ticked.</div>
+                                    {apiSolutions.map((name) => (
+                                        <label key={name} className="form-checkbox-row">
+                                            <input type="checkbox" checked={childSolutions.has(name)} disabled={saving}
+                                                onChange={(e) => toggleChildSolution(name, e.target.checked)} />
+                                            {name}
+                                        </label>
+                                    ))}
+                                </>
+                            )}
+                        </div>
+                    )}
+                    <datalist id={TABLE_LIST_ID}>
+                        {(tableNames ?? []).map((t) => <option key={t} value={t} />)}
+                    </datalist>
+                    <datalist id={PRIVILEGE_LIST_ID}>
+                        {(privilegeNames ?? []).map((n) => <option key={n} value={n} />)}
+                    </datalist>
                     {errors.length > 0 && (
                         <div className="form-submit-error" style={{ whiteSpace: "pre-line" }}>{errors.join("\n")}</div>
                     )}

@@ -15,6 +15,7 @@ const del = vi.fn();
 const execute = vi.fn();
 const queryData = vi.fn();
 const getEntityMetadata = vi.fn();
+const getAllEntitiesMetadata = vi.fn();
 const client = new DataverseClient();
 
 /** Answers queryData by the start of the query; every call is recorded in order. */
@@ -25,7 +26,7 @@ const writes: string[] = [];
 
 beforeEach(() => {
     writes.length = 0;
-    for (const fn of [create, update, del, execute, queryData, getEntityMetadata]) fn.mockReset();
+    for (const fn of [create, update, del, execute, queryData, getEntityMetadata, getAllEntitiesMetadata]) fn.mockReset();
     create.mockImplementation(async (table: string) => {
         writes.push(`create ${table}`);
         return { id: table === "customapi" ? API_ID : NEW_CHILD_ID };
@@ -41,7 +42,7 @@ beforeEach(() => {
         const answer = queryAnswers.find(([start]) => query.startsWith(start));
         return { value: answer ? answer[1] : [] };
     });
-    vi.stubGlobal("window", { dataverseAPI: { create, update, delete: del, execute, queryData, getEntityMetadata } });
+    vi.stubGlobal("window", { dataverseAPI: { create, update, delete: del, execute, queryData, getEntityMetadata, getAllEntitiesMetadata } });
 });
 
 function savedApi(): CustomApi {
@@ -68,6 +69,9 @@ describe("isCustomApiSupported", () => {
         expect(getEntityMetadata).toHaveBeenCalledWith("customapi", true, ["LogicalName"]);
 
         getEntityMetadata.mockRejectedValueOnce(new Error("Could not find an entity with specified entity name: customapi (0x80060888)"));
+        await expect(client.isCustomApiSupported()).resolves.toBe(false);
+        // The response from a real environment for a table that doesn't exist
+        getEntityMetadata.mockRejectedValueOnce(new Error("EntityMetadata With Id = LogicalName='customapi' does not exist."));
         await expect(client.isCustomApiSupported()).resolves.toBe(false);
         getEntityMetadata.mockRejectedValueOnce("Request failed with status 404");
         await expect(client.isCustomApiSupported()).resolves.toBe(false);
@@ -280,6 +284,21 @@ describe("updateCustomApi", () => {
         expect(del).not.toHaveBeenCalledWith("customapirequestparameter", REQUEST_ID, "primary");
     });
 
+    it("adds new children only to the solutions the user chose, without looking them up", async () => {
+        queryAnswers = [["solutioncomponentdefinitions?", [{ solutioncomponenttype: 10001 }]]];
+        const original = savedApi();
+        const draft = copy(original);
+        draft.requestParameters.push({ ...newCustomApiField(API_ID), name: "Extra", uniquename: "Extra", displayname: "Extra", isoptional: true });
+
+        await client.updateCustomApi(original, draft, ["Picked"]);
+        expect(writes).toEqual(["create customapirequestparameter", `add ${NEW_CHILD_ID} to Picked`]);
+        expect(queryData.mock.calls.some(([q]) => (q as string).startsWith("solutioncomponents?"))).toBe(false);
+
+        writes.length = 0;
+        await client.updateCustomApi(original, draft, []);
+        expect(writes).toEqual(["create customapirequestparameter"]);
+    });
+
     it("refuses an edit to a fixed field without writing", async () => {
         const original = savedApi();
         const draft = copy(original);
@@ -383,5 +402,30 @@ describe("solutions", () => {
     it("refuses an invalid solution without creating anything", async () => {
         await expect(client.createSolution({ friendlyname: "", uniquename: "1bad", version: "one", publisherid: "" })).rejects.toThrow("Failed to create the solution");
         expect(create).not.toHaveBeenCalled();
+    });
+});
+
+describe("name suggestions", () => {
+    it("lists table logical names in lower case and order", async () => {
+        getAllEntitiesMetadata.mockResolvedValueOnce({ value: [{ LogicalName: "contact" }, { LogicalName: "Account" }, {}] });
+        await expect(client.fetchTableNames()).resolves.toEqual(["account", "contact"]);
+        expect(getAllEntitiesMetadata).toHaveBeenCalledWith(["LogicalName"], "primary");
+    });
+
+    it("reads every page of privilege names", async () => {
+        const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+        const fullPage = Array.from({ length: 5000 }, (_, i) => ({ privilegeid: id(i + 1), name: `prvRead${i}` }));
+        queryData.mockImplementation(async (query: string) => ({
+            value: query.includes(" gt ") ? [{ privilegeid: id(5001), name: "prvCreateAccount" }] : fullPage,
+        }));
+        const names = await client.fetchPrivilegeNames();
+        expect(names).toHaveLength(5001);
+        expect(names).toContain("prvCreateAccount");
+        expect(queryData.mock.calls[0][0]).toContain("privileges?$select=name&$orderby=privilegeid&$top=5000");
+    });
+
+    it("wraps failures", async () => {
+        getAllEntitiesMetadata.mockRejectedValueOnce(new Error("boom"));
+        await expect(client.fetchTableNames()).rejects.toThrow("Failed to fetch tables: boom");
     });
 });

@@ -735,6 +735,28 @@ export class DataverseClient {
     }
   }
 
+  /** Logical names of every table, in lower case and name order: suggestions for table fields. */
+  async fetchTableNames(): Promise<string[]> {
+    try {
+      const response = await window.dataverseAPI.getAllEntitiesMetadata(["LogicalName"], "primary");
+      return response.value.map((t) => String(t.LogicalName ?? "").toLowerCase()).filter(Boolean).sort();
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to fetch tables: ${msg}`);
+    }
+  }
+
+  /** Names of every privilege, in name order: suggestions for a Custom API's Execute privilege. */
+  async fetchPrivilegeNames(): Promise<string[]> {
+    try {
+      const rows = await this.queryAllRows("privileges", "name", "privilegeid");
+      return rows.map((r) => String(r["name"] ?? "")).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to fetch privileges: ${msg}`);
+    }
+  }
+
   /** Plug-in types that can handle a Custom API (not workflow activities), ordered by type name. */
   async fetchCustomApiPluginTypes(): Promise<CustomApiPluginTypeOption[]> {
     try {
@@ -810,19 +832,19 @@ export class DataverseClient {
    * Saves the differences between the saved API and the edited draft. Updates and creates come first and
    * removed children are deleted last, so a failure leaves the contract as it was or only adds to it. The
    * one exception is a removed child whose unique name a new child reuses: it is deleted just before that
-   * create. New children join every unmanaged solution the API is in. Returns false when there was nothing
-   * to save. Dataverse saves each write on its own, so after a failure part of the edit may already be
+   * create. New children join childSolutions, or when that is left out, every unmanaged solution the API
+   * is in. Returns false when there was nothing to save. Dataverse saves each write on its own, so after a failure part of the edit may already be
    * saved; reload the API before trying again.
    */
-  async updateCustomApi(original: CustomApi, draft: CustomApi): Promise<boolean> {
+  async updateCustomApi(original: CustomApi, draft: CustomApi, childSolutions?: readonly string[]): Promise<boolean> {
     const errors = validateCustomApi(draft, original);
     if (errors.length > 0) throw new Error(`Failed to update the Custom API: ${errors.join("\n")}`);
     const plan = planCustomApiUpdate(original, draft);
     if (isEmptyPlan(plan)) return false;
 
-    let solutions: string[] = [];
+    let solutions: readonly string[] = [];
     try {
-      if (plan.creates.length > 0) solutions = await this.fetchUnmanagedSolutionsContaining(original.customapiid);
+      if (plan.creates.length > 0) solutions = childSolutions ?? (await this.fetchUnmanagedSolutionsContaining(original.customapiid));
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to update the Custom API: ${msg}`);
@@ -934,7 +956,7 @@ export class DataverseClient {
   }
 
   /** Unique names of the unmanaged, visible solutions (other than Default) that contain a record. */
-  private async fetchUnmanagedSolutionsContaining(componentId: string): Promise<string[]> {
+  async fetchUnmanagedSolutionsContaining(componentId: string): Promise<string[]> {
     if (!isGuid(componentId)) throw new Error(`Invalid component ID: "${componentId}"`);
     const components = await window.dataverseAPI.queryData(
       `solutioncomponents?$select=_solutionid_value&$filter=objectid eq ${componentId}`,

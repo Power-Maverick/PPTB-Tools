@@ -245,6 +245,8 @@ export default function App() {
     // Filter toggles
     const [showPlugins, setShowPlugins] = useState(true);
     const [showEndpoints, setShowEndpoints] = useState(true);
+    // First-party APIs are managed and swamp the Custom APIs view, so it starts with only unmanaged ones.
+    const [showManagedCustomApis, setShowManagedCustomApis] = useState(false);
 
     // Bulk enable/disable in progress
     const [bulkToggling, setBulkToggling] = useState(false);
@@ -1098,6 +1100,15 @@ export default function App() {
         if (node?.type === "customapi") setExpandedIds((prev) => new Set(prev).add(node.id));
     };
 
+    /** Shows or hides managed APIs; hiding them clears a selection that would no longer be in the tree. */
+    const toggleManagedCustomApis = (show: boolean) => {
+        setShowManagedCustomApis(show);
+        if (show || !selectedNode || viewMode !== 'customapis') return;
+        const visible = buildCustomApiNodes(customApis.filter((a) => !a.ismanaged), expandedIds, customApiSteps, images);
+        const contains = (nodes: TreeNode[]): boolean => nodes.some((n) => n.id === selectedNode.id || contains(n.children ?? []));
+        if (!contains(visible)) setSelectedNode(null);
+    };
+
     const handleCreateCustomApi = async (draft: CustomApi, solutionUniqueName?: string) => {
         let newId: string | undefined;
         try {
@@ -1116,11 +1127,11 @@ export default function App() {
         await refreshCustomApis(newId).catch((err: unknown) => notify(err instanceof Error ? err.message : String(err), "error"));
     };
 
-    const handleUpdateCustomApi = async (draft: CustomApi) => {
+    const handleUpdateCustomApi = async (draft: CustomApi, childSolutions?: string[]) => {
         if (!editedCustomApi) return;
         const selectedId = selectedNode?.id;
         try {
-            const changed = await client.updateCustomApi(editedCustomApi, draft);
+            const changed = await client.updateCustomApi(editedCustomApi, draft, childSolutions);
             notify(changed ? `Custom API ${draft.uniquename} updated.` : "No changes to save.");
             setShowUpdateCustomApi(false);
             if (changed) await refreshCustomApis(selectedId);
@@ -1371,7 +1382,9 @@ export default function App() {
     const bottomSteps = selectedPluginType ? (steps.get(selectedPluginType.plugintypeid) ?? []) : [];
     const bottomImages = selectedStep ? (images.get(selectedStep.sdkmessageprocessingstepid) ?? []) : [];
 
-    const rawTreeNodes = buildTreeNodes(assemblies, packages, pluginTypes, steps, images, expandedIds, serviceEndpoints, endpointSteps, showPlugins, showEndpoints, viewMode, customApis, customApiSteps);
+    const managedCustomApiCount = customApis.filter((a) => a.ismanaged).length;
+    const visibleCustomApis = showManagedCustomApis ? customApis : customApis.filter((a) => !a.ismanaged);
+    const rawTreeNodes = buildTreeNodes(assemblies, packages, pluginTypes, steps, images, expandedIds, serviceEndpoints, endpointSteps, showPlugins, showEndpoints, viewMode, visibleCustomApis, customApiSteps);
 
     const treeNodes = searchTerm
         ? filterTreeForSearch(rawTreeNodes, searchTerm.toLowerCase())
@@ -1553,14 +1566,23 @@ export default function App() {
                 <div className="toolbar-separator" />
 
                 <div className="toolbar-group toolbar-filter-group">
-                    <label className="toolbar-filter-label">
-                        <input type="checkbox" checked={showPlugins} onChange={(e) => setShowPlugins(e.target.checked)} />
-                        Plugins
-                    </label>
-                    <label className="toolbar-filter-label">
-                        <input type="checkbox" checked={showEndpoints} onChange={(e) => setShowEndpoints(e.target.checked)} />
-                        Endpoints
-                    </label>
+                    {viewMode === 'customapis' ? (
+                        <label className="toolbar-filter-label" title="Managed APIs come from managed solutions, including Microsoft's own.">
+                            <input type="checkbox" checked={showManagedCustomApis} onChange={(e) => toggleManagedCustomApis(e.target.checked)} />
+                            Managed ({managedCustomApiCount})
+                        </label>
+                    ) : (
+                        <>
+                            <label className="toolbar-filter-label">
+                                <input type="checkbox" checked={showPlugins} onChange={(e) => setShowPlugins(e.target.checked)} />
+                                Plugins
+                            </label>
+                            <label className="toolbar-filter-label">
+                                <input type="checkbox" checked={showEndpoints} onChange={(e) => setShowEndpoints(e.target.checked)} />
+                                Endpoints
+                            </label>
+                        </>
+                    )}
                 </div>
 
                 {isStepSelected && (
@@ -1637,7 +1659,9 @@ export default function App() {
                             searchTerm
                                 ? `No results for "${searchTerm}"`
                                 : viewMode === 'customapis'
-                                    ? "No Custom APIs found. Click Register → New Custom API to add one."
+                                    ? !showManagedCustomApis && managedCustomApiCount > 0
+                                        ? `No unmanaged Custom APIs. Tick Managed to show the ${managedCustomApiCount} managed ones, or click Register → New Custom API to add one.`
+                                        : "No Custom APIs found. Click Register → New Custom API to add one."
                                     : "No assemblies found. Click Register → New Assembly to add one."
                         }
                     />
@@ -1738,7 +1762,7 @@ export default function App() {
                     isOpen={showUpdateCustomApi}
                     existing={editedCustomApi}
                     assemblies={assemblies}
-                    onSave={(draft) => handleUpdateCustomApi(draft)}
+                    onSave={(draft, _solution, childSolutions) => handleUpdateCustomApi(draft, childSolutions)}
                     onClose={() => setShowUpdateCustomApi(false)}
                 />
             )}

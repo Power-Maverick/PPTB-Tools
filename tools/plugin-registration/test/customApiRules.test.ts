@@ -9,6 +9,7 @@ import {
     planCustomApiUpdate,
     suggestUniqueName,
     validateCustomApi,
+    validateKnownNames,
     validateNewSolution,
 } from "../src/utils/customApiRules";
 
@@ -359,5 +360,35 @@ describe("customApiStepLimit", () => {
         expect(customApiStepLimit(PLUGIN_TYPE_ID, api(0))).toBeUndefined();
         expect(customApiStepLimit("", api(0))).toBeUndefined();
         expect(customApiStepLimit(MESSAGE_ID, [draftApi({ allowedcustomprocessingsteptype: 0 })])).toBeUndefined();
+    });
+});
+
+describe("validateKnownNames", () => {
+    const known = { tables: new Set(["account", "contact"]), privileges: new Set(["prvreadaccount"]) };
+
+    it("accepts names that exist, in any case, and a blank privilege", () => {
+        const draft = draftApi({ bindingtype: 1, boundentitylogicalname: "Account", executeprivilegename: "prvReadAccount" });
+        draft.requestParameters = [request({ type: 5, logicalentityname: "contact" })];
+        expect(validateKnownNames(draft, undefined, known)).toEqual([]);
+        expect(validateKnownNames(draftApi(), undefined, known)).toEqual([]);
+    });
+
+    it("reports a missing bound table, parameter table and privilege on a new API", () => {
+        const draft = draftApi({ bindingtype: 1, boundentitylogicalname: "acount", executeprivilegename: "prvReadAcount" });
+        draft.responseProperties = [{ ...newCustomApiField(""), name: "Out", uniquename: "Out", displayname: "Out", type: 5, logicalentityname: "contct" }];
+        expect(validateKnownNames(draft, undefined, known)).toEqual([
+            "Bound table 'acount' doesn't exist in this environment.",
+            "Response property 'Out' uses table 'contct', which doesn't exist in this environment.",
+            "Execute privilege 'prvReadAcount' doesn't exist in this environment. Use the name of an existing privilege, such as prvReadAccount.",
+        ]);
+    });
+
+    it("checks only what a save would set, and skips lists that weren't loaded", () => {
+        const original = savedApi({ bindingtype: 1, boundentitylogicalname: "gone", executeprivilegename: "prvGone" });
+        original.requestParameters[0].logicalentityname = "gone";
+        expect(validateKnownNames(copy(original), original, known)).toEqual([]);
+
+        const draft = draftApi({ bindingtype: 1, boundentitylogicalname: "acount", executeprivilegename: "prvTypo" });
+        expect(validateKnownNames(draft, undefined, {})).toEqual([]);
     });
 });

@@ -463,3 +463,38 @@ export function customApiStepLimit(messageId: string, apis: readonly CustomApi[]
   }
   return undefined;
 }
+
+/** Table logical names and privilege names that exist in the environment, for catching typos. */
+export interface KnownNames {
+  /** Table logical names in lower case, or undefined when they couldn't be loaded. */
+  tables?: ReadonlySet<string>;
+  /** Privilege names in lower case, or undefined when they couldn't be loaded. */
+  privileges?: ReadonlySet<string>;
+}
+
+/**
+ * Names in a draft that don't exist in the environment. Only names this save would set are checked:
+ * the bound table of a new API, the table of a new parameter or property, and an Execute privilege that
+ * is new or changed. A list that couldn't be loaded isn't checked.
+ */
+export function validateKnownNames(draft: CustomApi, original: CustomApi | undefined, known: KnownNames): string[] {
+  const errors: string[] = [];
+  const { tables, privileges } = known;
+  const unknownTable = (name: string) => !!tables && !!name.trim() && !tables.has(name.trim().toLowerCase());
+  if (!original && draft.bindingtype !== CUSTOM_API_BINDING_GLOBAL && unknownTable(draft.boundentitylogicalname)) {
+    errors.push(`Bound table '${draft.boundentitylogicalname}' doesn't exist in this environment.`);
+  }
+  const children: [CustomApiField[], string][] = [[draft.requestParameters, "Request parameter"], [draft.responseProperties, "Response property"]];
+  for (const [fields, kind] of children) {
+    for (const field of fields) {
+      if (!field.id && unknownTable(field.logicalentityname)) {
+        errors.push(`${kind} '${field.uniquename}' uses table '${field.logicalentityname}', which doesn't exist in this environment.`);
+      }
+    }
+  }
+  const privilege = draft.executeprivilegename.trim();
+  if (privileges && privilege && !same(privilege, original?.executeprivilegename ?? null) && !privileges.has(privilege.toLowerCase())) {
+    errors.push(`Execute privilege '${privilege}' doesn't exist in this environment. Use the name of an existing privilege, such as prvReadAccount.`);
+  }
+  return errors;
+}
