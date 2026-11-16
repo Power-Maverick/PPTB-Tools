@@ -65,6 +65,28 @@ The detail tabs can still run individual reports with their own **Run report** o
 
 The dashboard combines summaries, not API rows. Do not add the two reports' credit totals together, or allocate Azure charges to individual agents. Credit reports cover the tenant; Azure covers one selected subscription, may include other services, and can have different processing dates. Multiple currencies remain separate.
 
+## MCP headless execution
+
+The tool is discoverable through PPTB's MCP server and runs headlessly (without opening its UI). Request both credit reports with `startDate` and `endDate` in `YYYY-MM-DD` format; they must fall within the previous 30 complete UTC days. Optional `granularity` is `Daily` (default) or `Summary`.
+
+Azure costs are opt-in: set `includeAzure` to `true` and provide a valid `subscriptionId` GUID. Optional Azure settings are `costType` (`ActualCost` by default or `AmortizedCost`), `scopeFilter` (`powerPlatform` by default or `all`), and `grouping` (defaults to `Meter`; supported values are `None`, `Meter`, `MeterCategory`, `ServiceName`, `ResourceGroupName`, and `ResourceId`). The Azure query uses the same dates as the credit reports.
+
+When `includeAzure` is true and `subscriptionId` is missing, blank, or invalid, the tool returns `operation: "needs-user-input"` and `status: "requires_input"` before making any report requests. `code` identifies `subscription_id_required` or `subscription_id_invalid`; `requiredInputs` supplies a user-facing prompt and GUID format, and `nextAction` tells the agent to ask the user and reinvoke. The returned `input` preserves the validated dates and options (including defaults). Reinvoke with that input and replace `subscriptionId` with the user-provided GUID; do not guess a subscription or change `includeAzure` to false. The subscription ID is available in **Azure Portal > Subscriptions**.
+
+These response fields are a tool-level contract, not an automatic MCP dialog. The calling agent must handle `requires_input`, prompt the user, and retry. Parameter descriptions also explain this requirement to clients that expose PPTB invocation metadata; subscription ID is not globally required, so credit-only calls remain supported.
+
+The two credit report results and optional Azure result are returned separately with their rows, status, retrieval time, and totals; failure of one source does not discard successful results from the others. Other invalid input is rejected. The MCP run uses PPTB's active connection and host-managed APIs; it does not accept or log access tokens. The same delegated Power Platform permissions, administrator role, Azure approval, RBAC, and billing visibility prerequisites described above still apply.
+
+### Headless diagnostic logs
+
+Headless execution writes single-line JSON diagnostics prefixed with `[Copilot Studio Cost Analyzer headless]` through PPTB's supplied `context.logger`, falling back to the console for any missing log level. Every entry includes a unique `runId`, UTC `timestamp`, `elapsedMs`, and an `event` name, so concurrent invocations and individual report jobs can be distinguished.
+
+- **Info:** run/report starts, validated report dates and settings, successful row/page counts and durations, skipped Azure analysis, and the final per-source status summary.
+- **Debug:** validated input metadata, available host API surfaces, credit-report submission/queue/processing/download progress, and each Azure page request. Credit countdown updates are logged on phase changes and at most once every 30 seconds within a phase, rather than every second.
+- **Warning/error:** requests for a user-provided subscription ID, validation rejection, unavailable APIs, report failures, and completion with failed sources. Service failures include HTTP status, recognized error code, and retry delay when available.
+
+Logs omit subscription IDs, tokens, raw invocation/context objects, report rows, usage/cost amounts, response bodies, and arbitrary service error messages. These logs diagnose execution; they do not change the returned report payload or automatically prompt the user. Debug-log visibility depends on the MCP host's logging configuration.
+
 ## Breakdowns, comparisons, and estimates
 
 - **Breakdowns:** Agent feature results can be filtered by environment, feature, model, channel, and agent/environment name or ID. Totals and CSV exports reflect the matching rows. The environment report can be filtered by environment.
@@ -176,5 +198,6 @@ npm run validate
 ```
 
 The Power Platform API raw-response workflow requires PPTB 1.2.9 or later and `@pptb/types` 1.2.9 or later.
+The build also emits `dist/headless.js` for MCP execution and packages `pptb.config.json` to register the invocation contract. The headless entry uses the host API surfaces made available by PPTB; Azure results are skipped unless requested.
 
 API requirements are declared under `features.apis`: `pp` and `arm` are required. The host does not recognize `features.requiredAPIs`; using that key leaves ARM undeclared and causes a `capabilityDenied` error before any Azure request. Azure costs use PPTB's `window.azureAPI`. Until a `@pptb/types` release includes the Azure API types and updated manifest validator support, the tool uses a temporary shim at `src/types/azureAPI.d.ts`, and older `pptb-validate` versions may reject `features.apis`. When the release is available, update `@pptb/types`, delete the shim, and run validation again. Close and reload the tool in PPTB after changing its manifest or version.

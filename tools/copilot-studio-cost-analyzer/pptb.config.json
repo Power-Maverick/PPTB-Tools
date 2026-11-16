@@ -1,0 +1,49 @@
+{
+    "invocation": {
+        "version": "1.1.0",
+        "prefill": {
+            "properties": {
+                "startDate": { "type": "string" },
+                "endDate": { "type": "string" },
+                "granularity": { "type": "string", "enum": ["Daily", "Summary"] },
+                "includeAzure": {
+                    "type": "boolean",
+                    "description": "Include Azure monetary costs. When true, subscriptionId is required. If unknown, ask the user for their Azure subscription ID before invoking. If the result has status requires_input, collect the requested value and reinvoke with the original dates and options."
+                },
+                "subscriptionId": {
+                    "type": "string",
+                    "title": "Azure subscription ID",
+                    "description": "Azure subscription GUID, required only when includeAzure is true. Ask the user to supply this value if missing or invalid; never invent an ID or disable Azure analysis to avoid asking."
+                },
+                "costType": { "type": "string", "enum": ["ActualCost", "AmortizedCost"] },
+                "scopeFilter": { "type": "string", "enum": ["powerPlatform", "all"] },
+                "grouping": { "type": "string", "enum": ["None", "Meter", "MeterCategory", "ServiceName", "ResourceGroupName", "ResourceId"] }
+            }
+        },
+        "returnTopic": {
+            "properties": {
+                "operation": { "type": "string" },
+                "status": { "type": "string", "description": "requires_input means no reports were requested; ask the user for requiredInputs and follow nextAction." },
+                "code": { "type": "string" },
+                "message": { "type": "string" },
+                "requiredInputs": { "type": "array", "items": { "type": "object" } },
+                "nextAction": { "type": "object" },
+                "input": { "type": "object" },
+                "reports": { "type": "object" },
+                "summary": { "type": "object" },
+                "generatedAt": { "type": "string" }
+            }
+        }
+    },
+    "agents": {
+        "version": "1.0.0",
+        "invokable": true,
+        "modes": ["two-way"],
+        "defaultMode": "two-way",
+        "timeoutMS": 900000,
+        "headless": true,
+        "executionModes": ["headless"],
+        "defaultExecutionMode": "headless",
+        "headlessEntry": "dist/headless.js"
+    }
+}

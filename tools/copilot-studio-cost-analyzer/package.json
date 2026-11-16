@@ -1,6 +1,6 @@
 {
     "name": "@power-maverick/tool-copilot-studio-cost-analyzer",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "displayName": "Copilot Studio Cost & Usage Analyzer",
     "description": "Analyze Copilot Studio agent credit consumption, capacity reports, and related Azure costs.",
     "icon": "icons/copilotStudioCostAnalyzer.svg",
@@ -32,7 +32,8 @@
         "node": ">=20.19.0"
     },
     "scripts": {
-        "build": "tsc && vite build",
+        "build": "npm run typecheck && vite build && npm run build:headless",
+        "build:headless": "tsc -p tsconfig.headless.json",
         "dev": "vite",
         "watch": "vite build --watch",
         "dev-watch": "vite build --mode development --watch",
@@ -52,7 +53,7 @@
         "react-dom": "^18.3.1"
     },
     "devDependencies": {
-        "@pptb/types": "1.2.9-beta.0",
+        "@pptb/types": "^1.2.9-beta.1",
         "@types/react": "^18.3.12",
         "@types/react-dom": "^18.3.1",
         "@vitejs/plugin-react": "^4.3.4",
@@ -61,6 +62,7 @@
         "vitest": "^4.1.12"
     },
     "files": [
-        "dist"
+        "dist",
+        "pptb.config.json"
     ]
 }
