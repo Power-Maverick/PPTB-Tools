@@ -1222,3 +1222,22 @@ button:disabled {
     border-top: 1px solid var(--border-color);
     cursor: default;
 }
+
+.name-combobox-detail {
+    margin-left: 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+/* A searchable drop-down: a text box with the arrow of a select. */
+.searchable-select {
+    padding-right: 24px;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23605e5c'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+}
+
+.searchable-select:focus {
+    cursor: text;
+}

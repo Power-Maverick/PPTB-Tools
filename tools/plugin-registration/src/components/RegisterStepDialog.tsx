@@ -3,6 +3,7 @@ import type { CustomApi, PluginType, ProcessingStep, SdkMessage, SdkMessageFilte
 import { customApiStepLimit } from "../utils/customApiRules";
 import { DataverseClient } from "../utils/DataverseClient";
 import { AttributePickerDialog } from "./AttributePickerDialog";
+import { SearchableSelect } from "./NameCombobox";
 import { UserPickerDialog } from "./UserPickerDialog";
 
 interface RegisterStepDialogProps {
@@ -284,16 +285,18 @@ export function RegisterStepDialog({
                             {loadingMessages ? (
                                 <div className="form-read-only">Loading messages…</div>
                             ) : (
-                                <select
-                                    className="form-select"
+                                <SearchableSelect
                                     value={selectedMessageId}
-                                    onChange={(e) => setSelectedMessageId(e.target.value)}
-                                >
-                                    <option value="">— Select Message —</option>
-                                    {messages.map((m) => (
-                                        <option key={m.sdkmessageid} value={m.sdkmessageid}>{m.name}</option>
-                                    ))}
-                                </select>
+                                    onChange={setSelectedMessageId}
+                                    noneLabel="— Select Message —"
+                                    aria-label="Message"
+                                    // Messages of Custom APIs are marked, so they can be found by typing "custom api".
+                                    options={messages.map((m) => ({
+                                        value: m.sdkmessageid,
+                                        label: m.name,
+                                        detail: customApis.some((a) => a.sdkmessageid?.toLowerCase() === m.sdkmessageid.toLowerCase()) ? "Custom API" : undefined,
+                                    }))}
+                                />
                             )}
                         </div>
                         <div className="form-row">
@@ -301,19 +304,15 @@ export function RegisterStepDialog({
                             {loadingFilters ? (
                                 <div className="form-read-only">Loading entities…</div>
                             ) : (
-                                <select
-                                    className="form-select"
+                                <SearchableSelect
                                     value={selectedFilterId}
-                                    onChange={(e) => setSelectedFilterId(e.target.value)}
+                                    onChange={setSelectedFilterId}
                                     disabled={!selectedMessageId}
-                                >
-                                    <option value="">None (Global)</option>
-                                    {filters.map((f) => (
-                                        <option key={f.sdkmessagefilterid} value={f.sdkmessagefilterid}>
-                                            {f.primaryobjecttypecode}
-                                        </option>
-                                    ))}
-                                </select>
+                                    noneLabel="None (Global)"
+                                    aria-label="Primary entity"
+                                    // Global messages have one filter whose table is "none"; say so, so it isn't mistaken for None (Global).
+                                    options={filters.map((f) => ({ value: f.sdkmessagefilterid, label: f.primaryobjecttypecode === "none" ? "none (no table)" : f.primaryobjecttypecode }))}
+                                />
                             )}
                         </div>
                         <div className="form-row">

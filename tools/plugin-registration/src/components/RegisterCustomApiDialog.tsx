@@ -6,10 +6,11 @@ import {
     CUSTOM_API_PARAMETER_TYPES,
     CUSTOM_API_STEP_TYPES,
 } from "../models/interfaces";
-import { canSpecifyTable, isLocked, newCustomApi, newCustomApiField, suggestUniqueName, validateCustomApi, validateKnownNames, validateNewSolution } from "../utils/customApiRules";
+import { canSpecifyTable, compareVersions, isLocked, newCustomApi, newCustomApiField, suggestUniqueName, validateCustomApi, validateKnownNames, validateNewSolution } from "../utils/customApiRules";
 import type { CustomApiPluginTypeOption } from "../utils/DataverseClient";
 import { DataverseClient } from "../utils/DataverseClient";
-import { NameCombobox } from "./NameCombobox";
+import { NameCombobox, SearchableSelect } from "./NameCombobox";
+import type { SelectOption } from "./NameCombobox";
 
 const client = new DataverseClient();
 
@@ -161,16 +162,24 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
         });
     }, [isEdit, prefix, draft.displayname, uniqueNameTouched, nameTouched]);
 
-    // Plug-in types grouped by assembly name, assemblies in name order.
-    const pluginTypeGroups = useMemo(() => {
-        const assemblyNames = new Map(assemblies.map((a) => [a.pluginassemblyid.toLowerCase(), a.name]));
-        const groups = new Map<string, CustomApiPluginTypeOption[]>();
-        for (const t of pluginTypes) {
-            const name = assemblyNames.get(t.pluginassemblyid.toLowerCase()) ?? "(Other assemblies)";
-            if (!groups.has(name)) groups.set(name, []);
-            groups.get(name)!.push(t);
-        }
-        return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+    // Plug-in types with their assembly name and version: an assembly can be registered side by side in two
+    // major or minor versions, with the same type names in each. Ordered by assembly name, then newest version,
+    // then type name. Search covers all three.
+    const pluginTypeOptions = useMemo<SelectOption[]>(() => {
+        const assemblyById = new Map(assemblies.map((a) => [a.pluginassemblyid.toLowerCase(), a]));
+        return pluginTypes
+            .map((t: CustomApiPluginTypeOption) => {
+                const assembly = assemblyById.get(t.pluginassemblyid.toLowerCase());
+                return {
+                    value: t.plugintypeid,
+                    label: t.typename,
+                    detail: assembly ? `${assembly.name} ${assembly.version}`.trim() : "(Other assemblies)",
+                    assemblyName: assembly?.name ?? "￿",
+                    version: assembly?.version ?? "",
+                };
+            })
+            .sort((a, b) => a.assemblyName.localeCompare(b.assemblyName) || compareVersions(b.version, a.version) || a.label.localeCompare(b.label))
+            .map(({ value, label, detail }) => ({ value, label, detail }));
     }, [assemblies, pluginTypes]);
 
     if (!isOpen) return null;
@@ -477,20 +486,8 @@ export function RegisterCustomApiDialog({ isOpen, existing, assemblies, onSave, 
                         </div>
                         <div className="form-row">
                             <label className="form-label">Plug-in Type</label>
-                            <select className="form-select" value={draft.plugintypeid ?? ""} disabled={locked}
-                                onChange={(e) => set("plugintypeid", e.target.value || undefined)}>
-                                <option value="">(None)</option>
-                                {draft.plugintypeid && !pluginTypes.some((t) => t.plugintypeid.toLowerCase() === draft.plugintypeid!.toLowerCase()) && (
-                                    <option value={draft.plugintypeid}>{draft.plugintypeid}</option>
-                                )}
-                                {pluginTypeGroups.map(([assembly, types]) => (
-                                    <optgroup key={assembly} label={assembly}>
-                                        {types.map((t) => (
-                                            <option key={t.plugintypeid} value={t.plugintypeid}>{t.typename}</option>
-                                        ))}
-                                    </optgroup>
-                                ))}
-                            </select>
+                            <SearchableSelect value={draft.plugintypeid ?? ""} options={pluginTypeOptions} noneLabel="(None)" disabled={locked}
+                                aria-label="Plug-in type" onChange={(value) => set("plugintypeid", value || undefined)} />
                         </div>
                         <div className="form-row">
                             <label className="form-label">Binding Type</label>
