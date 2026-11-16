@@ -56,6 +56,11 @@ const request: AzureCostRequest = {
 };
 
 describe("buildCostQuery", () => {
+    it("uses the shared dashboard date range instead of a named Azure period", () => {
+        const query = buildCostQuery({ ...request, timePeriod: { from: "2026-03-03", to: "2026-03-08" } }, NOW);
+        expect(query.timeframe).toBe("Custom");
+        expect(query.timePeriod).toEqual({ from: "2026-03-03T00:00:00Z", to: "2026-03-08T23:59:59Z" });
+    });
     it("builds a daily, grouped, Power Platform-filtered query", () => {
         expect(buildCostQuery(request, NOW)).toEqual({
             type: "ActualCost",
@@ -83,6 +88,18 @@ describe("buildCostQuery", () => {
 describe("Azure cost client", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
+
+    it("keeps the dashboard's custom range in the loaded result metadata", async () => {
+        const api = createApi({ queryCosts: vi.fn(async () => response(costPage([]))) });
+        const timePeriod = { from: "2026-03-03", to: "2026-03-08" };
+        const result = await loadAzureCosts(api, { ...request, timePeriod }, undefined, undefined, NOW);
+        expect(result.timePeriod).toEqual(timePeriod);
+        expect(api.arm.queryCosts).toHaveBeenCalledWith(
+            `/subscriptions/${SUBSCRIPTION}`,
+            expect.objectContaining({ timeframe: "Custom", timePeriod: { from: "2026-03-03T00:00:00Z", to: "2026-03-08T23:59:59Z" } }),
+            expect.any(Object),
+        );
+    });
 
     it("pages through subscriptions using continuation handles", async () => {
         const api = createApi({

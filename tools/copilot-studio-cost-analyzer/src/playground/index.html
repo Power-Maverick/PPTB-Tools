@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+    <title>Copilot Studio Cost &amp; Usage Analyzer - Playground</title>
+</head>
+<body>
+    <aside class="playground-banner">
+        <strong>INTERACTIVE PLAYGROUND</strong>
+        <span>The actual tool UI with fictional data. All reports are preloaded; reruns are instant. No sign-in or API calls. The live tool's report-generation wait is skipped here.</span>
+        <label>Theme <select id="playground-theme"><option value="light">Light</option><option value="dark">Dark</option></select></label>
+    </aside>
+    <div id="playground-notification" role="status" hidden></div>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+</body>
+</html>

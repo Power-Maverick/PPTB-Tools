@@ -37,6 +37,7 @@ export interface AzureCostState {
     busy?: AzureBusy;
     page: number;
     result?: AzureCostResult & { request: AzureCostRequest; retrievedAt: Date };
+    lastRequest?: AzureCostRequest;
     error?: string;
     diagnostic?: AzureDiagnostic;
     stopped: boolean;
@@ -59,19 +60,22 @@ const OPERATION_LABELS: Record<AzureBusy, string> = {
     costs: "cost query",
 };
 
-export function useAzureCosts(): AzureCostState & AzureCostActions {
+export type InitialAzureSession = Pick<AzureCostState, "connection" | "approved" | "subscriptions" | "subscriptionsLoaded" | "subscriptionId" | "result" | "lastRequest">;
+
+export function useAzureCosts(initial?: InitialAzureSession): AzureCostState & AzureCostActions {
     const api = getAzureApi();
     const controller = useRef<AbortController | undefined>(undefined);
-    const [connection, setConnection] = useState<AzureAPI.ConnectionState>();
+    const [connection, setConnection] = useState<AzureAPI.ConnectionState | undefined>(initial?.connection);
     const [connectionError, setConnectionError] = useState<string>();
-    const [approved, setApproved] = useState(false);
-    const [subscriptions, setSubscriptions] = useState<AzureAPI.Subscription[]>([]);
-    const [subscriptionsLoaded, setSubscriptionsLoaded] = useState(false);
-    const [subscriptionId, setSubscriptionIdState] = useState("");
+    const [approved, setApproved] = useState(initial?.approved ?? false);
+    const [subscriptions, setSubscriptions] = useState<AzureAPI.Subscription[]>(initial?.subscriptions ?? []);
+    const [subscriptionsLoaded, setSubscriptionsLoaded] = useState(initial?.subscriptionsLoaded ?? false);
+    const [subscriptionId, setSubscriptionIdState] = useState(initial?.subscriptionId ?? "");
     const [access, setAccess] = useState<AzureAPI.CostAccessCheck>();
     const [busy, setBusy] = useState<AzureBusy>();
     const [page, setPage] = useState(0);
-    const [result, setResult] = useState<AzureCostState["result"]>();
+    const [result, setResult] = useState<AzureCostState["result"]>(initial?.result);
+    const [lastRequest, setLastRequest] = useState<AzureCostRequest | undefined>(initial?.lastRequest);
     const [error, setError] = useState<string>();
     const [diagnostic, setDiagnostic] = useState<AzureDiagnostic>();
     const [stopped, setStopped] = useState(false);
@@ -96,8 +100,11 @@ export function useAzureCosts(): AzureCostState & AzureCostActions {
         setApproved(false);
         setSubscriptions([]);
         setSubscriptionsLoaded(false);
+        setSubscriptionIdState("");
         setAccess(undefined);
         setResult(undefined);
+        setLastRequest(undefined);
+        setDiagnostic(undefined);
     }, []);
 
     useEffect(() => {
@@ -139,6 +146,7 @@ export function useAzureCosts(): AzureCostState & AzureCostActions {
         try {
             await work(api, current.signal);
         } catch (reason) {
+            if (controller.current !== current) return;
             if (isAbortError(reason)) return;
             logAzureFailure(OPERATION_LABELS[kind], reason);
             const failure = toAzureError(reason);
@@ -183,6 +191,7 @@ export function useAzureCosts(): AzureCostState & AzureCostActions {
         setSubscriptionIdState(value.trim());
         setAccess(undefined);
         setResult(undefined);
+        setLastRequest(undefined);
     }, []);
 
     const checkAccess = useCallback(() => run("access", async (azure, signal) => {
@@ -207,6 +216,7 @@ export function useAzureCosts(): AzureCostState & AzureCostActions {
     const loadCosts = useCallback((options: Omit<AzureCostRequest, "subscriptionId">) => run("costs", async (azure, signal) => {
         setResult(undefined);
         const request = { ...options, subscriptionId };
+        setLastRequest(request);
         const loaded = await loadAzureCosts(azure, request, signal, setPage);
         setResult({ ...loaded, request, retrievedAt: new Date() });
         setApproved(true);
@@ -233,6 +243,7 @@ export function useAzureCosts(): AzureCostState & AzureCostActions {
         busy,
         page,
         result,
+        lastRequest,
         error,
         diagnostic,
         stopped,

@@ -193,7 +193,7 @@ function objectRows(value: unknown): JsonRecord[] {
     });
 }
 
-function parseFeatureRows(value: unknown): FeatureRow[] {
+export function parseFeatureRows(value: unknown): FeatureRow[] {
     return objectRows(value).map((row) => ({
         agentName: stringValue(row["Agent Name"]),
         agentId: stringValue(row["Agent Id"]),
@@ -212,7 +212,7 @@ function parseFeatureRows(value: unknown): FeatureRow[] {
     }));
 }
 
-function parseBillingRows(value: unknown): BillingRow[] {
+export function parseBillingRows(value: unknown): BillingRow[] {
     return objectRows(value).map((row) => ({
         tenantId: stringValue(row.TenantId),
         environmentId: stringValue(row.EnvironmentId),

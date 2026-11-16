@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FluentProvider, Spinner, webDarkTheme, webLightTheme } from "@fluentui/react-components";
-import { loadReport, REPORT_TIMEOUT_MS, type BillingRow, type FeatureRow, type ReportKind, type ReportProgress } from "./api/reports";
+import { REPORT_TIMEOUT_MS, type BillingRow, type FeatureRow, type ReportKind } from "./api/reports";
 import {
     aggregateAgents,
     aggregateBilling,
@@ -15,8 +15,12 @@ import { downloadCsv } from "./data/export";
 import type { PowerPlatformConnectionStatus, PowerPlatformReportOutcome } from "./data/prerequisites";
 import { AzureCostView } from "./components/AzureCostView";
 import { PrerequisitesHelp } from "./components/PrerequisitesHelp";
-import { useAzureCosts } from "./hooks/useAzureCosts";
+import { useAzureCosts, type InitialAzureSession } from "./hooks/useAzureCosts";
+import { useCreditReports, type CreditReportSession } from "./hooks/useCreditReports";
+import { SummaryDashboard } from "./components/SummaryDashboard";
+import { isLatestThirtyDays, reportReadinessMessage } from "./data/dashboard";
 import "./index.css";
+import copilotStudioIcon from "../public/icons/copilotstudio.svg?inline";
 
 type ReportData = { kind: "agents"; rows: FeatureRow[] } | { kind: "billing"; rows: BillingRow[] };
 type DateRange = { startDate: string; endDate: string };
@@ -69,20 +73,6 @@ function changePercent(earlier: number, later: number): string {
     return `${change > 0 ? "+" : ""}${formatNumber(change)}%`;
 }
 
-function getErrorMessage(reason: unknown): string {
-    if (reason && typeof reason === "object" && "status" in reason) {
-        const failure = reason as { status?: unknown; code?: unknown; message?: unknown };
-        if (failure.status === 401) return "Authentication failed. Reconnect your delegated Power Platform account and try again.";
-        if (failure.status === 403) return "Access denied. Confirm your account has an eligible tenant administrator role.";
-        if (failure.status === 404) return "The report API or selected report is not enabled for this tenant yet.";
-        if (failure.status === 429) return "The report API is throttling requests. Wait a little and try again.";
-        if (failure.code === "InvalidRequestContent") return "The report request was rejected. Check the date range and confirm JSON report downloads are enabled for this tenant.";
-        if (typeof failure.message === "string" && failure.message) return failure.message;
-    }
-    if (reason instanceof Error) return reason.message;
-    return "The report request failed unexpectedly. Check the console for diagnostic details.";
-}
-
 function reportOutcomeFor(reason: unknown): PowerPlatformReportOutcome | undefined {
     const status = reason && typeof reason === "object" && "status" in reason ? (reason as { status?: unknown }).status : undefined;
     if (status === 401) return "authFailed";
@@ -91,35 +81,21 @@ function reportOutcomeFor(reason: unknown): PowerPlatformReportOutcome | undefin
     return undefined;
 }
 
-function logReportFailure(reason: unknown): void {
-    if (reason && typeof reason === "object") {
-        const failure = reason as { name?: unknown; status?: unknown; code?: unknown; message?: unknown };
-        console.error("Copilot Studio report request failed.", {
-            name: typeof failure.name === "string" ? failure.name : "UnknownError",
-            status: typeof failure.status === "number" ? failure.status : undefined,
-            code: typeof failure.code === "string" ? failure.code : undefined,
-            message: typeof failure.message === "string" ? failure.message.replace(/Bearer\s+\S+/gi, "Bearer [redacted]") : "No error message provided.",
-        });
-        return;
-    }
-    const message = String(reason ?? "No error message provided.").replace(/Bearer\s+\S+/gi, "Bearer [redacted]");
-    console.error("Copilot Studio report request failed.", { name: "UnknownError", message });
+export interface InitialReportSession {
+    credits: CreditReportSession;
+    azure: InitialAzureSession;
 }
 
-function App() {
-    const requestId = useRef(0);
-    const requestController = useRef<AbortController | undefined>(undefined);
+function App({ initialSession }: { initialSession?: InitialReportSession }) {
     const [theme, setTheme] = useState<"light" | "dark">("light");
     const [connectionName, setConnectionName] = useState("Checking Power Platform connection…");
     const [connectionReady, setConnectionReady] = useState(false);
     const [kind, setKind] = useState<ReportKind>("FeatureDetailsPerResource");
     const [range, setRange] = useState<DateRange>(initialRange);
     const [granularity, setGranularity] = useState<"Daily" | "Summary">("Daily");
-    const [data, setData] = useState<ReportData>();
-    const [progress, setProgress] = useState<ReportProgress>();
-    const [error, setError] = useState<string>();
-    const [running, setRunning] = useState(false);
+    const [exportError, setError] = useState<string>();
     const [search, setSearch] = useState("");
+    const [agentSelection, setAgentSelection] = useState<{ agentId: string; environmentId: string }>();
     const [environmentFilter, setEnvironmentFilter] = useState("");
     const [featureFilter, setFeatureFilter] = useState("");
     const [modelFilter, setModelFilter] = useState("");
@@ -127,17 +103,50 @@ function App() {
     const [billingEnvironmentFilter, setBillingEnvironmentFilter] = useState("");
     const [visibleDetailCount, setVisibleDetailCount] = useState(250);
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
-    const [stopped, setStopped] = useState(false);
-    const [reportRetrievedAt, setReportRetrievedAt] = useState<Date>();
     const [reportDeferred, setReportDeferred] = useState(false);
     const [ppConnection, setPpConnection] = useState<PowerPlatformConnectionStatus>("error");
     const [reportOutcome, setReportOutcome] = useState<PowerPlatformReportOutcome>();
-    const [view, setView] = useState<"credits" | "azure">("credits");
+    const [view, setView] = useState<"summary" | "credits" | "azure">("summary");
     const [helpOpen, setHelpOpen] = useState(false);
-    const azure = useAzureCosts();
+    const azure = useAzureCosts(initialSession?.azure);
+    const credits = useCreditReports(initialSession?.credits);
+    const currentTask = kind === "FeatureDetailsPerResource" ? credits.agents : credits.billing;
+    const currentReport = kind === "FeatureDetailsPerResource" ? credits.agentState : credits.billingState;
+    const running = currentReport.status === "loading";
+    const creditsRunning = credits.agentState.status === "loading" || credits.billingState.status === "loading";
+    const anyRunning = creditsRunning || Boolean(azure.busy);
+    const readinessMessage = reportReadinessMessage(
+        credits.agentState.status === "ready",
+        credits.billingState.status === "ready",
+        Boolean(azure.result),
+    );
+    const data: ReportData | undefined = currentReport.status === "ready"
+        ? kind === "FeatureDetailsPerResource"
+            ? { kind: "agents", rows: credits.agentState.rows ?? [] }
+            : { kind: "billing", rows: credits.billingState.rows ?? [] }
+        : undefined;
+    const progress = currentReport.progress;
+    const error = exportError ?? currentReport.error;
+    const stopped = currentReport.status === "stopped";
+    const reportRetrievedAt = currentReport.retrievedAt;
+
+    const clearCredits = () => {
+        credits.agents.clear();
+        credits.billing.clear();
+        setError(undefined);
+    };
+
+    useEffect(() => {
+        const states = [credits.agentState, credits.billingState];
+        const failed = states.find((state) => state.status === "error");
+        if (failed) setReportOutcome(reportOutcomeFor(failed.failure));
+        else if (states.some((state) => state.status === "ready")) setReportOutcome("succeeded");
+        else setReportOutcome(undefined);
+    }, [credits.agentState, credits.billingState]);
 
     useEffect(() => {
         let mounted = true;
+        let lastConnectionId: string | undefined;
         if (typeof window === "undefined" || !window.toolboxAPI) {
             setConnectionName("Open this tool inside Power Platform ToolBox");
             setConnectionReady(false);
@@ -148,6 +157,13 @@ function App() {
             try {
                 const connection = await window.toolboxAPI.connections.getActiveConnection();
                 if (!mounted) return;
+                if (lastConnectionId !== undefined && lastConnectionId !== connection?.id) {
+                    credits.agents.clear();
+                    credits.billing.clear();
+                    setAgentSelection(undefined);
+                    setReportOutcome(undefined);
+                }
+                lastConnectionId = connection?.id;
                 setConnectionReady(Boolean(connection?.enabledForPowerPlatformAPI));
                 setPpConnection(!connection ? "none" : connection.enabledForPowerPlatformAPI ? "ready" : "disabled");
                 setConnectionName(
@@ -178,12 +194,21 @@ function App() {
             }
         };
         window.toolboxAPI.events.on(handleEvent);
+        const unsubscribeAzure = window.azureAPI?.onConnectionChanged((event) => {
+            if (event.reason !== "connectionChanged") return;
+            credits.agents.clear();
+            credits.billing.clear();
+            setAgentSelection(undefined);
+            setReportOutcome(undefined);
+            void updateConnection();
+        });
 
         return () => {
             mounted = false;
             window.toolboxAPI.events.off(handleEvent);
+            unsubscribeAzure?.();
         };
-    }, []);
+    }, [credits.agents, credits.billing]);
 
     const featureRows = data?.kind === "agents" ? data.rows : undefined;
     const billingRows = data?.kind === "billing" ? data.rows : undefined;
@@ -196,9 +221,10 @@ function App() {
                 && (!environmentFilter || row.environmentName === environmentFilter || row.environmentId === environmentFilter)
                 && (!featureFilter || row.feature === featureFilter || row.product === featureFilter)
                 && (!modelFilter || row.model === modelFilter)
-                && (!channelFilter || row.channel === channelFilter);
+                && (!channelFilter || row.channel === channelFilter)
+                && (!agentSelection || row.agentId === agentSelection.agentId && row.environmentId === agentSelection.environmentId);
         });
-    }, [featureRows, search, environmentFilter, featureFilter, modelFilter, channelFilter]);
+    }, [featureRows, search, environmentFilter, featureFilter, modelFilter, channelFilter, agentSelection]);
     const filteredBillingRows = useMemo(() => (billingRows ?? []).filter((row) =>
         !billingEnvironmentFilter || row.environmentName === billingEnvironmentFilter || row.environmentId === billingEnvironmentFilter,
     ), [billingRows, billingEnvironmentFilter]);
@@ -218,7 +244,7 @@ function App() {
     ), [featureRows, filteredFeatureRows, granularity, range.startDate, range.endDate]);
     const spikes = useMemo(() => detectUsageSpikes(dayTotals), [dayTotals]);
     const endDate = new Date(`${range.endDate}T00:00:00Z`);
-    const forecast = featureRows && granularity === "Daily"
+    const forecast = featureRows && granularity === "Daily" && isLatestThirtyDays(range)
         && featureRows.some((row) => row.consumptionDate)
         ? forecastMonthEnd(dayTotals, endDate.getUTCFullYear(), endDate.getUTCMonth())
         : undefined;
@@ -230,81 +256,37 @@ function App() {
         ? dateSpanLabel(returnedDates[0], returnedDates[returnedDates.length - 1])
         : granularity === "Summary" ? "Not included in Summary data" : "No dated rows returned";
 
-    const runReport = useCallback(async () => {
-        const id = ++requestId.current;
-        const controller = new AbortController();
-        requestController.current = controller;
-        setError(undefined);
-        setStopped(false);
-        setData(undefined);
-        setReportDeferred(false);
-        setReportRetrievedAt(undefined);
-        setRunning(true);
-        setElapsedSeconds(0);
+    const resetFilters = () => {
         setSearch("");
+        setAgentSelection(undefined);
         setEnvironmentFilter("");
         setFeatureFilter("");
         setModelFilter("");
         setChannelFilter("");
         setBillingEnvironmentFilter("");
         setVisibleDetailCount(250);
-        setProgress({ message: "Submitting report request…", elapsedMs: 0 });
-        try {
-            if (kind === "FeatureDetailsPerResource") {
-                const rows = await loadReport(kind, range, granularity, setProgress, controller.signal);
-                if (id === requestId.current) {
-                    setData({ kind: "agents", rows });
-                    setReportRetrievedAt(new Date());
-                    setReportOutcome("succeeded");
-                }
-            } else {
-                const rows = await loadReport(kind, range, granularity, setProgress, controller.signal);
-                if (id === requestId.current) {
-                    setData({ kind: "billing", rows });
-                    setReportRetrievedAt(new Date());
-                    setReportOutcome("succeeded");
-                }
-            }
-        } catch (reason) {
-            if (id !== requestId.current) return;
-            if (reason instanceof Error && reason.name === "AbortError") {
-                setStopped(true);
-                return;
-            }
-            logReportFailure(reason);
-            const outcome = reportOutcomeFor(reason);
-            if (outcome) setReportOutcome(outcome);
-            const message = getErrorMessage(reason);
-            setError(message);
-        } finally {
-            if (id === requestId.current) {
-                requestController.current = undefined;
-                setRunning(false);
-                setProgress(undefined);
-            }
-        }
-    }, [kind, range, granularity]);
+        setError(undefined);
+    };
 
-    const stopReport = useCallback(() => {
-        if (!running) return;
-        requestId.current++;
-        requestController.current?.abort();
-        requestController.current = undefined;
-        setRunning(false);
-        setProgress(undefined);
-        setStopped(true);
-    }, [running]);
+    const runReport = () => {
+        resetFilters();
+        return currentTask.run(range, granularity);
+    };
+
+    const stopReport = () => currentTask.stop();
+
+    const stopAll = () => {
+        credits.agents.stop();
+        credits.billing.stop();
+        azure.stop();
+    };
 
     useEffect(() => {
-        if (!running) return;
+        if (!anyRunning) return;
+        setElapsedSeconds(0);
         const timer = setInterval(() => setElapsedSeconds((seconds) => seconds + 1), 1000);
         return () => clearInterval(timer);
-    }, [running]);
-
-    useEffect(() => () => {
-        requestId.current++;
-        requestController.current?.abort();
-    }, []);
+    }, [anyRunning]);
 
     const dateError = !range.startDate || !range.endDate || range.startDate > range.endDate
         ? "Choose a valid date range."
@@ -328,8 +310,14 @@ function App() {
             <main className="app">
                 <header className="header">
                     <nav className="view-tabs" role="tablist" aria-label="Choose a data source">
-                        <button role="tab" aria-selected={view === "credits"} className={view === "credits" ? "selected" : ""} onClick={() => setView("credits")}>
-                            Copilot Credits{running && <Spinner size="extra-tiny" />}
+                        <button role="tab" aria-selected={view === "summary"} className={view === "summary" ? "selected" : ""} onClick={() => setView("summary")}>
+                            Summary{anyRunning && <Spinner size="extra-tiny" />}
+                        </button>
+                        <button role="tab" aria-selected={view === "credits" && kind === "FeatureDetailsPerResource"} className={view === "credits" && kind === "FeatureDetailsPerResource" ? "selected" : ""} onClick={() => { resetFilters(); setKind("FeatureDetailsPerResource"); setView("credits"); }}>
+                            Agent usage{credits.agentState.status === "loading" && <Spinner size="extra-tiny" />}
+                        </button>
+                        <button role="tab" aria-selected={view === "credits" && kind === "BillingDetailsPerEnvironment"} className={view === "credits" && kind === "BillingDetailsPerEnvironment" ? "selected" : ""} onClick={() => { resetFilters(); setKind("BillingDetailsPerEnvironment"); setView("credits"); }}>
+                            Environment capacity{credits.billingState.status === "loading" && <Spinner size="extra-tiny" />}
                         </button>
                         <button role="tab" aria-selected={view === "azure"} className={view === "azure" ? "selected" : ""} onClick={() => setView("azure")}>
                             Azure costs{azure.busy && <Spinner size="extra-tiny" />}
@@ -340,41 +328,62 @@ function App() {
                     </button>
                 </header>
 
-                <div className="view-panel" role="tabpanel" hidden={view !== "credits"}>
+                {(anyRunning || reportDeferred) && (
+                    <div className="progress-card">
+                        {anyRunning ? <Spinner size="small" /> : <span aria-hidden="true">✓</span>}
+                        <strong className="progress-quip">{anyRunning ? <RotatingQuip /> : "Requests finished. Available results are ready."}</strong>
+                        <span className="progress-details" role="status">
+                            Elapsed {formatElapsed(elapsedSeconds)} · Credit report timeout {formatElapsed(REPORT_TIMEOUT_MS / 1000)} per report · Azure requests time out after 60s
+                        </span>
+                        {anyRunning && <button className="stop-button compact-stop" onClick={stopAll}>Stop all</button>}
+                    </div>
+                )}
+                <WaitingBreak
+                    waiting={anyRunning}
+                    readinessMessage={readinessMessage}
+                    onStart={() => setReportDeferred(true)}
+                    onViewReport={() => setReportDeferred(false)}
+                />
 
-                <section className="report-choices" aria-label="Choose a report">
-                    <ReportChoice
-                        selected={kind === "FeatureDetailsPerResource"}
-                        disabled={running}
-                        title="Agent usage"
-                        subtitle="Which agents and features consume credits?"
-                        description="Break down billed and non-billed credits by agent and available feature dimensions."
-                        sample={[["Agent", "Feature", "Credits"], ["Service helper", "Generative answers", "1,240"], ["Order agent", "Tool actions", "386"]]}
-                        onClick={() => { setKind("FeatureDetailsPerResource"); setData(undefined); setReportRetrievedAt(undefined); setError(undefined); setStopped(false); setSearch(""); setEnvironmentFilter(""); setFeatureFilter(""); setModelFilter(""); setChannelFilter(""); setBillingEnvironmentFilter(""); setVisibleDetailCount(250); }}
+                <div className="view-panel" role="tabpanel" hidden={view !== "summary"}>
+                    <SummaryDashboard
+                        azure={azure}
+                        credits={credits}
+                        range={range}
+                        onRangeChange={(next) => { setRange(next); setGranularity("Daily"); clearCredits(); azure.clearResult(); }}
+                        connectionReady={connectionReady}
+                        connectionName={connectionName}
+                        onRefreshCredits={() => { setGranularity("Daily"); resetFilters(); }}
+                        onNavigate={(target) => {
+                            resetFilters();
+                            if (target === "azure") setView("azure");
+                            else { setKind(target === "agents" ? "FeatureDetailsPerResource" : "BillingDetailsPerEnvironment"); setView("credits"); }
+                        }}
+                        onAgent={(agent) => {
+                            resetFilters();
+                            setAgentSelection({ agentId: agent.agentId, environmentId: agent.environmentId });
+                            setKind("FeatureDetailsPerResource");
+                            setView("credits");
+                        }}
+                        elapsedSeconds={elapsedSeconds}
+                        deferred={reportDeferred}
                     />
-                    <ReportChoice
-                        selected={kind === "BillingDetailsPerEnvironment"}
-                        disabled={running}
-                        title="Environment capacity"
-                        subtitle="Where are credits consumed and how are they covered?"
-                        description="Compare prepaid and pay-as-you-go credit quantities by environment."
-                        sample={[["Environment", "Prepaid", "Pay-as-you-go"], ["Production", "12,400", "0"], ["Development", "0", "180"]]}
-                        onClick={() => { setKind("BillingDetailsPerEnvironment"); setData(undefined); setReportRetrievedAt(undefined); setError(undefined); setStopped(false); setSearch(""); setEnvironmentFilter(""); setFeatureFilter(""); setModelFilter(""); setChannelFilter(""); setBillingEnvironmentFilter(""); setVisibleDetailCount(250); }}
-                    />
-                </section>
+                </div>
+
+                <div className="view-panel" role="tabpanel" hidden={view !== "credits"}>
 
                 <section className="controls" aria-label="Report settings">
                     <label>
                         Start date (UTC)
-                        <input type="date" value={range.startDate} max={utcDate(1)} disabled={running} onChange={(event) => { setRange((current) => ({ ...current, startDate: event.target.value })); setData(undefined); setReportRetrievedAt(undefined); setError(undefined); }} />
+                        <input type="date" value={range.startDate} max={utcDate(1)} disabled={anyRunning} onChange={(event) => { setRange((current) => ({ ...current, startDate: event.target.value })); clearCredits(); azure.clearResult(); }} />
                     </label>
                     <label>
                         End date (UTC)
-                        <input type="date" value={range.endDate} max={utcDate(1)} disabled={running} onChange={(event) => { setRange((current) => ({ ...current, endDate: event.target.value })); setData(undefined); setReportRetrievedAt(undefined); setError(undefined); }} />
+                        <input type="date" value={range.endDate} max={utcDate(1)} disabled={anyRunning} onChange={(event) => { setRange((current) => ({ ...current, endDate: event.target.value })); clearCredits(); azure.clearResult(); }} />
                     </label>
                     <label>
                         Detail
-                        <select value={granularity} disabled={running} onChange={(event) => { setGranularity(event.target.value as "Daily" | "Summary"); setData(undefined); setReportRetrievedAt(undefined); setError(undefined); }}>
+                        <select value={granularity} disabled={anyRunning} onChange={(event) => { setGranularity(event.target.value as "Daily" | "Summary"); clearCredits(); }}>
                             <option value="Daily">Daily</option>
                             <option value="Summary">Summary</option>
                         </select>
@@ -400,26 +409,7 @@ function App() {
                         {connectionName}. Enable the Power Platform API on the active PPTB connection. Sign in with a delegated user account that has an eligible tenant administrator role; app-only authentication is not supported.
                     </div>
                 )}
-                {(progress || (data && reportDeferred)) && (
-                    <>
-                        <div className="progress-card">
-                            {progress ? <Spinner size="small" /> : <span aria-hidden="true">✓</span>}
-                            <strong className="progress-quip">{progress ? <RotatingQuip /> : "Your report is ready."}</strong>
-                            <span className="progress-details" role="status">
-                                {progress
-                                    ? <>Elapsed {formatElapsed(elapsedSeconds)} · {progressDetail(progress.message)} · timeout after {formatElapsed(REPORT_TIMEOUT_MS / 1000)}</>
-                                    : "Keep playing. Your results will wait until you choose to view them."}
-                            </span>
-                            {progress && <button className="stop-button compact-stop" onClick={stopReport}>Stop</button>}
-                        </div>
-                    </>
-                )}
-                <WaitingBreak
-                    waiting={running}
-                    reportReady={Boolean(data)}
-                    onStart={() => setReportDeferred(true)}
-                    onViewReport={() => setReportDeferred(false)}
-                />
+                {progress && <div className="report-help" role="status">{progressDetail(progress.message)} <button className="link-button" onClick={stopReport}>Stop this report</button></div>}
                 {stopped && <div className="stopped" role="status">Report stopped. No further status checks will be made. A request already in progress may still finish in the background.</div>}
                 {error && <div className="error" role="alert"><strong>Couldn’t load the report.</strong><span>{error}</span></div>}
 
@@ -434,6 +424,10 @@ function App() {
                             retrieved={reportRetrievedAt?.toLocaleString(undefined, { timeZone: "UTC", timeZoneName: "short" }) ?? "Unavailable"}
                             rowCount={featureRows.length}
                         />
+                        {agentSelection && <div className="notice">
+                            Showing the selected agent/environment: {featureRows?.find((row) => row.agentId === agentSelection.agentId && row.environmentId === agentSelection.environmentId)?.agentName || agentSelection.agentId || "Unknown agent"}.
+                            {" "}<button className="link-button" onClick={() => setAgentSelection(undefined)}>Show all agents</button>
+                        </div>}
                         <section className="filter-panel" aria-label="Filter agent report">
                             <label>Environment
                                 <select value={environmentFilter} onChange={(event) => setEnvironmentFilter(event.target.value)}>
@@ -603,7 +597,7 @@ function App() {
                 )}
                 </div>
                 <div className="view-panel" role="tabpanel" hidden={view !== "azure"}>
-                    <AzureCostView azure={azure} onOpenHelp={() => setHelpOpen(true)} />
+                    <AzureCostView azure={azure} onOpenHelp={() => setHelpOpen(true)} deferred={reportDeferred} />
                 </div>
                 <PrerequisitesHelp
                     open={helpOpen}
@@ -611,7 +605,7 @@ function App() {
                     powerPlatform={{ connection: ppConnection, reportOutcome }}
                     azure={azure}
                 />
-                <footer>{view === "credits"
+                <footer>{view !== "azure"
                     ? "Report data may be delayed or restated. Agent feature reports cover the previous 30 complete UTC days and can include multiple rows per agent and day."
                     : "Azure cost data can be delayed and revised until the billing period closes. Amounts are pre-tax and aren't invoices."}</footer>
             </main>
@@ -641,12 +635,12 @@ function CoverageSummary({ requested, returned, retrieved, rowCount }: {
 }
 
 const WAITING_QUIPS = [
-    "Giving the report a moment to wake up…",
-    "The bean counters are counting beans…",
-    "Brewing a fresh batch of usage insights…",
-    "Checking whether the numbers are done stretching…",
-    "Coffee break: the report is still processing…",
-    "Polishing the numbers before they land…",
+    "Your agents have been busy. Let’s see the numbers…",
+    "Turning Copilot Studio activity into insights…",
+    "Every agent has a story. This one comes with credits…",
+    "While the reports load, your next insight is on standby…",
+    "Following the trail of Copilot Credits…",
+    "Agent usage, meet the bigger picture…",
 ];
 
 function RotatingQuip() {
@@ -660,9 +654,9 @@ function RotatingQuip() {
     return <span aria-live="polite">{WAITING_QUIPS[quipIndex]}</span>;
 }
 
-function WaitingBreak({ waiting, reportReady, onStart, onViewReport }: {
+function WaitingBreak({ waiting, readinessMessage, onStart, onViewReport }: {
     waiting: boolean;
-    reportReady: boolean;
+    readinessMessage?: string;
     onStart: () => void;
     onViewReport: () => void;
 }) {
@@ -670,8 +664,9 @@ function WaitingBreak({ waiting, reportReady, onStart, onViewReport }: {
     const [caught, setCaught] = useState(0);
     const [lost, setLost] = useState(0);
     const [played, setPlayed] = useState(false);
-    const [beanPosition, setBeanPosition] = useState({ left: 48, top: 8 });
-    const [beanKey, setBeanKey] = useState(0);
+    const [dismissed, setDismissed] = useState(false);
+    const [iconPosition, setIconPosition] = useState({ left: 48, top: 8 });
+    const [iconKey, setIconKey] = useState(0);
     const gameDeadline = useRef(0);
     const active = secondsLeft !== undefined;
 
@@ -684,9 +679,9 @@ function WaitingBreak({ waiting, reportReady, onStart, onViewReport }: {
         return () => window.clearInterval(timer);
     }, [active]);
 
-    const moveBean = useCallback(() => {
-        setBeanPosition({ left: 8 + Math.random() * 78, top: 5 + Math.random() * 25 });
-        setBeanKey((key) => key + 1);
+    const moveIcon = useCallback(() => {
+        setIconPosition({ left: 8 + Math.random() * 78, top: 5 + Math.random() * 25 });
+        setIconKey((key) => key + 1);
     }, []);
 
     useEffect(() => {
@@ -694,56 +689,59 @@ function WaitingBreak({ waiting, reportReady, onStart, onViewReport }: {
         const timer = window.setTimeout(() => {
             if (Date.now() >= gameDeadline.current) return;
             setLost((score) => score + 1);
-            moveBean();
+            moveIcon();
         }, 1450);
         return () => window.clearTimeout(timer);
-    }, [active, beanKey, moveBean]);
+    }, [active, iconKey, moveIcon]);
 
     const startGame = () => {
         onStart();
         setCaught(0);
         setLost(0);
         setPlayed(true);
+        setDismissed(false);
         gameDeadline.current = Date.now() + 60_000;
         setSecondsLeft(60);
-        moveBean();
+        moveIcon();
     };
 
     if (!waiting && !active && !played) return null;
+    if (!waiting && !active && dismissed) return null;
 
     return (
         <div className="waiting-break">
             <div className="game-intro">
                 <div>
-                    <strong>Coffee bean break</strong>
-                    <span>Play Catch Coffee Bean while you wait for the report to render. Catch as many as you can in 60 seconds.</span>
+                    <strong>Copilot Studio break</strong>
+                    <span>Play Catch Copilot Studio while your reports load. Catch as many icons as you can in 60 seconds.</span>
                 </div>
                 {secondsLeft === undefined
-                    ? (waiting || reportReady) && <button type="button" className="game-action" onClick={startGame}>{played ? "Play again" : "Start game"}</button>
+                    ? (waiting || readinessMessage) && <button type="button" className="game-action" onClick={startGame}>{played ? "Play again" : "Start game"}</button>
                     : <div className="game-score"><span>Caught: {caught}</span><span>Lost: {lost}</span><span>{secondsLeft}s</span></div>}
             </div>
-                <div className="game-ready" style={{ visibility: reportReady ? "visible" : "hidden" }} aria-hidden={!reportReady}>
-                    <span role="status">{reportReady ? "Your report is ready. Feel free to finish your game." : ""}</span>
+                <div className="game-ready" style={{ visibility: readinessMessage ? "visible" : "hidden" }} aria-hidden={!readinessMessage}>
+                    <span role="status">{readinessMessage}{readinessMessage && active ? " Feel free to finish your game." : ""}</span>
                     <button type="button" className="game-action" onClick={() => {
                         setSecondsLeft(undefined);
+                        setDismissed(true);
                         onViewReport();
                     }}>View report</button>
                 </div>
             {secondsLeft !== undefined && (
-                <div className="bean-field" aria-label="Coffee bean game area">
+                <div className="copilot-field" aria-label="Copilot Studio game area">
                     <button
-                        key={beanKey}
+                        key={iconKey}
                         type="button"
-                        className="coffee-bean"
-                        style={{ left: `${beanPosition.left}%`, top: `${beanPosition.top}%` }}
-                        aria-label="Catch the coffee bean"
+                        className="copilot-target"
+                        style={{ left: `${iconPosition.left}%`, top: `${iconPosition.top}%` }}
+                        aria-label="Catch the Copilot Studio icon"
                         onClick={() => {
                             if (Date.now() >= gameDeadline.current) return;
                             setCaught((score) => score + 1);
-                            moveBean();
+                            moveIcon();
                         }}
                     >
-                        <img src="./icons/coffee-bean.svg" alt="" draggable={false} />
+                        <img src={copilotStudioIcon} alt="" draggable={false} />
                     </button>
                 </div>
             )}
@@ -769,7 +767,7 @@ function UsageInsights({ spikes, forecast, selectedDays, monthLabel }: {
                     <strong>{forecast === undefined ? "Not available" : formatNumber(forecast)}</strong>
                     <p>
                         {forecast === undefined
-                            ? `Select a full 30-day daily report to enable the estimate (currently ${selectedDays} calendar days).`
+                            ? `Select the last 30 complete UTC days in Daily mode to enable the estimate (currently ${selectedDays} calendar days).`
                             : "Assumes average billed usage across the last 30 complete UTC days continues through month-end. This is an estimate, not a billing forecast."}
                     </p>
                 </div>
@@ -828,48 +826,6 @@ function PeriodComparisonPanel({ comparison }: { comparison: NonNullable<ReturnT
                 </table>
             </div>
         </section>
-    );
-}
-
-function ReportChoice({
-    selected,
-    disabled,
-    title,
-    subtitle,
-    description,
-    sample,
-    onClick,
-}: {
-    selected: boolean;
-    disabled: boolean;
-    title: string;
-    subtitle: string;
-    description: string;
-    sample: string[][];
-    onClick: () => void;
-}) {
-    return (
-        <article className={`report-choice${selected ? " selected" : ""}`}>
-            <button type="button" className="report-choice-button" aria-pressed={selected} disabled={disabled} onClick={onClick}>
-                <span className="choice-heading">
-                    <strong>{title}</strong>
-                    <span className="choice-indicator">{selected ? "Selected" : "Choose"}</span>
-                </span>
-                <span className="choice-question">{subtitle}</span>
-                <span className="choice-description">{description}</span>
-            </button>
-            <div className="mock-preview">
-                <span className="mock-label">Illustrative preview · not live tenant data</span>
-                <div className="mock-table-scroll">
-                    <table>
-                        <thead><tr>{sample[0].map((cell) => <th key={cell}>{cell}</th>)}</tr></thead>
-                        <tbody>{sample.slice(1).map((row, index) => (
-                            <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>
-                        ))}</tbody>
-                    </table>
-                </div>
-            </div>
-        </article>
     );
 }
 

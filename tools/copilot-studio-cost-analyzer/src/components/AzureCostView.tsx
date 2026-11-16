@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Spinner } from "@fluentui/react-components";
 import { describePeriod, isSubscriptionId, type AzureCostType, type AzureGrouping, type AzurePeriod, type AzureScopeFilter } from "../api/azureCosts";
 import { dailyCostSeries, displayGroup, groupTotals, totalsByCurrency, type CostDay } from "../data/azureCostAnalysis";
 import { downloadCsv } from "../data/export";
 import type { AzureCostActions, AzureCostState } from "../hooks/useAzureCosts";
+import { AzureSubscriptionField } from "./AzureSubscriptionField";
 
 const PERIOD_LABELS: Record<AzurePeriod, string> = {
     MonthToDate: "Month to date",
@@ -32,12 +33,12 @@ function formatDay(value: string): string {
     return value ? new Date(`${value}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: "UTC" }) : "—";
 }
 
-export function AzureCostView({ azure, onOpenHelp }: { azure: AzureCostState & AzureCostActions; onOpenHelp: () => void }) {
+export function AzureCostView({ azure, onOpenHelp, deferred = false }: { azure: AzureCostState & AzureCostActions; onOpenHelp: () => void; deferred?: boolean }) {
     const [costType, setCostType] = useState<AzureCostType>("ActualCost");
-    const [period, setPeriod] = useState<AzurePeriod>("MonthToDate");
+    const [period, setPeriod] = useState<AzurePeriod | "Dashboard">("MonthToDate");
+    const [customPeriod, setCustomPeriod] = useState<{ from: string; to: string }>();
     const [grouping, setGrouping] = useState<AzureGrouping>("Meter");
     const [scopeFilter, setScopeFilter] = useState<AzureScopeFilter>("powerPlatform");
-    const [manualEntry, setManualEntry] = useState(false);
     const [chartCurrency, setChartCurrency] = useState("");
 
     const rows = useMemo(() => azure.result?.rows ?? [], [azure.result]);
@@ -49,9 +50,18 @@ export function AzureCostView({ azure, onOpenHelp }: { azure: AzureCostState & A
     const connectionReady = azure.connection?.configured && azure.connection.signedIn && azure.connection.status !== "interactionRequired";
     const validSubscription = isSubscriptionId(azure.subscriptionId);
     const selectedSubscription = azure.subscriptions.find((subscription) => subscription.subscriptionId === azure.subscriptionId);
-    const showManualEntry = manualEntry;
     const result = azure.result;
     const resultGroupLabel = result ? GROUPING_LABELS[result.request.grouping] : "";
+    const selectedPeriod = period === "Dashboard" ? customPeriod : describePeriod(period);
+
+    useEffect(() => {
+        if (!result) return;
+        setCostType(result.request.costType);
+        setScopeFilter(result.request.scopeFilter);
+        setGrouping(result.request.grouping);
+        setCustomPeriod(result.request.timePeriod);
+        setPeriod(result.request.timePeriod ? "Dashboard" : result.request.period);
+    }, [result]);
 
     const exportRows = () => {
         if (!result) return;
@@ -95,33 +105,7 @@ export function AzureCostView({ azure, onOpenHelp }: { azure: AzureCostState & A
             </div>
 
             <section className="controls azure-controls" aria-label="Azure cost settings">
-                <div className="azure-subscription">
-                    <span className="label-row">
-                        <label htmlFor="azure-subscription">Subscription</label>
-                        <button type="button" className="link-button" disabled={busy} onClick={() => setManualEntry((value) => !value)}>
-                            {showManualEntry ? "Choose from list" : "Enter ID"}
-                        </button>
-                    </span>
-                    {showManualEntry ? (
-                        <input
-                            id="azure-subscription"
-                            value={azure.subscriptionId}
-                            disabled={busy}
-                            placeholder="00000000-0000-0000-0000-000000000000"
-                            aria-invalid={Boolean(azure.subscriptionId) && !validSubscription}
-                            onChange={(event) => azure.setSubscriptionId(event.target.value)}
-                        />
-                    ) : (
-                        <select id="azure-subscription" value={azure.subscriptionId} disabled={busy || azure.subscriptions.length === 0} onChange={(event) => azure.setSubscriptionId(event.target.value)}>
-                            <option value="">{azure.busy === "subscriptions" ? "Loading subscriptions…" : azure.subscriptionsLoaded ? azure.subscriptions.length > 0 ? "Select a subscription" : "No subscriptions found; enter an ID" : "Connect Azure to list subscriptions"}</option>
-                            {azure.subscriptions.map((subscription) => (
-                                <option key={subscription.subscriptionId} value={subscription.subscriptionId}>
-                                    {subscription.displayName || subscription.subscriptionId}{subscription.state && subscription.state !== "Enabled" ? ` (${subscription.state})` : ""}
-                                </option>
-                            ))}
-                        </select>
-                    )}
-                </div>
+                <AzureSubscriptionField azure={azure} />
                 <label>
                     Costs
                     <select value={scopeFilter} disabled={busy} onChange={(event) => setScopeFilter(event.target.value as AzureScopeFilter)}>
@@ -138,7 +122,8 @@ export function AzureCostView({ azure, onOpenHelp }: { azure: AzureCostState & A
                 </label>
                 <label>
                     Period
-                    <select value={period} disabled={busy} onChange={(event) => setPeriod(event.target.value as AzurePeriod)}>
+                    <select value={period} disabled={busy} onChange={(event) => setPeriod(event.target.value as AzurePeriod | "Dashboard")}>
+                        {customPeriod && <option value="Dashboard">Dashboard dates</option>}
                         {(Object.keys(PERIOD_LABELS) as AzurePeriod[]).map((value) => <option key={value} value={value}>{PERIOD_LABELS[value]}</option>)}
                     </select>
                 </label>
@@ -153,15 +138,15 @@ export function AzureCostView({ azure, onOpenHelp }: { azure: AzureCostState & A
                 ) : (
                     <button
                         className="primary-button"
-                        disabled={busy || !connectionReady || !validSubscription}
-                        onClick={() => void azure.loadCosts({ costType, period, grouping, scopeFilter })}
+                        disabled={busy || !connectionReady || !validSubscription || !selectedPeriod}
+                        onClick={() => void azure.loadCosts({ costType, period: period === "Dashboard" ? "Last30Days" : period, timePeriod: period === "Dashboard" ? customPeriod : undefined, grouping, scopeFilter })}
                     >
                         {azure.error && !busy ? "Try again" : "Load costs"}
                     </button>
                 )}
             </section>
             <div className="report-help">
-                {PERIOD_LABELS[period]}: {formatDay(describePeriod(period).from)} – {formatDay(describePeriod(period).to)} (UTC).{" "}
+                {period === "Dashboard" ? "Dashboard dates" : PERIOD_LABELS[period]}: {selectedPeriod ? `${formatDay(selectedPeriod.from)} – ${formatDay(selectedPeriod.to)}` : "Choose a period"} (UTC).{" "}
                 {scopeFilter === "powerPlatform"
                     ? "Filters to Microsoft.PowerPlatform/accounts resources created by pay-as-you-go billing plans linked to this subscription."
                     : "Includes every charge in the subscription, not only Power Platform."}
@@ -185,7 +170,7 @@ export function AzureCostView({ azure, onOpenHelp }: { azure: AzureCostState & A
                 </div>
             )}
 
-            {result && (
+            {result && !deferred && (
                 <section className="results">
                     <section className="coverage-panel" aria-label="Azure cost coverage">
                         <div><span>Subscription</span><strong title={result.request.subscriptionId}>{selectedSubscription?.displayName || result.request.subscriptionId}</strong></div>

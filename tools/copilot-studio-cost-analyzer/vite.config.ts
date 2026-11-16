@@ -41,13 +41,43 @@ function fixHtmlForPPTB(): Plugin {
     };
 }
 
+function inlinePlayground(): Plugin {
+    return {
+        name: 'inline-offline-playground',
+        enforce: 'post',
+        generateBundle: {
+            order: 'post',
+            handler(_, bundle) {
+                const html = bundle['index.html'];
+                if (!html || html.type !== 'asset' || typeof html.source !== 'string') {
+                    throw new Error('Playground HTML output was not generated.');
+                }
+                for (const [fileName, output] of Object.entries(bundle)) {
+                    if (output.type === 'chunk') {
+                        const tag = `<script src="./${fileName}"></script>`;
+                        if (!html.source.includes(tag)) throw new Error(`Missing playground script tag for ${fileName}.`);
+                        html.source = html.source.replace(tag, () => `<script>${output.code.replace(/<\/script/gi, '<\\/script')}</script>`);
+                        delete bundle[fileName];
+                    } else if (fileName.endsWith('.css')) {
+                        html.source = html.source.replace(/<link[^>]*rel="stylesheet"[^>]*>/g, () => `<style>${String(output.source)}</style>`);
+                        delete bundle[fileName];
+                    }
+                }
+            },
+        },
+    };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig((configEnv) => {
+    const playground = configEnv.mode === 'playground';
     return {
-        plugins: [react(), fixHtmlForPPTB()],
+        root: playground ? 'src/playground' : '.',
+        plugins: [react(), fixHtmlForPPTB(), ...(playground ? [inlinePlayground()] : [])],
         base: './',
         build: {
-            outDir: 'dist',
+            outDir: playground ? '../../playground' : 'dist',
+            emptyOutDir: !playground,
             assetsDir: 'assets',
             sourcemap: configEnv.mode === 'development',
             rollupOptions: {

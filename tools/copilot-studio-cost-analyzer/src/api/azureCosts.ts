@@ -20,6 +20,7 @@ export interface AzureCostRequest {
     period: AzurePeriod;
     grouping: AzureGrouping;
     scopeFilter: AzureScopeFilter;
+    timePeriod?: { from: string; to: string };
 }
 
 export interface AzureCostResult {
@@ -194,8 +195,8 @@ export function buildCostQuery(request: Omit<AzureCostRequest, "subscriptionId">
     if (request.scopeFilter === "powerPlatform") {
         dataset.filter = { dimensions: { name: "ResourceType", operator: "In", values: [POWER_PLATFORM_RESOURCE_TYPE] } };
     }
-    if (request.period === "Last30Days") {
-        const period = describePeriod("Last30Days", now);
+    if (request.timePeriod || request.period === "Last30Days") {
+        const period = request.timePeriod ?? describePeriod("Last30Days", now);
         return { type: request.costType, timeframe: "Custom", timePeriod: { from: `${period.from}T00:00:00Z`, to: `${period.to}T23:59:59Z` }, dataset };
     }
     return { type: request.costType, timeframe: request.period, dataset };
@@ -223,7 +224,7 @@ export async function loadAzureCosts(
         response = await withThrottleRetry(api, (options) => api.arm.nextPage<AzureAPI.CostQueryResult>(handle, options), signal);
         if (response.data) rows.push(...parseCostResult(response.data, grouping));
     }
-    return { rows, pages, timePeriod: describePeriod(request.period, now) };
+    return { rows, pages, timePeriod: request.timePeriod ?? describePeriod(request.period, now) };
 }
 
 export function azureErrorMessage(reason: unknown): string {

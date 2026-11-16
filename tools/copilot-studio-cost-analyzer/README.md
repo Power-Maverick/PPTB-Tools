@@ -4,9 +4,17 @@ Review Copilot Studio agent credit consumption and environment capacity from Pow
 
 Select **Prerequisites & permissions** in the tool header at any time to see a live checklist of what is ready, missing, denied, or not yet verified, plus a reference of what an administrator needs to provision.
 
+## Interactive playground
+
+[![Explore the interactive playground](./playground/preview.png)](https://powermaverick.dev/demos/copilot-studio-cost-analyzer/)
+
+Try the [interactive playground](https://powermaverick.dev/demos/copilot-studio-cost-analyzer/) before connecting a tenant—no installation or sign-in required. Explore **Summary**, **Agent usage**, **Environment capacity**, and **Azure costs**, including filters, charts, potential spikes, drill-downs, and CSV exports.
+
+All reports are preloaded with fictional data, and refreshes return instantly. The demo does not access tenant data or call reporting APIs; real reports require the permissions below and may take time to generate.
+
 ## Before you start
 
-Make sure all of the following are true:
+For the Power Platform credit reports, make sure all of the following are true. Azure costs have their own prerequisites below:
 
 1. **Use Power Platform ToolBox 1.2.9 or later.** The tool uses the Power Platform API's raw-response methods to follow the report-generation workflow and download its compressed report.
 2. **Have an active PPTB connection.** In the connection settings, enable **Power Platform API** for that connection. Select or activate this connection before opening the tool.
@@ -19,21 +27,43 @@ Make sure all of the following are true:
 
 PPTB manages sign-in and token renewal. The tool does not ask you to paste a token or app secret.
 
+### App registration and permissions
+
+Configure the **Microsoft Entra app registration whose client ID is used by your PPTB connection**, not an individual Copilot Studio agent's app registration. Enabling an API in PPTB or declaring it in the tool manifest does not grant Microsoft Entra permissions, tenant roles, or Azure RBAC.
+
+| API | Why the tool uses it | App registration / token requirement | Additional authorization |
+|---|---|---|---|
+| **Power Platform API (`pp`)** | Agent usage and environment capacity credit reports | Delegated user sign-in; PPTB requests `https://api.powerplatform.com/.default`. Configure the registration's Power Platform API delegated permissions and consent as described below. | Signed-in user must have Global Administrator, Power Platform Administrator, or Dynamics 365 Administrator in the reporting tenant. |
+| **Azure Resource Manager (`arm`)** | Actual or amortized monetary charges from Azure Cost Management | For delegated sign-in, add **Azure Service Management > Delegated permissions > user_impersonation**. PPTB requests `https://management.azure.com/.default`. | Cost Management Reader (or equivalent) on the subscription, plus any billing visibility settings required by the billing agreement. |
+
+For a custom OAuth app registration:
+
+1. Open **Microsoft Entra admin center > App registrations**, then select the registration matching the PPTB connection's client ID.
+2. Under **API permissions > Add a permission > APIs my organization uses**, find **Power Platform API**. Verify its application ID is **`8578e004-a5c6-46e7-913e-12f58912df43`** to avoid similarly named APIs. Use **Delegated permissions** and configure the permissions required by your Power Platform integration.
+   - The [licensing report endpoint reference](https://learn.microsoft.com/en-us/rest/api/power-platform/copilotstudio/licensing-reports/generate-licensing-report) documents `.default` and the administrator roles above, but does **not** identify a dedicated named licensing-report delegated permission. `.default` is a token-request scope, not a permission you select in the portal.
+   - Use Microsoft's [Power Platform authentication setup](https://learn.microsoft.com/en-us/power-platform/admin/programmability-authentication-v2) and [permission reference](https://learn.microsoft.com/en-us/power-platform/admin/programmability-permission-reference). Do not assume unrelated agent invocation permissions grant licensing-report access. If your tenant requires an additional report-specific permission not listed in these references, confirm it with Microsoft rather than granting all available permissions.
+3. Add **Azure Service Management > Delegated permissions > user_impersonation** for Azure costs.
+4. Have an authorized administrator grant consent where the permission or your tenant policy requires it. **Admin consent does not assign the user's Power Platform administrator role or Azure Cost Management role**; those must be provisioned separately.
+5. Under **Authentication > Add a platform > Mobile and desktop applications**, register **`http://localhost`** for PPTB's system-browser sign-in. Preserve existing Dataverse/Power Platform permissions and redirect URIs. Do not configure this desktop flow as a SPA or add a client secret for delegated OAuth.
+6. In PPTB, enter this registration's client ID and enable **Power Platform API** and **Azure Resource Manager API** under the connection's **Additional APIs**. Reconnect after permission or consent changes, reload the tool, then use **Prerequisites & permissions** to check access.
+
+For **client ID/secret** connections, Azure uses application authentication and the Azure role must be assigned to the app's service principal. That does not enable the two credit reports: this tool requires delegated user authentication for those reports. See [Azure prerequisites](#azure-prerequisites) for billing visibility and subscription requirements.
+
 ## Use the tool
 
 1. Open **Copilot Studio Cost & Usage Analyzer** in Power Platform ToolBox.
-2. Choose one of the report cards. Each includes an illustrative preview (not tenant data):
-   - **Agent usage** to see Copilot Credit use by agent/resource, environment, feature, and available dimensions such as model, channel, tool, and knowledge source.
-   - **Environment capacity** to see entitled capacity and consumption split between prepaid capacity and pay-as-you-go.
-3. Choose the **start** and **end dates**. The tool defaults to the previous 30 complete UTC days so the usage trend and month-end estimate have a full baseline. The current UTC day isn't complete and can't be selected as the report end date.
-4. Choose **Daily** or **Summary**:
-   - **Daily** keeps the report's date column, allowing you to inspect and chart day-by-day results.
-   - **Summary** combines the requested period; the report omits its date column.
-5. Select **Run report**. Report generation is asynchronous and can take several minutes. The tool waits one minute after submitting the report before its first status check, then follows the service's `Retry-After` interval. The status shows a countdown and elapsed time, with an automatic 15-minute timeout. Rotating status quips and an optional 60-second coffee-bean game are available while you wait; they do not affect report polling. The game shows caught and lost beans; each bean that escapes after 1.45 seconds counts as lost. If the report arrives during a round, a quiet message lets you know it is ready below without interrupting the game. Individual API requests also time out after 60 seconds. Select **Stop** to stop waiting and prevent future status checks. An API request already in progress may finish in the background.
-6. Review the summary cards and tables. In the agent report, filter by environment, feature, model, channel, or agent/environment text. Compare per-agent billed usage between the earlier and later halves of the selected period. The detail table initially shows up to 250 rows; select **Show more rows** to reveal more.
+2. The tool opens on **Summary**. Choose the **start** and **end dates**, which default to the previous 30 complete UTC days. Dashboard dates must stay within that retained agent-report window and cannot include the incomplete current UTC day.
+3. In the **Dashboard settings** panel, use **Connect Azure** above the date/subscription fields and **Refresh dashboard** button. Complete PPTB's approval/sign-in flow and choose a subscription (or use **Enter ID**) to include all three reports. Azure connection status appears in the same panel; use **Prerequisites & permissions** in the header for setup guidance. You can still load just the credit reports without Azure. Expand **Azure settings** to choose Actual/Amortized and Power Platform-only/all-subscription costs.
+4. Select **Refresh dashboard**. Both Power Platform report jobs are submitted concurrently in Daily mode, and the Azure query starts without waiting for them. All three use the same requested UTC dates. If Azure is unavailable, not approved, or no valid subscription is selected, it is skipped with guidance; credit reports can still run. If the Power Platform connection is unavailable, configured Azure costs can run independently.
+5. Results appear progressively as each source completes. Each metric card shows its status; expand **Data coverage & context** for requested/returned dates and retrieval time. Errors and warnings stay visible. A failed source does not discard successful siblings; **Retry** reruns only the failed or stopped source. **Stop all** stops outstanding requests and further polling while retaining completed sources. The tool waits one minute before each credit report's first status check, then follows that job's `Retry-After`. Each credit job has a 15-minute timeout; individual API requests time out after 60 seconds (Azure authentication allows 120 seconds). Parallel loading avoids sequential waits but cannot speed up Microsoft's report generation.
+6. Review the compact KPI cards, sparklines, prepaid/PAYG consumption split, and **Consumption over time** explorer. Switch its metric without additional requests; select an Azure currency when multiple currencies are returned. Hover or keyboard-focus a day for exact values, or expand the daily table. Missing dates are gaps, not verified zeros; negative Azure adjustments remain negative. Summary-mode credit reports do not produce daily charts. Ranked agent and Azure-group bars and contextual insight tiles show consumption concentration, PAYG share, spikes, and the existing monthly estimate. Select an agent's ranked label to open its cached report filtered to that exact agent/environment pair; **Show all agents** removes that selection. Use **View details** or the **Agent usage**, **Environment capacity**, and **Azure costs** tabs for the full cached reports without additional requests. The detail table initially shows up to 250 rows; select **Show more rows** to reveal more.
 7. Select **Export filtered CSV** to save the rows currently matching the selected filters. Exports are created locally from the report already loaded in the tool; there is no import or additional API request.
 
-You can run another report at any time by choosing the other card or changing the date range. The two report types have different dimensions and response shapes, so Microsoft does not combine them into one API report and their rows cannot be reliably joined. The tool runs one selected report at a time.
+The **Catch Copilot Studio** game and rotating agent-themed status quips remain available while requests run. A round lasts 60 seconds and shows caught/lost counts; a Copilot Studio icon that escapes after 1.45 seconds counts as lost. As results arrive, a quiet message identifies the ready sources and count (for example, "Azure costs are ready · 1 of 3 reports ready"), without forcing a screen change. "All 3 reports are ready" appears only when all three sources succeed; failed, stopped, or unloaded sources do not count as ready. The game survives tab switches; select **View report** to leave the game and reveal available results.
+
+The detail tabs can still run individual reports with their own **Run report** or **Load costs** action. Credit reports support **Daily** (dated rows) and **Summary** (the API omits dates); the Summary dashboard always requests Daily data. Changing shared credit dates/detail settings clears cached credit results; changing the date range also clears Azure results. A separately loaded Azure period is shown as such on the dashboard with a warning if it differs from the dashboard dates.
+
+The dashboard combines summaries, not API rows. Do not add the two reports' credit totals together, or allocate Azure charges to individual agents. Credit reports cover the tenant; Azure covers one selected subscription, may include other services, and can have different processing dates. Multiple currencies remain separate.
 
 ## Breakdowns, comparisons, and estimates
 
@@ -41,7 +71,7 @@ You can run another report at any time by choosing the other card or changing th
 - **Period comparison:** In Daily mode, the agent report compares the earlier and later halves of the selected date range, including totals by agent. This is a comparison within the selected report, not a separately requested baseline period.
 - **Freshness and coverage:** The results show the requested UTC period, the minimum and maximum dates found in returned rows, row count, and when the data was retrieved. A returned date range does not guarantee complete source data; Microsoft can delay or restate daily values.
 - **Potential spikes:** A daily value is flagged when billed credits are greater than twice the preceding seven-day average. Dates with no returned rows are treated as zero for this calculation. A flag is only an indicator for investigation.
-- **Month-end estimate:** Available only when the agent report covers 30 complete UTC days. It multiplies the average billed credits per day in those last 30 days by the number of days in the month. It assumes that recent usage continues at the same rate, and is not a prediction, invoice amount, or billing advice. Use a Daily report; Summary data does not include daily dates.
+- **Month-end estimate:** Available only when the Daily agent report covers the latest 30 complete UTC days. It multiplies the average billed credits per day in those last 30 days by the number of days in the selected end-date month. It assumes that recent usage continues at the same rate, and is not actual month-to-date plus a remaining-month forecast, an invoice amount, or billing advice. Summary data does not include daily dates.
 
 ## What the reports show
 
@@ -147,4 +177,4 @@ npm run validate
 
 The Power Platform API raw-response workflow requires PPTB 1.2.9 or later and `@pptb/types` 1.2.9 or later.
 
-API requirements are declared under `features.requiredAPIs`: `pp` and `arm` are required. Graph is not declared because the tool does not use it. Azure costs use PPTB's `window.azureAPI`. Until a `@pptb/types` release includes the Azure API types and updated manifest validator support, the tool uses a temporary shim at `src/types/azureAPI.d.ts`, and older `pptb-validate` versions may reject `features.requiredAPIs`. When the release is available, update `@pptb/types`, delete the shim, and run validation again.
+API requirements are declared under `features.apis`: `pp` and `arm` are required. The host does not recognize `features.requiredAPIs`; using that key leaves ARM undeclared and causes a `capabilityDenied` error before any Azure request. Azure costs use PPTB's `window.azureAPI`. Until a `@pptb/types` release includes the Azure API types and updated manifest validator support, the tool uses a temporary shim at `src/types/azureAPI.d.ts`, and older `pptb-validate` versions may reject `features.apis`. When the release is available, update `@pptb/types`, delete the shim, and run validation again. Close and reload the tool in PPTB after changing its manifest or version.

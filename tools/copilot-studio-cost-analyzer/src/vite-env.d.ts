@@ -1,4 +1,5 @@
 /// <reference types="@pptb/types" />
+/// <reference types="vite/client" />
 
 declare global {
     interface Window {

@@ -89,6 +89,8 @@ Analyze and view Plugin Trace Logs from Microsoft Dataverse. Exclusively for PPT
 
 Retrieve Copilot Studio licensing reports directly through PPTB's Power Platform API raw-response client. Analyze agent-level billed/non-billed credit usage and environment-level prepaid/pay-as-you-go consumption without manual report imports. Review related Azure Cost Management charges, such as Power Platform pay-as-you-go billing plans, and check prerequisites and permissions from a built-in help panel.
 
+The Summary dashboard loads all three sources concurrently, shows results as each completes, and provides cached drill-downs, source-specific retries, daily trends, and Stop all without discarding completed results.
+
 **Requirements:** PPTB 1.2.9 or later, a delegated Power Platform API connection, an eligible tenant administrator role, and a tenant where the report API is enabled. Azure costs also need a PPTB build with Azure API support, the Azure Resource Manager API enabled on the connection, and Cost Management Reader (or equivalent) on the subscription. Credit quantities are not invoice amounts, and Azure costs aren't attributed to individual agents.
 
 ### [Entity Field Catalog](./tools/entity-field-catalog)

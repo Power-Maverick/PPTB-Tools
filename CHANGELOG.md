@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Copilot Studio Cost & Usage Analyzer playground: all three reports start preloaded with sample Azure access approved; refresh and individual reruns return instantly without changing the live tool's polling delays.
+- Copilot Studio Cost & Usage Analyzer: offline playground now renders all four tabs from the real tool components with a typed sample host adapter, working report controls/filters/exports, host theme preview, and a self-contained static-hosting build.
+- Copilot Studio Cost & Usage Analyzer: standalone interactive dashboard playground and README preview; redesigned live Summary with KPI sparklines, prepaid/PAYG split, metric/currency trend explorer, accessible daily values and missing-data gaps, ranked consumer bars, exact agent/environment drill-downs, and insight tiles.
+- Copilot Studio Cost & Usage Analyzer 0.1.1: unified Summary dashboard with parallel agent/environment/Azure loading, shared UTC dates, progressive results, independent source retries and coverage, Stop all, cached detail views, daily trends, top consumers, and the non-interrupting coffee-bean game.
 - Copilot Studio Cost & Usage Analyzer: Azure costs tab using PPTB's Azure API (subscription selection, Power Platform billing-plan filter, actual/amortized costs, grouping, daily chart, per-currency totals, CSV export, Stop), plus a Prerequisites & permissions dialog with live checks and copyable administrator details.
 - Copilot Studio Cost & Usage Analyzer: direct delegated API reports with CSV export, environment/feature/model/channel filters, period comparisons, coverage metadata, spike indicators, and a month-end estimate based on the last 30 complete UTC days.
 - Data Migrator: selectable sources and up to five destinations, repeated playlist combinations, destination-specific system mappings, and final migration confirmation.
@@ -39,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Contributing guidelines
 
 ### Changed
+- Copilot Studio Cost & Usage Analyzer: replaced the coffee-bean game target with the Copilot Studio icon and added agent-themed waiting quips; scoring, timing, and non-interrupting readiness behavior are unchanged.
 - Data Migrator: sticky error notifications, missing playlist connection warnings beside Start playlist, left-aligned preview/playlist actions, and consistent environment step headers.
 - Data Migrator: made environment selection the first step, display actual linked connection counts, removed the large title banner, unified action styling, and kept playlist controls and entries together below configuration. PPTB connection events now invalidate stale previews and stop subsequent writes safely.
 - Data Migrator: grouped configuration actions separately from playlist execution and entry editing; upgraded `@pptb/types` and minimum PPTB API to 1.2.7 with a two-to-six connection range.

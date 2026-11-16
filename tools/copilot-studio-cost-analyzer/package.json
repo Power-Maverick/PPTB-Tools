@@ -1,6 +1,6 @@
 {
     "name": "@power-maverick/tool-copilot-studio-cost-analyzer",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "displayName": "Copilot Studio Cost & Usage Analyzer",
     "description": "Analyze Copilot Studio agent credit consumption, capacity reports, and related Azure costs.",
     "icon": "icons/copilotStudioCostAnalyzer.svg",
@@ -19,7 +19,7 @@
     "features": {
         "connections": 1,
         "minAPI": "1.2.9",
-        "requiredAPIs": {
+        "apis": {
             "pp": {
                 "required": true
             },
@@ -37,6 +37,8 @@
         "watch": "vite build --watch",
         "dev-watch": "vite build --mode development --watch",
         "preview": "vite preview",
+        "build:playground": "tsc && vite build --mode playground",
+        "playground": "npm run build:playground && vite preview --outDir playground --host 127.0.0.1 --open /",
         "validate": "pptb-validate",
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
