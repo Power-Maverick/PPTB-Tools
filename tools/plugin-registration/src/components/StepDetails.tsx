@@ -132,10 +132,21 @@ export function StepDetails({ step, onSave, onRegisterImage, onEnable, onDisable
                 )}
             </PropertySection>
             <div className="details-footer">
-                <div className="field-hint">
-                    <div className="field-hint-label">{focusedField}</div>
-                    <div className="field-hint-desc">{FIELD_HINTS[focusedField] ?? ""}</div>
-                </div>
+                {isMainOperation ? (
+                    <div className="field-hint">
+                        <div className="field-hint-label">Custom API main operation</div>
+                        <div className="field-hint-desc">
+                            Dataverse created this step from the Custom API&apos;s Plug-in Type and keeps it with the API, so it
+                            can&apos;t be enabled, disabled or unregistered here. To remove it, set the Custom API&apos;s Plug-in Type
+                            to (None) or delete the Custom API.
+                        </div>
+                    </div>
+                ) : (
+                    <div className="field-hint">
+                        <div className="field-hint-label">{focusedField}</div>
+                        <div className="field-hint-desc">{FIELD_HINTS[focusedField] ?? ""}</div>
+                    </div>
+                )}
                 <div className="details-footer-actions">
                     <button className="btn-secondary" onClick={onRegisterImage}>Register Image</button>
                     <button className="btn-secondary" onClick={onUpdate}>Update Step</button>
