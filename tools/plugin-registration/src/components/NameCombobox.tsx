@@ -110,6 +110,11 @@ function SuggestionList({ id, items, total, active, position, onHover, onChoose 
                     {item.detail && <span className="name-combobox-detail">{item.detail}</span>}
                 </li>
             ))}
+            {items.length === 0 && (
+                <li className="name-combobox-more" aria-hidden="true">
+                    No matches.
+                </li>
+            )}
             {total > items.length && (
                 <li className="name-combobox-more" aria-hidden="true">
                     Showing {items.length} of {total.toLocaleString()}. Type to narrow the list.
@@ -267,7 +272,8 @@ export function SearchableSelect({ value, onChange, options, noneLabel, disabled
     // "None" is offered until the user starts searching.
     const matches = none && !query ? [none, ...filtered.matches] : filtered.matches;
     const total = filtered.total + (matches.length - filtered.matches.length);
-    const showList = open && !disabled && matches.length > 0;
+    // While searching, an empty list stays open to say nothing matched.
+    const showList = open && !disabled && (matches.length > 0 || !!query?.trim());
     const position = useListPosition(inputRef, showList);
 
     const openList = () => {
@@ -281,9 +287,28 @@ export function SearchableSelect({ value, onChange, options, noneLabel, disabled
         setQuery(null);
     };
     const choose = (index: number) => {
-        onChange(matches[index].value);
+        const option = matches[index];
+        if (!option) return;
+        onChange(option.value);
         close();
         inputRef.current?.blur();
+    };
+    // Leaving the box after typing a name in full picks that option, as long as only one has that name;
+    // otherwise the previous choice comes back.
+    // Set when Tab has just picked an option, so leaving the box doesn't pick again from the typed text.
+    const pickedOnTab = useRef(false);
+    const leave = () => {
+        if (pickedOnTab.current) {
+            pickedOnTab.current = false;
+            close();
+            return;
+        }
+        const typed = query?.trim().toLowerCase();
+        if (typed) {
+            const exact = options.filter((o) => o.label.toLowerCase() === typed);
+            if (exact.length === 1) onChange(exact[0].value);
+        }
+        close();
     };
 
     return (
@@ -305,20 +330,28 @@ export function SearchableSelect({ value, onChange, options, noneLabel, disabled
                     openList();
                 }}
                 onClick={() => !open && openList()}
-                onBlur={close}
+                onBlur={leave}
                 onChange={(e) => {
                     setQuery(e.target.value);
                     setOpen(true);
                     setActive(0);
                 }}
-                onKeyDown={(e) =>
+                onKeyDown={(e) => {
+                    // After a search, Tab picks the highlighted option and moves on, like Enter would pick it.
+                    // Tabbing through without typing leaves the choice alone.
+                    const highlighted = matches[Math.min(active, matches.length - 1)];
+                    if (e.key === "Tab" && query?.trim() && highlighted) {
+                        pickedOnTab.current = true;
+                        onChange(highlighted.value);
+                        return;
+                    }
                     handleListKeys(e, { open, showList, count: matches.length, active }, {
                         open: openList,
                         close,
                         move: setActive,
                         choose,
-                    })
-                }
+                    });
+                }}
             />
             {showList && position && (
                 <SuggestionList

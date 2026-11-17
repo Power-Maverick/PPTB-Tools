@@ -165,6 +165,17 @@ export const CUSTOM_API_BINDING_ENTITY = 1;
 export const CUSTOM_API_BINDING_ENTITY_COLLECTION = 2;
 
 export const CUSTOM_API_STEP_TYPES: Record<number, string> = { 0: "None", 1: "Async Only", 2: "Sync and Async" };
+/** Stage of the step Dataverse creates from a Custom API's Plug-in Type to run the API itself. */
+export const STAGE_MAIN_OPERATION = 30;
+
+/**
+ * Whether a step is the one Dataverse keeps for a Custom API's Plug-in Type. Dataverse creates, updates
+ * and removes it with the Custom API, so it can't be enabled, disabled or unregistered on its own.
+ */
+export function isMainOperationStep(step: { stage: number }): boolean {
+  return step.stage === STAGE_MAIN_OPERATION;
+}
+
 export const CUSTOM_API_STEPS_NONE = 0;
 export const CUSTOM_API_STEPS_ASYNC_ONLY = 1;
 

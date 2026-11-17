@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import type { CustomApi, PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, SystemUser } from "../models/interfaces";
+import { isMainOperationStep, STAGE_MAIN_OPERATION } from "../models/interfaces";
 import { customApiStepLimit } from "../utils/customApiRules";
 import { DataverseClient } from "../utils/DataverseClient";
 import { AttributePickerDialog } from "./AttributePickerDialog";
@@ -186,8 +187,11 @@ export function RegisterStepDialog({
             .finally(() => setSystemUserLoading(false));
     }, [impersonationMode, systemUserId]);
 
+    // A Custom API's main operation step (stage 30) is created and kept by Dataverse from the API's
+    // Plug-in Type. It's shown read-only, and the limits for extra steps don't apply to it.
+    const isMainOperation = isUpdate && !!existingStep && isMainOperationStep(existingStep);
     // A Custom API's Allowed Custom Processing Step Type limits the steps on its message.
-    const stepLimit = customApiStepLimit(selectedMessageId, customApis);
+    const stepLimit = isMainOperation ? undefined : customApiStepLimit(selectedMessageId, customApis);
     const asyncOnly = stepLimit?.asyncOnly ?? false;
     const stepsBlocked = stepLimit ? !stepLimit.allowsSteps : false;
     useEffect(() => {
@@ -233,7 +237,7 @@ export function RegisterStepDialog({
     };
 
     const handleSubmit = async () => {
-        if (!selectedMessageId || stepsBlocked) return;
+        if (!selectedMessageId || stepsBlocked || isMainOperation) return;
         setSaving(true);
         setSubmitError("");
         try {
@@ -328,6 +332,7 @@ export function RegisterStepDialog({
                             <select className="form-select" value={stage} onChange={(e) => handleStageChange(Number(e.target.value))}>
                                 <option value={10} disabled={asyncOnly}>Pre-Validation</option>
                                 <option value={20} disabled={asyncOnly}>Pre-Operation</option>
+                                {isMainOperation && <option value={STAGE_MAIN_OPERATION}>Main Operation</option>}
                                 <option value={40}>Post-Operation</option>
                             </select>
                         </div>
@@ -502,6 +507,12 @@ export function RegisterStepDialog({
                                 </label>
                             </div>
                         )}
+                        {isMainOperation && (
+                            <div className="form-hint">
+                                This is the Custom API&apos;s main operation step. Dataverse creates and updates it from the
+                                Custom API&apos;s Plug-in Type, so it can&apos;t be changed here. Edit the Custom API to change it.
+                            </div>
+                        )}
                         {submitError && (
                             <div className="form-submit-error">{submitError}</div>
                         )}
@@ -511,7 +522,7 @@ export function RegisterStepDialog({
                         <button
                             className="btn-primary"
                             onClick={() => void handleSubmit()}
-                            disabled={saving || !selectedMessageId || !name || stepsBlocked}
+                            disabled={saving || !selectedMessageId || !name || stepsBlocked || isMainOperation}
                         >
                             {saving ? "Saving…" : isUpdate ? "Update" : "Register"}
                         </button>

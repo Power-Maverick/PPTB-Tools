@@ -332,6 +332,18 @@ describe("deleting", () => {
         expect(del).toHaveBeenCalledWith("customapi", API_ID, "primary");
     });
 
+    it("doesn't count the main operation step Dataverse keeps for the API's plug-in type", async () => {
+        const MESSAGE_ID = "88888888-8888-4888-8888-888888888888";
+        queryAnswers = [["sdkmessageprocessingsteps?", [{ sdkmessageprocessingstepid: "main", stage: 30 }]]];
+        await client.deleteCustomApi({ ...savedApi(), sdkmessageid: MESSAGE_ID });
+        expect(del).toHaveBeenCalledWith("customapi", API_ID, "primary");
+
+        del.mockClear();
+        queryAnswers = [["sdkmessageprocessingsteps?", [{ sdkmessageprocessingstepid: "main", stage: 30 }, { sdkmessageprocessingstepid: "s1", stage: 40 }]]];
+        await expect(client.deleteCustomApi({ ...savedApi(), sdkmessageid: MESSAGE_ID })).rejects.toThrow("1 step is registered");
+        expect(del).not.toHaveBeenCalled();
+    });
+
     it("deletes an unmanaged API, and refuses a managed one", async () => {
         await client.deleteCustomApi(savedApi());
         expect(del).toHaveBeenCalledWith("customapi", API_ID, "primary");

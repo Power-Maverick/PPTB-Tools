@@ -17,8 +17,9 @@ import { RegisterStepDialog } from "./components/RegisterStepDialog";
 import { ServiceEndpointDetails } from "./components/ServiceEndpointDetails";
 import { StepDetails } from "./components/StepDetails";
 import type { CustomApi, CustomApiField, PluginAssembly, PluginPackage, PluginType, ProcessingStep, ServiceEndpoint, StepImage, TreeNode } from "./models/interfaces";
+import { isMainOperationStep } from "./models/interfaces";
 import { REQUEST_TABLE, RESPONSE_TABLE } from "./utils/customApiRules";
-import { CustomApiCreatedError, customApiStepsBlockDelete, DataverseClient } from "./utils/DataverseClient";
+import { CustomApiCreatedError, customApiStepsBlockDelete, DataverseClient, stepsBlockingCustomApiDelete } from "./utils/DataverseClient";
 
 type ViewMode = 'assemblies' | 'packages' | 'customapis';
 
@@ -716,6 +717,7 @@ export default function App() {
     const handleUnregisterStep = async () => {
         if (selectedNode?.type !== "step") return;
         const step = selectedNode.data as ProcessingStep;
+        if (isMainOperationStep(step)) return;
         if (!window.confirm(`Unregister step "${step.name}"?`)) return;
         try {
             await client.deleteStep(step.sdkmessageprocessingstepid);
@@ -737,6 +739,7 @@ export default function App() {
     const handleEnableStep = async () => {
         if (selectedNode?.type !== "step") return;
         const step = selectedNode.data as ProcessingStep;
+        if (isMainOperationStep(step)) return;
         try {
             await client.enableStep(step.sdkmessageprocessingstepid);
             notify("Step enabled.");
@@ -760,6 +763,7 @@ export default function App() {
     const handleDisableStep = async () => {
         if (selectedNode?.type !== "step") return;
         const step = selectedNode.data as ProcessingStep;
+        if (isMainOperationStep(step)) return;
         try {
             await client.disableStep(step.sdkmessageprocessingstepid);
             notify("Step disabled.");
@@ -789,14 +793,16 @@ export default function App() {
             const cached = steps.get(pt.plugintypeid);
             const ptSteps = cached ?? (await client.fetchSteps(pt.plugintypeid));
             if (!cached) setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(pt.plugintypeid, ptSteps));
-            if (ptSteps.length === 0) { notify("No steps found."); return; }
+            // A Custom API's main operation step stays as Dataverse keeps it.
+            const toggled = ptSteps.filter((s) => !isMainOperationStep(s));
+            if (toggled.length === 0) { notify("No steps found."); return; }
             const op = (id: string) => (action === "enable" ? client.enableStep(id) : client.disableStep(id));
-            const results = await Promise.allSettled(ptSteps.map((s) => op(s.sdkmessageprocessingstepid)));
+            const results = await Promise.allSettled(toggled.map((s) => op(s.sdkmessageprocessingstepid)));
             const failed = results.filter((r) => r.status === "rejected").length;
             if (failed > 0) {
-                notify(`${ptSteps.length - failed} step(s) ${verb}. ${failed} failed.`, "error");
+                notify(`${toggled.length - failed} step(s) ${verb}. ${failed} failed.`, "error");
             } else {
-                notify(`All ${ptSteps.length} step(s) ${verb}.`);
+                notify(`All ${toggled.length} step(s) ${verb}.`);
             }
             const refreshed = await client.fetchSteps(pt.plugintypeid);
             setSteps((prev: Map<string, ProcessingStep[]>) => new Map(prev).set(pt.plugintypeid, refreshed));
@@ -834,7 +840,8 @@ export default function App() {
                 }
                 return next;
             });
-            const allSteps = stepsEntries.flatMap(({ ptSteps }) => ptSteps);
+            // A Custom API's main operation step stays as Dataverse keeps it.
+            const allSteps = stepsEntries.flatMap(({ ptSteps }) => ptSteps).filter((s) => !isMainOperationStep(s));
             if (allSteps.length === 0) { notify("No steps found."); return; }
             const op = (id: string) => (action === "enable" ? client.enableStep(id) : client.disableStep(id));
             const results = await Promise.allSettled(allSteps.map((s) => op(s.sdkmessageprocessingstepid)));
@@ -1153,7 +1160,7 @@ export default function App() {
         }
         try {
             // Steps on the API's message would go with it, so ask for them to be removed first.
-            const steps = api.sdkmessageid ? await client.fetchStepsForMessage(api.sdkmessageid) : [];
+            const steps = stepsBlockingCustomApiDelete(api.sdkmessageid ? await client.fetchStepsForMessage(api.sdkmessageid) : []);
             if (steps.length > 0) {
                 notify(`Can't delete Custom API "${api.uniquename}": ${customApiStepsBlockDelete(steps.length)}`, "error");
                 return;
@@ -1295,7 +1302,8 @@ export default function App() {
 
     // Context-sensitive toolbar state
     const canUpdate = !!(selectedAssembly || selectedStep || selectedImage || selectedEndpoint || selectedPackage || editedCustomApi);
-    const canUnregister = !!(selectedAssembly || selectedStep || selectedImage || selectedEndpoint || selectedPackage || editedCustomApi);
+    const stepIsMainOperation = !!selectedStep && isMainOperationStep(selectedStep);
+    const canUnregister = !!(selectedAssembly || (selectedStep && !stepIsMainOperation) || selectedImage || selectedEndpoint || selectedPackage || editedCustomApi);
     const canRegisterStep = !!(selectedPluginType && !selectedPluginType.isworkflowactivity);
     const canRegisterImage = !!selectedStep;
     const isStepSelected = !!selectedStep;
@@ -1585,7 +1593,7 @@ export default function App() {
                     )}
                 </div>
 
-                {isStepSelected && (
+                {isStepSelected && !stepIsMainOperation && (
                     <>
                         <div className="toolbar-separator" />
                         <div className="toolbar-group">

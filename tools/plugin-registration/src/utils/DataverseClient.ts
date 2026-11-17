@@ -1,5 +1,5 @@
 import type { CustomApi, CustomApiField, CustomApiRequestParameter, ManagedIdentity, ManagedIdentityInput, NewSolutionInput, PluginAssembly, PluginPackage, PluginType, ProcessingStep, PublisherOption, SdkMessage, SdkMessageFilter, SolutionOption, StepImage, ServiceEndpoint } from "../models/interfaces";
-import { MI_CREDENTIAL_SOURCE_MANAGED } from "../models/interfaces";
+import { isMainOperationStep, MI_CREDENTIAL_SOURCE_MANAGED } from "../models/interfaces";
 import type { CustomApiChildTable } from "./customApiRules";
 import { customApiCreateRecord, isEmptyPlan, isGuid, planCustomApiUpdate, REQUEST_TABLE, RESPONSE_TABLE, solutionCreateRecord, validateCustomApi, validateNewSolution } from "./customApiRules";
 
@@ -52,6 +52,14 @@ const MISSING_TABLE = /0x80060888|could not find|does not exist|\b404\b/i;
 export function isMissingTableError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : typeof error === "string" ? error : JSON.stringify(error ?? "");
   return MISSING_TABLE.test(message);
+}
+
+/**
+ * Steps that keep a Custom API from being deleted: those registered on its message. The main operation
+ * step Dataverse keeps for the API's Plug-in Type doesn't count, since it goes with the API.
+ */
+export function stepsBlockingCustomApiDelete(steps: readonly ProcessingStep[]): ProcessingStep[] {
+  return steps.filter((s) => !isMainOperationStep(s));
 }
 
 /** Why a Custom API with registered steps can't be deleted yet. */
@@ -875,7 +883,7 @@ export class DataverseClient {
   async deleteCustomApi(api: CustomApi): Promise<void> {
     if (api.ismanaged) throw new Error("A managed Custom API must be removed through its managed solution.");
     try {
-      const steps = api.sdkmessageid ? await this.fetchStepsForMessage(api.sdkmessageid) : [];
+      const steps = stepsBlockingCustomApiDelete(api.sdkmessageid ? await this.fetchStepsForMessage(api.sdkmessageid) : []);
       if (steps.length > 0) throw new Error(customApiStepsBlockDelete(steps.length));
       await window.dataverseAPI.delete("customapi", api.customapiid, "primary");
     } catch (error: unknown) {
