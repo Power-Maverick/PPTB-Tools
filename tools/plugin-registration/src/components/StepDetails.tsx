@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ProcessingStep } from "../models/interfaces";
+import { isMainOperationStep } from "../models/interfaces";
 import { PropertySection } from "./PropertySection";
 
 interface StepDetailsProps {
@@ -32,6 +33,8 @@ export function StepDetails({ step, onSave, onRegisterImage, onEnable, onDisable
     const [saving, setSaving] = useState(false);
     const [focusedField, setFocusedField] = useState<string>("Name");
     const isEnabled = step.statecode === 0;
+    // Dataverse keeps a Custom API's main operation step with the API, so it can't be toggled or removed here.
+    const isMainOperation = isMainOperationStep(step);
 
     useEffect(() => {
         setDescription(step.description);
@@ -129,18 +132,29 @@ export function StepDetails({ step, onSave, onRegisterImage, onEnable, onDisable
                 )}
             </PropertySection>
             <div className="details-footer">
-                <div className="field-hint">
-                    <div className="field-hint-label">{focusedField}</div>
-                    <div className="field-hint-desc">{FIELD_HINTS[focusedField] ?? ""}</div>
-                </div>
+                {isMainOperation ? (
+                    <div className="field-hint">
+                        <div className="field-hint-label">Custom API main operation</div>
+                        <div className="field-hint-desc">
+                            Dataverse created this step from the Custom API&apos;s Plug-in Type and keeps it with the API, so it
+                            can&apos;t be enabled, disabled or unregistered here. To remove it, set the Custom API&apos;s Plug-in Type
+                            to (None) or delete the Custom API.
+                        </div>
+                    </div>
+                ) : (
+                    <div className="field-hint">
+                        <div className="field-hint-label">{focusedField}</div>
+                        <div className="field-hint-desc">{FIELD_HINTS[focusedField] ?? ""}</div>
+                    </div>
+                )}
                 <div className="details-footer-actions">
                     <button className="btn-secondary" onClick={onRegisterImage}>Register Image</button>
                     <button className="btn-secondary" onClick={onUpdate}>Update Step</button>
-                    {isEnabled
+                    {!isMainOperation && (isEnabled
                         ? <button className="btn-secondary" onClick={onDisable}>Disable</button>
                         : <button className="btn-secondary" onClick={onEnable}>Enable</button>
-                    }
-                    <button className="btn-danger" onClick={onUnregister}>Unregister</button>
+                    )}
+                    {!isMainOperation && <button className="btn-danger" onClick={onUnregister}>Unregister</button>}
                     <button className="btn-primary" onClick={() => void handleSave()} disabled={saving}>
                         {saving ? "Saving…" : "Save"}
                     </button>

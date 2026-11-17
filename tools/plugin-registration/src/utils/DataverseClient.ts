@@ -1,11 +1,144 @@
-import type { ManagedIdentity, ManagedIdentityInput, PluginAssembly, PluginPackage, PluginType, ProcessingStep, SdkMessage, SdkMessageFilter, SolutionOption, StepImage, ServiceEndpoint } from "../models/interfaces";
-import { MI_CREDENTIAL_SOURCE_MANAGED } from "../models/interfaces";
+import type { CustomApi, CustomApiField, CustomApiRequestParameter, ManagedIdentity, ManagedIdentityInput, NewSolutionInput, PluginAssembly, PluginPackage, PluginType, ProcessingStep, PublisherOption, SdkMessage, SdkMessageFilter, SolutionOption, StepImage, ServiceEndpoint } from "../models/interfaces";
+import { isMainOperationStep, MI_CREDENTIAL_SOURCE_MANAGED } from "../models/interfaces";
+import type { CustomApiChildTable } from "./customApiRules";
+import { customApiCreateRecord, isEmptyPlan, isGuid, planCustomApiUpdate, REQUEST_TABLE, RESPONSE_TABLE, solutionCreateRecord, validateCustomApi, validateNewSolution } from "./customApiRules";
 
-const GUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Step columns and expands that {@link toProcessingStep} reads. */
+const STEP_SELECT = "sdkmessageprocessingstepid,name,description,rank,mode,stage,filteringattributes,asyncautodelete,statecode,_impersonatinguserid_value,_sdkmessageid_value,_sdkmessagefilterid_value,configuration,_sdkmessageprocessingstepsecureconfigid_value,supporteddeployment";
+const STEP_EXPAND = "sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)";
 
-/** Validate that a string is a Dataverse-format GUID (case-insensitive hex, hyphenated, no braces). */
-function isGuid(value: string): boolean {
-  return GUID_REGEX.test(value);
+/**
+ * Maps a sdkmessageprocessingstep row, queried with its message name and filter table expanded, to a
+ * step. The caller sets the step's handler: plugintypeid or serviceendpointid.
+ */
+function toProcessingStep(s: Record<string, unknown>): ProcessingStep {
+  const msgExpand = s["sdkmessageid"] as Record<string, unknown> | null;
+  const filterExpand = s["sdkmessagefilterid"] as Record<string, unknown> | null;
+  return {
+    sdkmessageprocessingstepid: s["sdkmessageprocessingstepid"] as string,
+    name: s["name"] as string,
+    description: (s["description"] as string) ?? "",
+    rank: (s["rank"] as number) ?? 1,
+    mode: (s["mode"] as number) ?? 0,
+    stage: (s["stage"] as number) ?? 40,
+    sdkmessageid: (s["_sdkmessageid_value"] as string) ?? "",
+    messageName: (msgExpand?.["name"] as string) ?? "",
+    sdkmessagefilterid: (s["_sdkmessagefilterid_value"] as string) ?? "",
+    primaryEntityName: (filterExpand?.["primaryobjecttypecode"] as string) ?? "none",
+    filteringattributes: (s["filteringattributes"] as string) ?? "",
+    asyncautodelete: (s["asyncautodelete"] as boolean) ?? false,
+    statecode: (s["statecode"] as number) ?? 0,
+    impersonatinguserid: (s["_impersonatinguserid_value"] as string) ?? undefined,
+    configuration: (s["configuration"] as string) ?? undefined,
+    secureconfigid: (s["_sdkmessageprocessingstepsecureconfigid_value"] as string) ?? undefined,
+    supporteddeployment: s["supporteddeployment"] != null ? (s["supporteddeployment"] as number) : undefined,
+  };
+}
+
+/** Thrown when a Custom API was created but could not be added to its solution. Carries the new API's id. */
+export class CustomApiCreatedError extends Error {
+  constructor(readonly customApiId: string, message: string) {
+    super(message);
+    this.name = "CustomApiCreatedError";
+  }
+}
+
+/**
+ * Dataverse's answer when a table doesn't exist: 0x80060888 ("Could not find an entity with specified
+ * entity name") or a 404. The host passes errors on as text, so this matches the code and phrases.
+ */
+const MISSING_TABLE = /0x80060888|could not find|does not exist|\b404\b/i;
+
+export function isMissingTableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : JSON.stringify(error ?? "");
+  return MISSING_TABLE.test(message);
+}
+
+/**
+ * Steps that keep a Custom API from being deleted: those registered on its message. The main operation
+ * step Dataverse keeps for the API's Plug-in Type doesn't count, since it goes with the API.
+ */
+export function stepsBlockingCustomApiDelete(steps: readonly ProcessingStep[]): ProcessingStep[] {
+  return steps.filter((s) => !isMainOperationStep(s));
+}
+
+/** Why a Custom API with registered steps can't be deleted yet. */
+export function customApiStepsBlockDelete(stepCount: number): string {
+  const steps = stepCount === 1 ? "1 step is" : `${stepCount} steps are`;
+  return `${steps} registered on this Custom API's message. Delete those steps first.`;
+}
+
+/** A plug-in type offered as the handler of a Custom API. */
+export interface CustomApiPluginTypeOption {
+  plugintypeid: string;
+  typename: string;
+  pluginassemblyid: string;
+}
+
+const CUSTOM_API_SELECT =
+  "customapiid,name,uniquename,displayname,description,bindingtype,boundentitylogicalname,allowedcustomprocessingsteptype,_plugintypeid_value,_sdkmessageid_value,executeprivilegename,isfunction,isprivate,workflowsdkstepenabled,ismanaged,iscustomizable";
+const FIELD_SELECT = "_customapiid_value,name,uniquename,displayname,description,type,logicalentityname,ismanaged,iscustomizable";
+const REQUEST_SELECT = `customapirequestparameterid,${FIELD_SELECT},isoptional`;
+const RESPONSE_SELECT = `customapiresponsepropertyid,${FIELD_SELECT}`;
+
+/** iscustomizable is a managed property: { Value: boolean, ... }. A missing value means customizable. */
+function readCustomizable(value: unknown): boolean {
+  if (value && typeof value === "object" && "Value" in value) return (value as { Value: unknown }).Value !== false;
+  return value !== false;
+}
+
+/** Rows per page when reading a whole table; Dataverse's largest page. */
+const QUERY_PAGE_SIZE = 5000;
+
+function byUniqueName(a: { uniquename: string }, b: { uniquename: string }): number {
+  return a.uniquename.localeCompare(b.uniquename, undefined, { sensitivity: "base" });
+}
+
+function toCustomApi(a: Record<string, unknown>): CustomApi {
+  return {
+    customapiid: a["customapiid"] as string,
+    name: (a["name"] as string) ?? "",
+    uniquename: (a["uniquename"] as string) ?? "",
+    displayname: (a["displayname"] as string) ?? "",
+    description: (a["description"] as string) ?? "",
+    // An absent choice must not quietly become Global/None and change the contract on save.
+    bindingtype: (a["bindingtype"] as number) ?? -1,
+    boundentitylogicalname: (a["boundentitylogicalname"] as string) ?? "",
+    allowedcustomprocessingsteptype: (a["allowedcustomprocessingsteptype"] as number) ?? -1,
+    plugintypeid: (a["_plugintypeid_value"] as string) ?? undefined,
+    sdkmessageid: (a["_sdkmessageid_value"] as string) ?? undefined,
+    executeprivilegename: (a["executeprivilegename"] as string) ?? "",
+    isfunction: (a["isfunction"] as boolean) ?? false,
+    isprivate: (a["isprivate"] as boolean) ?? false,
+    workflowsdkstepenabled: (a["workflowsdkstepenabled"] as boolean) ?? false,
+    ismanaged: (a["ismanaged"] as boolean) ?? false,
+    iscustomizable: readCustomizable(a["iscustomizable"]),
+    requestParameters: [],
+    responseProperties: [],
+  };
+}
+
+function toField(f: Record<string, unknown>, id: string): CustomApiField {
+  return {
+    id,
+    customapiid: (f["_customapiid_value"] as string) ?? "",
+    name: (f["name"] as string) ?? "",
+    uniquename: (f["uniquename"] as string) ?? "",
+    displayname: (f["displayname"] as string) ?? "",
+    description: (f["description"] as string) ?? "",
+    type: (f["type"] as number) ?? -1,
+    logicalentityname: (f["logicalentityname"] as string) ?? "",
+    ismanaged: (f["ismanaged"] as boolean) ?? false,
+    iscustomizable: readCustomizable(f["iscustomizable"]),
+  };
+}
+
+function toRequestParameter(r: Record<string, unknown>): CustomApiRequestParameter {
+  return { ...toField(r, r["customapirequestparameterid"] as string), isoptional: (r["isoptional"] as boolean) ?? false };
+}
+
+function toResponseProperty(r: Record<string, unknown>): CustomApiField {
+  return toField(r, r["customapiresponsepropertyid"] as string);
 }
 
 /** Build the @odata.bind value for the pluginpackages collection. Validates the GUID first. */
@@ -108,33 +241,10 @@ export class DataverseClient {
   async fetchSteps(pluginTypeId: string): Promise<ProcessingStep[]> {
     try {
       const response = await window.dataverseAPI.queryData(
-        `sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,description,rank,mode,stage,filteringattributes,asyncautodelete,statecode,_impersonatinguserid_value,_sdkmessageid_value,_sdkmessagefilterid_value,configuration,_sdkmessageprocessingstepsecureconfigid_value,supporteddeployment&$filter=_eventhandler_value eq '${pluginTypeId}'&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)&$orderby=name`,
+        `sdkmessageprocessingsteps?$select=${STEP_SELECT}&$filter=_eventhandler_value eq '${pluginTypeId}'&$expand=${STEP_EXPAND}&$orderby=name`,
         "primary",
       );
-      return (response.value as Record<string, unknown>[]).map((s) => {
-        const msgExpand = s["sdkmessageid"] as Record<string, unknown> | null;
-        const filterExpand = s["sdkmessagefilterid"] as Record<string, unknown> | null;
-        return {
-          sdkmessageprocessingstepid: s["sdkmessageprocessingstepid"] as string,
-          name: s["name"] as string,
-          description: (s["description"] as string) ?? "",
-          rank: (s["rank"] as number) ?? 1,
-          mode: (s["mode"] as number) ?? 0,
-          stage: (s["stage"] as number) ?? 40,
-          sdkmessageid: (s["_sdkmessageid_value"] as string) ?? "",
-          messageName: (msgExpand?.["name"] as string) ?? "",
-          sdkmessagefilterid: (s["_sdkmessagefilterid_value"] as string) ?? "",
-          primaryEntityName: (filterExpand?.["primaryobjecttypecode"] as string) ?? "none",
-          filteringattributes: (s["filteringattributes"] as string) ?? "",
-          asyncautodelete: (s["asyncautodelete"] as boolean) ?? false,
-          statecode: (s["statecode"] as number) ?? 0,
-          plugintypeid: pluginTypeId,
-          impersonatinguserid: (s["_impersonatinguserid_value"] as string) ?? undefined,
-          configuration: (s["configuration"] as string) ?? undefined,
-          secureconfigid: (s["_sdkmessageprocessingstepsecureconfigid_value"] as string) ?? undefined,
-          supporteddeployment: s["supporteddeployment"] != null ? (s["supporteddeployment"] as number) : undefined,
-        };
-      });
+      return (response.value as Record<string, unknown>[]).map((s) => ({ ...toProcessingStep(s), plugintypeid: pluginTypeId }));
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to fetch steps: ${msg}`);
@@ -535,18 +645,15 @@ export class DataverseClient {
     }
   }
 
-  /** Adds a record to an unmanaged solution, looking up the component type of its table. */
-  private async addToSolution(componentId: string, entityLogicalName: string, solutionUniqueName: string): Promise<void> {
-    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(entityLogicalName)) {
-      throw new Error(`Invalid entity name: "${entityLogicalName}"`);
-    }
-    const definitions = await window.dataverseAPI.queryData(
-      `solutioncomponentdefinitions?$select=solutioncomponenttype&$filter=primaryentityname eq '${entityLogicalName}'&$top=1`,
-      "primary",
-    );
-    const componentType = (definitions.value[0]?.["solutioncomponenttype"] as number | undefined) ?? undefined;
+  /**
+   * Adds a record to an unmanaged solution, looking up the component type of its table. Pass a map to
+   * reuse component types already looked up when adding several records.
+   */
+  private async addToSolution(componentId: string, entityLogicalName: string, solutionUniqueName: string, componentTypes?: Map<string, number>): Promise<void> {
+    let componentType = componentTypes?.get(entityLogicalName);
     if (componentType === undefined) {
-      throw new Error(`Unable to find the solution component type for table ${entityLogicalName}`);
+      componentType = await this.fetchSolutionComponentType(entityLogicalName);
+      componentTypes?.set(entityLogicalName, componentType);
     }
     await window.dataverseAPI.execute({
       operationName: "AddSolutionComponent",
@@ -558,6 +665,319 @@ export class DataverseClient {
         AddRequiredComponents: false,
       },
     });
+  }
+
+  private async fetchSolutionComponentType(entityLogicalName: string): Promise<number> {
+    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(entityLogicalName)) {
+      throw new Error(`Invalid entity name: "${entityLogicalName}"`);
+    }
+    const definitions = await window.dataverseAPI.queryData(
+      `solutioncomponentdefinitions?$select=solutioncomponenttype&$filter=primaryentityname eq '${entityLogicalName}'&$top=1`,
+      "primary",
+    );
+    const componentType = (definitions.value[0]?.["solutioncomponenttype"] as number | undefined) ?? undefined;
+    if (componentType === undefined) {
+      throw new Error(`Unable to find the solution component type for table ${entityLogicalName}`);
+    }
+    return componentType;
+  }
+
+  // ── Custom API methods ──
+
+  /**
+   * True when the environment has the Custom API tables. Only a missing-table error counts as "not
+   * supported". Any other error (sign-in, network, throttling) keeps the view, so loading the APIs then
+   * reports the real problem instead of the view quietly disappearing.
+   */
+  async isCustomApiSupported(): Promise<boolean> {
+    try {
+      await window.dataverseAPI.getEntityMetadata("customapi", true, ["LogicalName"]);
+      return true;
+    } catch (error: unknown) {
+      return !isMissingTableError(error);
+    }
+  }
+
+  /**
+   * Every row of a table. queryData returns only the first page and no next link, so this pages by the
+   * primary key itself: each page asks for rows after the last key of the one before.
+   */
+  private async queryAllRows(entitySet: string, select: string, key: string): Promise<Record<string, unknown>[]> {
+    const rows: Record<string, unknown>[] = [];
+    let after: string | undefined;
+    for (;;) {
+      const filter = after ? `&$filter=${key} gt ${after}` : "";
+      const page = (await window.dataverseAPI.queryData(`${entitySet}?$select=${select}${filter}&$orderby=${key}&$top=${QUERY_PAGE_SIZE}`, "primary")).value;
+      rows.push(...page);
+      if (page.length < QUERY_PAGE_SIZE) return rows;
+      const last = page[page.length - 1][key];
+      if (typeof last !== "string" || !isGuid(last)) throw new Error(`${entitySet} returned a row without a valid ${key}.`);
+      after = last;
+    }
+  }
+
+  /** Every Custom API with its request parameters and response properties, ordered by unique name. */
+  async fetchCustomApis(): Promise<CustomApi[]> {
+    try {
+      const [apis, requests, responses] = await Promise.all([
+        this.queryAllRows("customapis", CUSTOM_API_SELECT, "customapiid"),
+        this.queryAllRows("customapirequestparameters", REQUEST_SELECT, "customapirequestparameterid"),
+        this.queryAllRows("customapiresponseproperties", RESPONSE_SELECT, "customapiresponsepropertyid"),
+      ]);
+      const result = apis.map(toCustomApi).sort(byUniqueName);
+      const byId = new Map(result.map((a) => [a.customapiid.toLowerCase(), a]));
+      for (const r of requests) {
+        byId.get(String(r["_customapiid_value"] ?? "").toLowerCase())?.requestParameters.push(toRequestParameter(r));
+      }
+      for (const r of responses) {
+        byId.get(String(r["_customapiid_value"] ?? "").toLowerCase())?.responseProperties.push(toResponseProperty(r));
+      }
+      for (const api of result) {
+        api.requestParameters.sort(byUniqueName);
+        api.responseProperties.sort(byUniqueName);
+      }
+      return result;
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to fetch Custom APIs: ${msg}`);
+    }
+  }
+
+  /** Logical names of every table, in lower case and name order: suggestions for table fields. */
+  async fetchTableNames(): Promise<string[]> {
+    try {
+      const response = await window.dataverseAPI.getAllEntitiesMetadata(["LogicalName"], "primary");
+      return response.value.map((t) => String(t.LogicalName ?? "").toLowerCase()).filter(Boolean).sort();
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to fetch tables: ${msg}`);
+    }
+  }
+
+  /** Names of every privilege, in name order: suggestions for a Custom API's Execute privilege. */
+  async fetchPrivilegeNames(): Promise<string[]> {
+    try {
+      const rows = await this.queryAllRows("privileges", "name", "privilegeid");
+      return rows.map((r) => String(r["name"] ?? "")).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to fetch privileges: ${msg}`);
+    }
+  }
+
+  /** Plug-in types that can handle a Custom API (not workflow activities), ordered by type name. */
+  async fetchCustomApiPluginTypes(): Promise<CustomApiPluginTypeOption[]> {
+    try {
+      const response = await window.dataverseAPI.queryData(
+        "plugintypes?$select=plugintypeid,typename,_pluginassemblyid_value&$filter=isworkflowactivity eq false&$orderby=typename",
+        "primary",
+      );
+      return (response.value as Record<string, unknown>[]).map((t) => ({
+        plugintypeid: t["plugintypeid"] as string,
+        typename: (t["typename"] as string) ?? "",
+        pluginassemblyid: (t["_pluginassemblyid_value"] as string) ?? "",
+      }));
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to fetch plug-in types: ${msg}`);
+    }
+  }
+
+  /** The customization prefix of an unmanaged solution's publisher. */
+  async fetchPublisherPrefix(solutionUniqueName: string): Promise<string> {
+    const name = solutionUniqueName.replace(/'/g, "''");
+    const response = await window.dataverseAPI.queryData(
+      `solutions?$select=uniquename&$filter=uniquename eq '${name}' and ismanaged eq false&$expand=publisherid($select=customizationprefix)`,
+      "primary",
+    );
+    const values = response.value as Record<string, unknown>[];
+    const publisher = values.length === 1 ? (values[0]["publisherid"] as Record<string, unknown> | null) : null;
+    const prefix = publisher?.["customizationprefix"] as string | undefined;
+    if (!prefix) {
+      throw new Error(`The unmanaged solution "${solutionUniqueName}" or its publisher prefix could not be found.`);
+    }
+    return prefix;
+  }
+
+  /**
+   * Creates a Custom API with its request parameters and response properties in one request, then adds
+   * the API and its children to the solution. Unique names must use the solution publisher's prefix.
+   * Returns the new API's id.
+   */
+  async createCustomApi(api: CustomApi, solutionUniqueName: string): Promise<string> {
+    if (!solutionUniqueName) throw new Error("Failed to create the Custom API: select an unmanaged solution.");
+    let id: string;
+    try {
+      const prefix = await this.fetchPublisherPrefix(solutionUniqueName);
+      const errors = validateCustomApi(api, undefined, prefix);
+      if (errors.length > 0) throw new Error(errors.join("\n"));
+      const result = await window.dataverseAPI.create("customapi", customApiCreateRecord(api), "primary");
+      id = result.id;
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create the Custom API: ${msg}`);
+    }
+
+    try {
+      const componentTypes = new Map<string, number>();
+      await this.addToSolution(id, "customapi", solutionUniqueName, componentTypes);
+      const filter = `$filter=_customapiid_value eq ${id}`;
+      const childSets: [CustomApiChildTable, string][] = [[REQUEST_TABLE, "customapirequestparameters"], [RESPONSE_TABLE, "customapiresponseproperties"]];
+      for (const [table, entitySet] of childSets) {
+        const children = await window.dataverseAPI.queryData(`${entitySet}?$select=${table}id&${filter}`, "primary");
+        for (const child of children.value as Record<string, unknown>[]) {
+          await this.addToSolution(child[`${table}id`] as string, table, solutionUniqueName, componentTypes);
+        }
+      }
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new CustomApiCreatedError(id, `The Custom API was created, but adding it to solution "${solutionUniqueName}" failed: ${msg}`);
+    }
+    return id;
+  }
+
+  /**
+   * Saves the differences between the saved API and the edited draft. Updates and creates come first and
+   * removed children are deleted last, so a failure leaves the contract as it was or only adds to it. The
+   * one exception is a removed child whose unique name a new child reuses: it is deleted just before that
+   * create. New children join childSolutions, or when that is left out, every unmanaged solution the API
+   * is in. Returns false when there was nothing to save. Dataverse saves each write on its own, so after a failure part of the edit may already be
+   * saved; reload the API before trying again.
+   */
+  async updateCustomApi(original: CustomApi, draft: CustomApi, childSolutions?: readonly string[]): Promise<boolean> {
+    const errors = validateCustomApi(draft, original);
+    if (errors.length > 0) throw new Error(`Failed to update the Custom API: ${errors.join("\n")}`);
+    const plan = planCustomApiUpdate(original, draft);
+    if (isEmptyPlan(plan)) return false;
+
+    let solutions: readonly string[] = [];
+    try {
+      if (plan.creates.length > 0) solutions = childSolutions ?? (await this.fetchUnmanagedSolutionsContaining(original.customapiid));
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to update the Custom API: ${msg}`);
+    }
+
+    const componentTypes = new Map<string, number>();
+    try {
+      if (Object.keys(plan.apiChanges).length > 0) await window.dataverseAPI.update("customapi", original.customapiid, plan.apiChanges, "primary");
+      for (const u of plan.updates) await window.dataverseAPI.update(u.table, u.id, u.changes, "primary");
+      for (const c of plan.creates) {
+        if (c.replaces) await window.dataverseAPI.delete(c.table, c.replaces, "primary");
+        const created = await window.dataverseAPI.create(c.table, c.record, "primary");
+        for (const solution of solutions) await this.addToSolution(created.id, c.table, solution, componentTypes);
+      }
+      for (const d of plan.deletes) await window.dataverseAPI.delete(d.table, d.id, "primary");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to update the Custom API. Some changes may already be saved; reload before trying again. ${msg}`);
+    }
+    return true;
+  }
+
+  /**
+   * Deletes an unmanaged Custom API. Dataverse deletes its parameters, properties and message with it.
+   * Refuses while steps are registered on the API's message, so no step goes away without the user
+   * seeing it: delete those steps first.
+   */
+  async deleteCustomApi(api: CustomApi): Promise<void> {
+    if (api.ismanaged) throw new Error("A managed Custom API must be removed through its managed solution.");
+    try {
+      const steps = stepsBlockingCustomApiDelete(api.sdkmessageid ? await this.fetchStepsForMessage(api.sdkmessageid) : []);
+      if (steps.length > 0) throw new Error(customApiStepsBlockDelete(steps.length));
+      await window.dataverseAPI.delete("customapi", api.customapiid, "primary");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to delete the Custom API: ${msg}`);
+    }
+  }
+
+  /** Deletes one unmanaged request parameter or response property. */
+  async deleteCustomApiField(table: CustomApiChildTable, field: CustomApiField): Promise<void> {
+    const kind = table === REQUEST_TABLE ? "request parameter" : "response property";
+    if (field.ismanaged) throw new Error(`A managed ${kind} must be removed through its managed solution.`);
+    try {
+      await window.dataverseAPI.delete(table, field.id, "primary");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to delete the ${kind}: ${msg}`);
+    }
+  }
+
+  /**
+   * Steps registered on a message, such as a Custom API's. Each step's handler is set from its event
+   * handler: a plug-in type or a service endpoint.
+   */
+  async fetchStepsForMessage(messageId: string): Promise<ProcessingStep[]> {
+    if (!isGuid(messageId)) throw new Error(`Invalid message ID: "${messageId}"`);
+    try {
+      const response = await window.dataverseAPI.queryData(
+        `sdkmessageprocessingsteps?$select=${STEP_SELECT}&$filter=_sdkmessageid_value eq ${messageId}&$expand=${STEP_EXPAND},eventhandler_plugintype($select=plugintypeid),eventhandler_serviceendpoint($select=serviceendpointid)&$orderby=name`,
+        "primary",
+      );
+      return (response.value as Record<string, unknown>[]).map((s) => {
+        const pluginType = s["eventhandler_plugintype"] as Record<string, unknown> | null;
+        const endpoint = s["eventhandler_serviceendpoint"] as Record<string, unknown> | null;
+        return {
+          ...toProcessingStep(s),
+          plugintypeid: (pluginType?.["plugintypeid"] as string) ?? undefined,
+          serviceendpointid: (endpoint?.["serviceendpointid"] as string) ?? undefined,
+        };
+      });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to fetch steps for message: ${msg}`);
+    }
+  }
+
+  /** Publishers that can own a new solution: editable ones with a customization prefix, ordered by name. */
+  async fetchPublishers(): Promise<PublisherOption[]> {
+    try {
+      const response = await window.dataverseAPI.queryData(
+        "publishers?$select=publisherid,friendlyname,customizationprefix&$filter=isreadonly eq false&$orderby=friendlyname",
+        "primary",
+      );
+      return (response.value as Record<string, unknown>[])
+        .map((p) => ({
+          publisherid: p["publisherid"] as string,
+          friendlyname: (p["friendlyname"] as string) ?? "",
+          customizationprefix: (p["customizationprefix"] as string) ?? "",
+        }))
+        .filter((p) => p.customizationprefix.trim() !== "");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to fetch publishers: ${msg}`);
+    }
+  }
+
+  /** Creates an unmanaged solution and returns it as a solution choice. */
+  async createSolution(solution: NewSolutionInput): Promise<SolutionOption> {
+    const errors = validateNewSolution(solution);
+    if (errors.length > 0) throw new Error(`Failed to create the solution: ${errors.join("\n")}`);
+    try {
+      await window.dataverseAPI.create("solution", solutionCreateRecord(solution), "primary");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create the solution: ${msg}`);
+    }
+    return { uniquename: solution.uniquename, friendlyname: solution.friendlyname.trim() };
+  }
+
+  /** Unique names of the unmanaged, visible solutions (other than Default) that contain a record. */
+  async fetchUnmanagedSolutionsContaining(componentId: string): Promise<string[]> {
+    if (!isGuid(componentId)) throw new Error(`Invalid component ID: "${componentId}"`);
+    const components = await window.dataverseAPI.queryData(
+      `solutioncomponents?$select=_solutionid_value&$filter=objectid eq ${componentId}`,
+      "primary",
+    );
+    const solutionIds = [...new Set((components.value as Record<string, unknown>[]).map((c) => c["_solutionid_value"] as string).filter(isGuid))];
+    if (solutionIds.length === 0) return [];
+    const idFilter = solutionIds.map((s) => `solutionid eq ${s}`).join(" or ");
+    const solutions = await window.dataverseAPI.queryData(
+      `solutions?$select=uniquename&$filter=(${idFilter}) and ismanaged eq false and isvisible eq true and uniquename ne 'Default'&$orderby=uniquename`,
+      "primary",
+    );
+    return (solutions.value as Record<string, unknown>[]).map((s) => s["uniquename"] as string).filter(Boolean);
   }
 
   async registerStep(
@@ -791,32 +1211,10 @@ export class DataverseClient {
   async fetchStepsForEndpoint(endpointId: string): Promise<ProcessingStep[]> {
     try {
       const response = await window.dataverseAPI.queryData(
-        `sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,name,description,rank,mode,stage,filteringattributes,asyncautodelete,statecode,_sdkmessageid_value,_sdkmessagefilterid_value,configuration,_sdkmessageprocessingstepsecureconfigid_value,supporteddeployment&$filter=_eventhandler_value eq '${endpointId}'&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)&$orderby=name`,
+        `sdkmessageprocessingsteps?$select=${STEP_SELECT}&$filter=_eventhandler_value eq '${endpointId}'&$expand=${STEP_EXPAND}&$orderby=name`,
         "primary",
       );
-      return (response.value as Record<string, unknown>[]).map((s) => {
-        const msgExpand = s["sdkmessageid"] as Record<string, unknown> | null;
-        const filterExpand = s["sdkmessagefilterid"] as Record<string, unknown> | null;
-        return {
-          sdkmessageprocessingstepid: s["sdkmessageprocessingstepid"] as string,
-          name: s["name"] as string,
-          description: (s["description"] as string) ?? "",
-          rank: (s["rank"] as number) ?? 1,
-          mode: (s["mode"] as number) ?? 0,
-          stage: (s["stage"] as number) ?? 40,
-          sdkmessageid: (s["_sdkmessageid_value"] as string) ?? "",
-          messageName: (msgExpand?.["name"] as string) ?? "",
-          sdkmessagefilterid: (s["_sdkmessagefilterid_value"] as string) ?? "",
-          primaryEntityName: (filterExpand?.["primaryobjecttypecode"] as string) ?? "none",
-          filteringattributes: (s["filteringattributes"] as string) ?? "",
-          asyncautodelete: (s["asyncautodelete"] as boolean) ?? false,
-          statecode: (s["statecode"] as number) ?? 0,
-          serviceendpointid: endpointId,
-          configuration: (s["configuration"] as string) ?? undefined,
-          secureconfigid: (s["_sdkmessageprocessingstepsecureconfigid_value"] as string) ?? undefined,
-          supporteddeployment: s["supporteddeployment"] != null ? (s["supporteddeployment"] as number) : undefined,
-        };
-      });
+      return (response.value as Record<string, unknown>[]).map((s) => ({ ...toProcessingStep(s), serviceendpointid: endpointId }));
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to fetch steps for endpoint: ${msg}`);
