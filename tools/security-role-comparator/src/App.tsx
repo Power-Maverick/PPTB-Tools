@@ -1,4 +1,4 @@
-import { Button, Dropdown, MessageBar, MessageBarBody, Option, SearchBox, Spinner, Tooltip } from "@fluentui/react-components";
+import { Button, Combobox, Dropdown, MessageBar, MessageBarBody, Option, OptionGroup, SearchBox, Spinner, Switch, Tooltip } from "@fluentui/react-components";
 import {
     AddCircleFilled,
     DismissCircleRegular,
@@ -15,6 +15,7 @@ import "./styles.css";
 import { DataverseConnector } from "./utils/dataverseClient";
 
 const MAX_COMPARE_ROLES = 5;
+const MAX_ENVIRONMENTS = 5;
 const STORAGE_PREFIX = "security-role-comparator:recent-selections:v1";
 
 /** Ordered list of operation values used by the operation filter (incl. the non-table placeholder). */
@@ -51,11 +52,18 @@ function toggleMultiSelect(optionValue: string, current: string[], available: st
 /** True when a value passes a multi-select filter ("all" mode passes everything). */
 const passesMultiSelect = (value: string, selected: string[]) => selected.includes(ALL_VALUE) || selected.includes(value);
 
-/** Summary text shown in the multi-select filter's closed state. */
-function multiSelectSummary(selected: string[], available: string[], noun: string): string {
-    if (selected.includes(ALL_VALUE)) return `All ${noun}`;
-    if (selected.length === 0) return `No ${noun}`;
-    return `${selected.length} of ${available.length} ${noun}`;
+function groupSelectionSummary(selected: string[]): string {
+    if (selected.includes(ALL_VALUE)) return "All groups";
+    if (selected.length === 0) return "No groups";
+    return selected
+        .map((label) => label.replace(/\s+Tables$/i, "").replace(/\s+Privileges$/i, "").replace(/^Privacy Related$/i, "Privacy"))
+        .join(", ");
+}
+
+function operationSelectionSummary(selected: string[]): string {
+    if (selected.includes(ALL_VALUE)) return "All operations";
+    if (selected.length === 0) return "No operations";
+    return selected.map(operationLabel).join(", ");
 }
 
 /** Row-level filter modes for the comparison grid. */
@@ -86,22 +94,38 @@ const DEPTH_ICON: Record<PrivilegeDepth, DepthIconInfo> = {
 };
 
 interface SavedSelections {
-    version: 1;
+    version: 2;
+    baseEnvironmentId: string;
     baseRoleId: string;
+    compareEnvironmentIds: string[];
     compareRoleIds: string[];
 }
 
 interface RoleSelections {
+    baseEnvironmentId: string;
     baseRoleId: string;
+    compareEnvironmentIds: string[];
     compareRoleIds: string[];
 }
 
-function buildStorageKey(envUrl: string): string {
-    try {
-        return `${STORAGE_PREFIX}:${new URL(envUrl).origin}`;
-    } catch {
-        return `${STORAGE_PREFIX}:${envUrl}`;
-    }
+interface ConnectedEnvironment {
+    connection: ToolBoxAPI.Connection;
+    slot: number;
+    connector: DataverseConnector;
+    roles: SecurityRole[];
+}
+
+interface ComparedRole {
+    selectionKey: string;
+    environmentId: string;
+    environmentName: string;
+    roleId: string;
+    roleName: string;
+}
+
+function buildStorageKey(environments: ConnectedEnvironment[]): string {
+    const environmentKey = environments.map(({ connection }) => connection.url.replace(/\/$/, "").toLowerCase()).join("|");
+    return `${STORAGE_PREFIX}:${environmentKey}`;
 }
 
 function readSavedSelections(storageKey: string): SavedSelections | null {
@@ -110,11 +134,15 @@ function readSavedSelections(storageKey: string): SavedSelections | null {
         if (!raw) return null;
 
         const parsed = JSON.parse(raw) as Partial<SavedSelections>;
-        if (parsed.version !== 1) return null;
+        if (parsed.version !== 2) return null;
 
         return {
-            version: 1,
+            version: 2,
+            baseEnvironmentId: typeof parsed.baseEnvironmentId === "string" ? parsed.baseEnvironmentId : "",
             baseRoleId: typeof parsed.baseRoleId === "string" ? parsed.baseRoleId : "",
+            compareEnvironmentIds: Array.isArray(parsed.compareEnvironmentIds)
+                ? parsed.compareEnvironmentIds.filter((value): value is string => typeof value === "string")
+                : [],
             compareRoleIds: Array.isArray(parsed.compareRoleIds) ? parsed.compareRoleIds.filter((value): value is string => typeof value === "string") : [],
         };
     } catch {
@@ -142,18 +170,88 @@ function getRoleDisplayName(role: SecurityRole, duplicateNames: Set<string>): st
     return role.name;
 }
 
-function normalizeSelections(preferredIds: string[], validIds: Set<string>, disallowIds: Set<string> = new Set<string>()): string[] {
-    const seen = new Set<string>();
-    const normalized: string[] = [];
+interface RoleComboboxProps {
+    roles: SecurityRole[];
+    selectedRoleId: string;
+    placeholder: string;
+    ariaLabel: string;
+    disabled: boolean;
+    onChange: (roleId: string) => void;
+}
 
-    for (const id of preferredIds) {
-        if (!id || !validIds.has(id) || disallowIds.has(id) || seen.has(id)) continue;
-        seen.add(id);
-        normalized.push(id);
-        if (normalized.length === MAX_COMPARE_ROLES) break;
-    }
+function RoleCombobox({ roles, selectedRoleId, placeholder, ariaLabel, disabled, onChange }: RoleComboboxProps) {
+    const duplicateNames = useMemo(() => {
+        const counts = new Map<string, number>();
+        for (const role of roles) counts.set(role.name, (counts.get(role.name) ?? 0) + 1);
+        return new Set(Array.from(counts.entries()).filter(([, count]) => count > 1).map(([name]) => name));
+    }, [roles]);
+    const selectedRole = roles.find((role) => role.roleid === selectedRoleId);
+    const selectedLabel = selectedRole ? getRoleDisplayName(selectedRole, duplicateNames) : "";
+    const [inputValue, setInputValue] = useState(selectedLabel);
 
-    return normalized;
+    useEffect(() => {
+        setInputValue(selectedLabel);
+    }, [selectedLabel]);
+
+    const normalizedSearch = inputValue.trim().toLowerCase();
+    const isSelectedLabel = normalizedSearch === selectedLabel.toLowerCase();
+    const matchingRoles =
+        !normalizedSearch || isSelectedLabel
+            ? roles
+            : roles.filter((role) => getRoleDisplayName(role, duplicateNames).toLowerCase().includes(normalizedSearch));
+    const unmanagedRoles = matchingRoles.filter((role) => !role.ismanaged);
+    const managedRoles = matchingRoles.filter((role) => role.ismanaged);
+
+    return (
+        <Combobox
+            className="role-combobox"
+            size="small"
+            inlinePopup
+            value={inputValue}
+            selectedOptions={selectedRoleId ? [selectedRoleId] : []}
+            placeholder={placeholder}
+            aria-label={ariaLabel}
+            disabled={disabled}
+            onChange={(event) => {
+                const value = event.target.value;
+                setInputValue(value);
+                if (!value) onChange("");
+            }}
+            onFocus={(event) => (event.target as HTMLInputElement).select()}
+            onBlur={() => setInputValue(selectedLabel)}
+            onOptionSelect={(_, data) => {
+                const roleId = data.optionValue ?? "";
+                const role = roles.find((candidate) => candidate.roleid === roleId);
+                onChange(roleId);
+                setInputValue(role ? getRoleDisplayName(role, duplicateNames) : "");
+            }}
+        >
+            {unmanagedRoles.length > 0 && (
+                <OptionGroup label={getRoleGroupLabel(false)}>
+                    {unmanagedRoles.map((role) => {
+                        const label = getRoleDisplayName(role, duplicateNames);
+                        return (
+                            <Option className="role-option" key={role.roleid} value={role.roleid} text={label}>
+                                {label}
+                            </Option>
+                        );
+                    })}
+                </OptionGroup>
+            )}
+            {managedRoles.length > 0 && (
+                <OptionGroup label={getRoleGroupLabel(true)}>
+                    {managedRoles.map((role) => {
+                        const label = getRoleDisplayName(role, duplicateNames);
+                        return (
+                            <Option className="role-option" key={role.roleid} value={role.roleid} text={label}>
+                                {label}
+                            </Option>
+                        );
+                    })}
+                </OptionGroup>
+            )}
+        </Combobox>
+    );
 }
 
 /** Renders the Fluent icon representing a privilege depth level. */
@@ -161,7 +259,7 @@ function DepthIcon({ depth, muted }: { depth: PrivilegeDepth; muted?: boolean })
     const { Icon, color } = DEPTH_ICON[depth] ?? DEPTH_ICON[PrivilegeDepth.None];
     return (
         <Tooltip content={DEPTH_LABELS[depth]} relationship="label">
-            <Icon className={`depth-icon${muted ? " depth-icon-muted" : ""}`} style={{ color }} aria-label={DEPTH_LABELS[depth]} />
+            <Icon className={`depth-icon depth-icon-${depth}${muted ? " depth-icon-muted" : ""}`} style={{ color }} aria-label={DEPTH_LABELS[depth]} />
         </Tooltip>
     );
 }
@@ -187,21 +285,24 @@ function markdownCell(value: string): string {
 }
 
 export default function App() {
-    const [roles, setRoles] = useState<SecurityRole[]>([]);
+    const [environments, setEnvironments] = useState<ConnectedEnvironment[]>([]);
     const [loadingEnvironment, setLoadingEnvironment] = useState(false);
     const [loadingRoles, setLoadingRoles] = useState(false);
+    const [baseEnvironmentId, setBaseEnvironmentId] = useState("");
     const [baseRoleId, setBaseRoleId] = useState<string>("");
+    const [compareEnvironmentIds, setCompareEnvironmentIds] = useState<string[]>([""]);
     const [compareRoleIds, setCompareRoleIds] = useState<string[]>([""]);
     const [comparing, setComparing] = useState(false);
     const [comparisonData, setComparisonData] = useState<ParsedPrivilege[]>([]);
     const [comparedRoleIds, setComparedRoleIds] = useState<string[]>([]);
+    const [comparedRoles, setComparedRoles] = useState<ComparedRole[]>([]);
     const [hasComparedOnce, setHasComparedOnce] = useState(false);
     const [error, setError] = useState<string>("");
     const [searchTerm, setSearchTerm] = useState("");
     const [diffFilter, setDiffFilter] = useState<DiffFilter>("differences");
     const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
     const [selectedOperations, setSelectedOperations] = useState<string[]>([]);
-    const connectorRef = useRef<DataverseConnector | null>(null);
+    const [parentRolesOnly, setParentRolesOnly] = useState(true);
     const storageKeyRef = useRef<string>("");
     const initializedRef = useRef(false);
 
@@ -213,57 +314,98 @@ export default function App() {
         if (!initializedRef.current || !storageKeyRef.current) return;
 
         saveSavedSelections(storageKeyRef.current, {
-            version: 1,
+            version: 2,
+            baseEnvironmentId,
             baseRoleId,
-            compareRoleIds: compareRoleIds.filter((id) => id !== ""),
+            compareEnvironmentIds,
+            compareRoleIds,
         });
-    }, [baseRoleId, compareRoleIds]);
+    }, [baseEnvironmentId, baseRoleId, compareEnvironmentIds, compareRoleIds]);
 
-    const getSelectionDefaults = (availableRoles: SecurityRole[], savedSelections: SavedSelections | null): RoleSelections => {
-        const validRoleIds = new Set(availableRoles.map((role) => role.roleid));
+    const getSelectionDefaults = (availableEnvironments: ConnectedEnvironment[], savedSelections: SavedSelections | null): RoleSelections => {
+        const defaultEnvironmentId = availableEnvironments[0]?.connection.id ?? "";
+        const environmentById = new Map(availableEnvironments.map((environment) => [environment.connection.id, environment]));
+        const savedBaseEnvironmentId = savedSelections?.baseEnvironmentId ?? "";
+        const nextBaseEnvironmentId = environmentById.has(savedBaseEnvironmentId) ? savedBaseEnvironmentId : defaultEnvironmentId;
+        const baseRoles = environmentById.get(nextBaseEnvironmentId)?.roles ?? [];
+        const nextBaseRoleId = savedSelections?.baseRoleId && baseRoles.some((role) => role.roleid === savedSelections.baseRoleId) ? savedSelections.baseRoleId : "";
+        const nextCompareEnvironmentIds: string[] = [];
+        const nextCompareRoleIds: string[] = [];
+        const usedSelections = new Set(nextBaseRoleId ? [`${nextBaseEnvironmentId}:${nextBaseRoleId}`] : []);
 
-        const baseId = savedSelections?.baseRoleId && validRoleIds.has(savedSelections.baseRoleId) ? savedSelections.baseRoleId : "";
-        const compareIds = savedSelections ? normalizeSelections(savedSelections.compareRoleIds, validRoleIds, new Set(baseId ? [baseId] : [])) : [];
+        for (let index = 0; index < Math.min(savedSelections?.compareRoleIds.length ?? 0, MAX_COMPARE_ROLES); index++) {
+            const environmentId = environmentById.has(savedSelections?.compareEnvironmentIds[index] ?? "")
+                ? savedSelections!.compareEnvironmentIds[index]
+                : defaultEnvironmentId;
+            const roleId = savedSelections!.compareRoleIds[index] ?? "";
+            const roles = environmentById.get(environmentId)?.roles ?? [];
+            const selectionKey = `${environmentId}:${roleId}`;
+            nextCompareEnvironmentIds.push(environmentId);
+            nextCompareRoleIds.push(roleId && roles.some((role) => role.roleid === roleId) && !usedSelections.has(selectionKey) ? roleId : "");
+            if (nextCompareRoleIds[index]) usedSelections.add(selectionKey);
+        }
 
         return {
-            baseRoleId: baseId,
-            compareRoleIds: compareIds.length > 0 ? compareIds : [""],
+            baseEnvironmentId: nextBaseEnvironmentId,
+            baseRoleId: nextBaseRoleId,
+            compareEnvironmentIds: nextCompareEnvironmentIds.length > 0 ? nextCompareEnvironmentIds : [defaultEnvironmentId],
+            compareRoleIds: nextCompareRoleIds.length > 0 ? nextCompareRoleIds : [""],
         };
     };
 
-    const applySelectionDefaults = ({ baseRoleId: nextBaseRoleId, compareRoleIds: nextCompareRoleIds }: RoleSelections) => {
+    const applySelectionDefaults = ({
+        baseEnvironmentId: nextBaseEnvironmentId,
+        baseRoleId: nextBaseRoleId,
+        compareEnvironmentIds: nextCompareEnvironmentIds,
+        compareRoleIds: nextCompareRoleIds,
+    }: RoleSelections) => {
+        setBaseEnvironmentId(nextBaseEnvironmentId);
         setBaseRoleId(nextBaseRoleId);
+        setCompareEnvironmentIds(nextCompareEnvironmentIds);
         setCompareRoleIds(nextCompareRoleIds);
     };
 
-    const loadEnvironment = async (): Promise<RoleSelections | null> => {
+    const loadEnvironment = async (): Promise<{ selections: RoleSelections; environments: ConnectedEnvironment[] } | null> => {
         setLoadingEnvironment(true);
         setError("");
 
         try {
             if (!window.toolboxAPI) throw new Error("Toolbox API not available");
-            const conn = await window.toolboxAPI.connections.getActiveConnection();
-            if (!conn?.url) throw new Error("No active connection found. Please connect to a Dataverse environment first.");
+            const connectionSlots = await window.toolboxAPI.connections.getConnections();
+            const connectedSlots = connectionSlots
+                .map((connection, slot) => ({ connection, slot }))
+                .filter((entry): entry is { connection: ToolBoxAPI.Connection; slot: number } => entry.connection !== null)
+                .slice(0, MAX_ENVIRONMENTS);
+            if (connectedSlots.length === 0) throw new Error("No active connection found. Please connect to a Dataverse environment first.");
 
-            connectorRef.current = new DataverseConnector(conn.url);
-            storageKeyRef.current = buildStorageKey(conn.url);
+            const loadedEnvironments = await Promise.all(
+                connectedSlots.map(async ({ connection, slot }): Promise<ConnectedEnvironment> => {
+                    const connector = new DataverseConnector(connection.url, slot);
+                    return {
+                        connection,
+                        slot,
+                        connector,
+                        roles: await connector.fetchRoles(undefined, parentRolesOnly),
+                    };
+                }),
+            );
+            setEnvironments(loadedEnvironments);
+            storageKeyRef.current = buildStorageKey(loadedEnvironments);
 
             const savedSelections = readSavedSelections(storageKeyRef.current);
-            const fetchedRoles = await connectorRef.current.fetchRoles();
-            setRoles(fetchedRoles);
-
-            const resolvedSelections = getSelectionDefaults(fetchedRoles, savedSelections);
+            const resolvedSelections = getSelectionDefaults(loadedEnvironments, savedSelections);
             applySelectionDefaults(resolvedSelections);
 
             setComparisonData([]);
             setComparedRoleIds([]);
-            initializedRef.current = fetchedRoles.length > 0;
+            setComparedRoles([]);
+            initializedRef.current = loadedEnvironments.some((environment) => environment.roles.length > 0);
 
-            if (!fetchedRoles.length) {
+            if (!initializedRef.current) {
                 setError("No security roles were found in the connected environment.");
             }
 
-            return resolvedSelections;
+            return { selections: resolvedSelections, environments: loadedEnvironments };
         } catch (err: any) {
             setError(err.message || "Failed to load security roles");
             return null;
@@ -274,9 +416,15 @@ export default function App() {
     };
 
     const runRefreshAndComparison = async () => {
-        const refreshedSelections = await loadEnvironment();
-        if (!refreshedSelections) return;
-        await runComparisonWith(refreshedSelections.baseRoleId, refreshedSelections.compareRoleIds);
+        const refreshed = await loadEnvironment();
+        if (!refreshed) return;
+        await runComparisonWith(
+            refreshed.selections.baseEnvironmentId,
+            refreshed.selections.baseRoleId,
+            refreshed.selections.compareEnvironmentIds,
+            refreshed.selections.compareRoleIds,
+            refreshed.environments,
+        );
     };
 
     const runPrimaryAction = async () => {
@@ -290,32 +438,104 @@ export default function App() {
     const addCompareSlot = () => {
         if (compareRoleIds.length < MAX_COMPARE_ROLES) {
             setCompareRoleIds((prev) => [...prev, ""]);
+            setCompareEnvironmentIds((prev) => [...prev, baseEnvironmentId || environments[0]?.connection.id || ""]);
         }
     };
 
     const removeCompareSlot = (index: number) => {
         setCompareRoleIds((prev) => prev.filter((_, i) => i !== index));
+        setCompareEnvironmentIds((prev) => prev.filter((_, i) => i !== index));
     };
 
     const setCompareRole = (index: number, value: string) => {
         setCompareRoleIds((prev) => prev.map((id, i) => (i === index ? value : id)));
     };
 
+    const setCompareEnvironment = (index: number, environmentId: string) => {
+        setCompareEnvironmentIds((prev) => prev.map((id, i) => (i === index ? environmentId : id)));
+        setCompareRole(index, "");
+    };
+
+    const setParentRoleFilter = async (checked: boolean) => {
+        if (environments.length === 0) return;
+
+        setParentRolesOnly(checked);
+        setLoadingRoles(true);
+        setError("");
+
+        try {
+            const reloadedEnvironments = await Promise.all(
+                environments.map(async (environment): Promise<ConnectedEnvironment> => {
+                    environment.connector.clearRoleCache();
+                    return {
+                        ...environment,
+                        roles: await environment.connector.fetchRoles(undefined, checked),
+                    };
+                }),
+            );
+            setEnvironments(reloadedEnvironments);
+
+            const resolvedSelections = getSelectionDefaults(reloadedEnvironments, {
+                version: 2,
+                baseEnvironmentId,
+                baseRoleId,
+                compareEnvironmentIds,
+                compareRoleIds,
+            });
+            applySelectionDefaults(resolvedSelections);
+        } catch (err: any) {
+            setParentRolesOnly(!checked);
+            setError(err.message || "Failed to load security roles");
+            await DataverseConnector.showMessage("Error", err.message || "Failed to load security roles", "error");
+        } finally {
+            setLoadingRoles(false);
+        }
+    };
+
     const canCompare = !!baseRoleId && compareRoleIds.some((id) => id !== "");
 
-    const runComparisonWith = async (baseId: string, compareIds: string[]) => {
-        if (!connectorRef.current) return;
-        const activeCompareIds = compareIds.filter((id) => id !== "");
-        if (!baseId || activeCompareIds.length === 0) return;
+    const runComparisonWith = async (
+        baseEnvironment: string,
+        baseId: string,
+        compareEnvironments: string[],
+        compareIds: string[],
+        availableEnvironments = environments,
+    ) => {
+        const environmentById = new Map(availableEnvironments.map((environment) => [environment.connection.id, environment]));
+        const selectedSlots = [
+            { environmentId: baseEnvironment, roleId: baseId },
+            ...compareIds.map((roleId, index) => ({ environmentId: compareEnvironments[index], roleId })).filter(({ roleId }) => roleId),
+        ];
+        if (!baseId || selectedSlots.length < 2) return;
 
         setComparing(true);
         setError("");
         setComparisonData([]);
         try {
-            const allIds = [baseId, ...activeCompareIds];
-            const data = await connectorRef.current.buildComparisonData(allIds);
+            const comparisonSelections = selectedSlots.map(({ environmentId, roleId }, index) => {
+                const environment = environmentById.get(environmentId);
+                if (!environment) throw new Error("A selected environment is no longer available.");
+                const role = environment.roles.find((candidate) => candidate.roleid === roleId);
+                if (!role) throw new Error("A selected security role is no longer available.");
+                const selectionKey = `${index}:${environmentId}:${roleId}`;
+                return {
+                    connector: environment.connector,
+                    roleId,
+                    selectionKey,
+                    comparedRole: {
+                        selectionKey,
+                        environmentId,
+                        environmentName: environment.connection.name,
+                        roleId,
+                        roleName: role.name,
+                    },
+                };
+            });
+            const data = await DataverseConnector.buildCrossEnvironmentComparison(comparisonSelections);
+            const nextComparedRoles = comparisonSelections.map(({ comparedRole }) => comparedRole);
             setComparisonData(data);
-            setComparedRoleIds(allIds);
+            setComparedRoleIds(nextComparedRoles.map(({ selectionKey }) => selectionKey));
+            setComparedRoles(nextComparedRoles);
             setHasComparedOnce(true);
         } catch (err: any) {
             setError(err.message || "Comparison failed");
@@ -325,31 +545,29 @@ export default function App() {
         }
     };
 
-    const runComparison = () => runComparisonWith(baseRoleId, compareRoleIds);
+    const runComparison = () => runComparisonWith(baseEnvironmentId, baseRoleId, compareEnvironmentIds, compareRoleIds);
 
     // Swap a compare-slot role with the current base role, then refresh the comparison.
     const setCompareRoleAsBase = async (index: number) => {
         const promotedRoleId = compareRoleIds[index];
         if (!promotedRoleId) return;
+        const promotedEnvironmentId = compareEnvironmentIds[index];
         const nextCompareIds = compareRoleIds.map((id, i) => (i === index ? baseRoleId : id));
+        const nextCompareEnvironmentIds = compareEnvironmentIds.map((id, i) => (i === index ? baseEnvironmentId : id));
+        setBaseEnvironmentId(promotedEnvironmentId);
         setBaseRoleId(promotedRoleId);
+        setCompareEnvironmentIds(nextCompareEnvironmentIds);
         setCompareRoleIds(nextCompareIds);
-        await runComparisonWith(promotedRoleId, nextCompareIds);
+        await runComparisonWith(promotedEnvironmentId, promotedRoleId, nextCompareEnvironmentIds, nextCompareIds);
     };
 
-    const getRoleName = (roleId: string) => roles.find((r) => r.roleid === roleId)?.name ?? roleId;
+    const getRoleName = (selectionKey: string) => {
+        const comparedRole = comparedRoles.find((role) => role.selectionKey === selectionKey);
+        if (!comparedRole) return selectionKey;
+        return environments.length > 1 ? `${comparedRole.roleName} (${comparedRole.environmentName})` : comparedRole.roleName;
+    };
 
     const getEntityLabel = (priv: ParsedPrivilege) => `${priv.entityDisplayName} (${priv.entitySchemaName})`;
-
-    const unmanagedRoles = roles.filter((role) => !role.ismanaged);
-    const managedRoles = roles.filter((role) => role.ismanaged);
-    const duplicateRoleNames = useMemo(() => {
-        const counts = new Map<string, number>();
-        for (const role of roles) {
-            counts.set(role.name, (counts.get(role.name) ?? 0) + 1);
-        }
-        return new Set(Array.from(counts.entries()).filter(([, count]) => count > 1).map(([name]) => name));
-    }, [roles]);
 
     const baseRoleForResults = comparedRoleIds[0];
 
@@ -494,24 +712,39 @@ export default function App() {
                 <div className="selector-row">
                     <div className="role-selector-group">
                         <label className="role-label base-label">Base Role</label>
-                        <div className="select-wrapper">
-                            <select className="role-select" value={baseRoleId} onChange={(e) => setBaseRoleId(e.target.value)} disabled={loadingEnvironment || loadingRoles}>
-                                <option value="">— Select base role —</option>
-                                <optgroup label={getRoleGroupLabel(false)}>
-                                    {unmanagedRoles.map((role) => (
-                                        <option key={role.roleid} value={role.roleid}>
-                                            {getRoleDisplayName(role, duplicateRoleNames)}
-                                        </option>
-                                    ))}
-                                </optgroup>
-                                <optgroup label={getRoleGroupLabel(true)}>
-                                    {managedRoles.map((role) => (
-                                        <option key={role.roleid} value={role.roleid}>
-                                            {getRoleDisplayName(role, duplicateRoleNames)}
-                                        </option>
-                                    ))}
-                                </optgroup>
+                        {environments.length > 1 && (
+                            <select
+                                className="environment-select"
+                                value={baseEnvironmentId}
+                                onChange={(event) => {
+                                    setBaseEnvironmentId(event.target.value);
+                                    setBaseRoleId("");
+                                }}
+                                disabled={loadingEnvironment || loadingRoles}
+                                aria-label="Base role environment"
+                            >
+                                {environments.map(({ connection }) => (
+                                    <option key={connection.id} value={connection.id}>
+                                        {connection.name}
+                                    </option>
+                                ))}
                             </select>
+                        )}
+                        <div className="select-wrapper">
+                            <RoleCombobox
+                                roles={(environments.find(({ connection }) => connection.id === baseEnvironmentId)?.roles ?? []).filter(
+                                    (role) =>
+                                        role.roleid === baseRoleId ||
+                                        !compareRoleIds.some(
+                                            (compareRoleId, index) => compareEnvironmentIds[index] === baseEnvironmentId && compareRoleId === role.roleid,
+                                        ),
+                                )}
+                                selectedRoleId={baseRoleId}
+                                placeholder="Select or search base role"
+                                ariaLabel="Select or search base role"
+                                disabled={loadingEnvironment || loadingRoles}
+                                onChange={setBaseRoleId}
+                            />
                         </div>
                     </div>
 
@@ -526,33 +759,42 @@ export default function App() {
                                         </button>
                                     )}
                                 </label>
-                                <div className="select-wrapper compare-select-row">
+                                {environments.length > 1 && (
                                     <select
-                                        className="role-select"
-                                        value={id}
-                                        onChange={(e) => setCompareRole(idx, e.target.value)}
+                                        className="environment-select"
+                                        value={compareEnvironmentIds[idx] ?? environments[0]?.connection.id ?? ""}
+                                        onChange={(event) => setCompareEnvironment(idx, event.target.value)}
                                         disabled={loadingEnvironment || loadingRoles}
+                                        aria-label={`Comparison role ${idx + 1} environment`}
                                     >
-                                        <option value="">— Select role —</option>
-                                        <optgroup label={getRoleGroupLabel(false)}>
-                                            {unmanagedRoles
-                                                .filter((role) => role.roleid !== baseRoleId && !compareRoleIds.some((cid, ci) => ci !== idx && cid === role.roleid))
-                                                .map((role) => (
-                                                    <option key={role.roleid} value={role.roleid}>
-                                                        {getRoleDisplayName(role, duplicateRoleNames)}
-                                                    </option>
-                                                ))}
-                                        </optgroup>
-                                        <optgroup label={getRoleGroupLabel(true)}>
-                                            {managedRoles
-                                                .filter((role) => role.roleid !== baseRoleId && !compareRoleIds.some((cid, ci) => ci !== idx && cid === role.roleid))
-                                                .map((role) => (
-                                                    <option key={role.roleid} value={role.roleid}>
-                                                        {getRoleDisplayName(role, duplicateRoleNames)}
-                                                    </option>
-                                                ))}
-                                        </optgroup>
+                                        {environments.map(({ connection }) => (
+                                            <option key={connection.id} value={connection.id}>
+                                                {connection.name}
+                                            </option>
+                                        ))}
                                     </select>
+                                )}
+                                <div className="select-wrapper compare-select-row">
+                                    <RoleCombobox
+                                        roles={(environments.find(({ connection }) => connection.id === compareEnvironmentIds[idx])?.roles ?? []).filter(
+                                            (role) =>
+                                                role.roleid === id ||
+                                                !(
+                                                    (compareEnvironmentIds[idx] === baseEnvironmentId && role.roleid === baseRoleId) ||
+                                                    compareRoleIds.some(
+                                                        (compareId, compareIndex) =>
+                                                            compareIndex !== idx &&
+                                                            compareEnvironmentIds[compareIndex] === compareEnvironmentIds[idx] &&
+                                                            compareId === role.roleid,
+                                                    )
+                                                ),
+                                        )}
+                                        selectedRoleId={id}
+                                        placeholder="Select or search role"
+                                        ariaLabel={`Select or search comparison role ${idx + 1}`}
+                                        disabled={loadingEnvironment || loadingRoles}
+                                        onChange={(roleId) => setCompareRole(idx, roleId)}
+                                    />
                                     {compareRoleIds.length > 1 && (
                                         <button
                                             type="button"
@@ -576,6 +818,12 @@ export default function App() {
                     </div>
 
                     <div className="selector-actions">
+                        <Switch
+                            checked={parentRolesOnly}
+                            onChange={(_, data) => void setParentRoleFilter(data.checked)}
+                            label="Parent roles only"
+                            disabled={loadingEnvironment || loadingRoles}
+                        />
                         {loadingEnvironment || loadingRoles ? (
                             <Spinner size="tiny" label="Loading selections…" labelPosition="after" />
                         ) : (
@@ -620,13 +868,17 @@ export default function App() {
                         ))}
                     </select>
                     <Dropdown
-                        className="multi-filter"
+                        className="multi-filter group-filter"
                         size="small"
                         multiselect
                         placeholder="Groups"
                         listbox={{ className: "filter-listbox" }}
                         selectedOptions={selectedCategories}
-                        value={multiSelectSummary(selectedCategories, availableCategories, "groups")}
+                        value={groupSelectionSummary(selectedCategories)}
+                        button={{
+                            children: <span className="multi-filter-summary">{groupSelectionSummary(selectedCategories)}</span>,
+                        }}
+                        title={groupSelectionSummary(selectedCategories)}
                         onOptionSelect={(_e, data) => setSelectedCategories((prev) => toggleMultiSelect(data.optionValue ?? "", prev, availableCategories))}
                         aria-label="Filter by group"
                     >
@@ -640,13 +892,17 @@ export default function App() {
                         ))}
                     </Dropdown>
                     <Dropdown
-                        className="multi-filter"
+                        className="multi-filter operation-filter"
                         size="small"
                         multiselect
                         placeholder="Operations"
                         listbox={{ className: "filter-listbox" }}
                         selectedOptions={selectedOperations}
-                        value={multiSelectSummary(selectedOperations, availableOperations, "operations")}
+                        value={operationSelectionSummary(selectedOperations)}
+                        button={{
+                            children: <span className="multi-filter-summary">{operationSelectionSummary(selectedOperations)}</span>,
+                        }}
+                        title={operationSelectionSummary(selectedOperations)}
                         onOptionSelect={(_e, data) => setSelectedOperations((prev) => toggleMultiSelect(data.optionValue ?? "", prev, availableOperations))}
                         aria-label="Filter by operation"
                     >

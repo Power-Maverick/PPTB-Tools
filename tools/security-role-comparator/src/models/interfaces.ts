@@ -8,6 +8,7 @@ export interface SecurityRole {
     issystemgenerated?: boolean;
     isinherited?: number;
     canbedeleted?: boolean;
+    parentroleid?: string;
     _businessunitid_value?: string;
     businessunitName?: string;
 }

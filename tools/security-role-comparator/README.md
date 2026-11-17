@@ -1,6 +1,6 @@
 # Security Role Comparator
 
-Compare one security role against multiple other roles in Dataverse—side by side, privilege by privilege, with combined permission analysis.
+Compare one security role against multiple other roles across up to five Dataverse environments—side by side, privilege by privilege, with combined permission analysis.
 
 ## Table of Contents
 
@@ -29,6 +29,9 @@ Compare one security role against multiple other roles in Dataverse—side by si
 - ✅ React 18 with TypeScript
 - ✅ Vite for fast development and optimized builds
 - ✅ Compare base role against up to 5 other roles simultaneously
+- ✅ Compare roles across up to 5 linked Dataverse environments
+- ✅ Searchable base and comparison role selectors
+- ✅ Parent-role-only selector filter, enabled by default
 - ✅ Category grouping (Tables, Miscellaneous, Privacy Related)
 - ✅ Accurate privilege mapping from entity metadata
 - ✅ Depth icons for visual permission levels
@@ -85,6 +88,8 @@ npm run preview
 3. Install the tool in Power Platform ToolBox through the UI
 
 4. Use Security Role Comparator:
+    - Leave **Parent roles only** enabled to hide business-unit child copies, or turn it off to show every role
+    - When multiple environments are linked, choose an environment above each base or comparison role selector
     - Select a base role
     - Choose up to 5 comparison roles
     - Click Compare to analyze privileges
@@ -100,10 +105,11 @@ The tool displays privileges in a grid showing:
 
 - Base role permissions in the first column
 - Comparison roles in subsequent columns
+- Environment names in role headings when comparing across multiple environments
 - Color-coded difference indicators (green + for more, red - for less)
 - Category grouping like the native Dataverse role editor
 
-Select roles are remembered per environment for quick re-comparison.
+Role and environment selections are remembered for each linked environment set. Equivalent privileges are matched by privilege name so roles remain comparable when record identifiers differ between environments.
 
 ### Combined Permission Analysis
 

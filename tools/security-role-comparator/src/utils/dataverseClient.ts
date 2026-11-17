@@ -44,12 +44,20 @@ function normalizeKey(value: string): string {
 }
 
 export class DataverseConnector {
-    constructor(_envUrl: string) {}
+    constructor(
+        _envUrl: string,
+        private readonly connectionTarget: number = 0,
+    ) {}
     private readonly entityDisplayCache = new Map<string, EntityDisplayInfo | null>();
     private roleEditorLayoutMaps: RoleEditorLayoutMaps | null = null;
     private entityPrivilegeIndex: EntityPrivilegeIndex | null = null;
-    private allRolesCache: SecurityRole[] | null = null;
+    private readonly allRolesCache = new Map<boolean, SecurityRole[]>();
     private roleIdsBySolutionCache: Map<string, Set<string>> | null = null;
+
+    clearRoleCache(): void {
+        this.allRolesCache.clear();
+        this.roleIdsBySolutionCache = null;
+    }
 
     private toQueryPath(queryOrUrl: string): string {
         if (!queryOrUrl.startsWith("http")) {
@@ -307,9 +315,10 @@ export class DataverseConnector {
     }
 
     /** Fetch every security role in the environment (cached), sorted by managed state then name. */
-    private async fetchAllRolesRaw(): Promise<SecurityRole[]> {
-        if (this.allRolesCache) {
-            return this.allRolesCache;
+    private async fetchAllRolesRaw(parentRolesOnly = false): Promise<SecurityRole[]> {
+        const cachedRoles = this.allRolesCache.get(parentRolesOnly);
+        if (cachedRoles) {
+            return cachedRoles;
         }
 
         const selects = [
@@ -320,11 +329,13 @@ export class DataverseConnector {
             "_roletemplateid_value",
             "isautoassigned",
             "issytemgenerated",
+            "_parentroleid_value",
             "_businessunitid_value",
         ];
-        const query = `roles?$select=${selects.join(",")}&$orderby=ismanaged asc,name asc&$top=5000`;
+        const parentRoleFilter = parentRolesOnly ? "&$filter=_parentroleid_value eq null" : "";
+        const query = `roles?$select=${selects.join(",")}${parentRoleFilter}&$orderby=ismanaged asc,name asc&$top=5000`;
         const rows = await this.fetchAllRecords(query);
-        this.allRolesCache = rows.map(
+        const roles = rows.map(
             (row: any): SecurityRole => ({
                 roleid: row.roleid,
                 name: row.name,
@@ -334,11 +345,13 @@ export class DataverseConnector {
                 isautoassigned: row.isautoassigned,
                 // NB: the role entity's logical name for this column is misspelled in Dataverse.
                 issystemgenerated: row.issytemgenerated,
+                parentroleid: row._parentroleid_value,
                 _businessunitid_value: row._businessunitid_value,
                 businessunitName: row["_businessunitid_value@OData.Community.Display.V1.FormattedValue"],
             }),
         );
-        return this.allRolesCache;
+        this.allRolesCache.set(parentRolesOnly, roles);
+        return roles;
     }
 
     /**
@@ -370,8 +383,8 @@ export class DataverseConnector {
     }
 
     /** Fetch the security roles contained in a solution (via solutioncomponent membership). */
-    async fetchRoles(solutionId?: string): Promise<SecurityRole[]> {
-        const allRoles = await this.fetchAllRolesRaw();
+    async fetchRoles(solutionId?: string, parentRolesOnly = false): Promise<SecurityRole[]> {
+        const allRoles = await this.fetchAllRolesRaw(parentRolesOnly);
         if (!solutionId) {
             return allRoles;
         }
@@ -543,6 +556,52 @@ export class DataverseConnector {
         return result;
     }
 
+    static async buildCrossEnvironmentComparison(
+        selections: Array<{ connector: DataverseConnector; roleId: string; selectionKey: string }>,
+    ): Promise<ParsedPrivilege[]> {
+        const datasets = await Promise.all(
+            selections.map(async ({ connector, roleId, selectionKey }) => ({
+                roleId,
+                selectionKey,
+                rows: await connector.buildComparisonData([roleId]),
+            })),
+        );
+        const selectionKeys = selections.map(({ selectionKey }) => selectionKey);
+        const merged = new Map<string, ParsedPrivilege>();
+
+        for (const { roleId, selectionKey, rows } of datasets) {
+            for (const row of rows) {
+                const privilegeKey = normalizeKey(row.rawName);
+                let mergedRow = merged.get(privilegeKey);
+                if (!mergedRow) {
+                    mergedRow = {
+                        ...row,
+                        privilegeid: privilegeKey,
+                        depthByRole: Object.fromEntries(selectionKeys.map((key) => [key, PrivilegeDepth.None])),
+                    };
+                    merged.set(privilegeKey, mergedRow);
+                }
+                mergedRow.depthByRole[selectionKey] = row.depthByRole[roleId] ?? PrivilegeDepth.None;
+            }
+        }
+
+        const result = Array.from(merged.values());
+        result.sort((a, b) => {
+            const kindCmp = CATEGORY_KIND_ORDER[a.categoryKind] - CATEGORY_KIND_ORDER[b.categoryKind];
+            if (kindCmp !== 0) return kindCmp;
+            const orderCmp = a.categoryOrder - b.categoryOrder;
+            if (orderCmp !== 0) return orderCmp;
+            const labelCmp = a.categoryLabel.localeCompare(b.categoryLabel);
+            if (labelCmp !== 0) return labelCmp;
+            const entityCmp = a.entityDisplayName.localeCompare(b.entityDisplayName);
+            if (entityCmp !== 0) return entityCmp;
+            const schemaCmp = a.entitySchemaName.localeCompare(b.entitySchemaName);
+            if (schemaCmp !== 0) return schemaCmp;
+            return operationRank(a.operation) - operationRank(b.operation);
+        });
+        return result;
+    }
+
     /**
      * Determine the OOB-style grouping category for a privilege. Table privileges (those that
      * resolve to an entity) group under their entity's role-editor tab; miscellaneous / privacy
@@ -594,7 +653,7 @@ export class DataverseConnector {
         if (!window.dataverseAPI) {
             throw new Error("Dataverse API not available");
         }
-        return await window.dataverseAPI.queryData(this.toQueryPath(queryPath));
+        return await window.dataverseAPI.queryData(this.toQueryPath(queryPath), this.connectionTarget);
     }
 
     static async showMessage(title: string, message: string, severity: "success" | "error" | "warning" | "info"): Promise<void> {
