@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Entity Field Catalog 1.1.7: updated `brace-expansion` 1.1.18 to 1.1.22 (high-severity advisories GHSA-qhr7-859c-m2p7 and GHSA-6j4f-fj2g-mc7p, plus moderate GHSA-q2hr-2g5m-vwhr), and dev-only `vite` 6.4.3 to 6.4.6 (GHSA-587h-7wmj-h5pm and others) and `source-map-js` 1.2.1 to 1.2.3 (GHSA-68fv-2mgg-jv7q) in `npm-shrinkwrap.json`.
+
 ### Added
 - Data Migrator: selectable sources and up to five destinations, repeated playlist combinations, destination-specific system mappings, and final migration confirmation.
 - Initial monorepo structure with npm workspaces
