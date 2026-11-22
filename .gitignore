@@ -145,3 +145,6 @@ tools/*/output/
 
 # Playwright files
 .playwright-mcp/
+
+# Visual Studio
+.vs/
